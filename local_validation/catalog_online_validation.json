@@ -1,0 +1,769 @@
+{
+  "mode": "kinematic",
+  "setup_objects": [
+    {
+      "id": "catalog-banana-1",
+      "label": "banana",
+      "shape": "compound",
+      "center": [
+        0.26,
+        -0.11999999999999998,
+        0.02
+      ],
+      "size": [
+        {
+          "shape": "capsule",
+          "size": [
+            0.02,
+            0.013719931674183167
+          ],
+          "pos": [
+            -0.04424935932628474,
+            -0.003096265014674627,
+            0.02
+          ],
+          "yaw": 0.3437500000000004,
+          "color_bgr": null
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.02,
+            0.013719931674183164
+          ],
+          "pos": [
+            -0.01770211511228921,
+            0.003096265014674634,
+            0.02
+          ],
+          "yaw": 0.11458333333333301,
+          "color_bgr": null
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.02,
+            0.013719931674183164
+          ],
+          "pos": [
+            0.009557811584639215,
+            0.003096265014674634,
+            0.02
+          ],
+          "yaw": -0.114583333333333,
+          "color_bgr": null
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.02,
+            0.013719931674183165
+          ],
+          "pos": [
+            0.03610505579863474,
+            -0.003096265014674627,
+            0.02
+          ],
+          "yaw": -0.34375000000000044,
+          "color_bgr": null
+        },
+        {
+          "shape": "capsule",
+          "size": [
+            0.006,
+            0.006
+          ],
+          "pos": [
+            0.0659692910004679,
+            -0.013786518576889003,
+            0.02
+          ],
+          "yaw": -0.34375000000000044,
+          "color_bgr": [
+            40,
+            75,
+            95
+          ]
+        }
+      ],
+      "dimensions": [
+        0.1414689595983931,
+        0.083601193446347,
+        0.04
+      ],
+      "yaw": -0.4,
+      "transform": [
+        [
+          0.9210609940028851,
+          0.3894183423086505,
+          0.0,
+          0.2649258535112413
+        ],
+        [
+          -0.3894183423086505,
+          0.9210609940028851,
+          0.0,
+          -0.11335040574731597
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "color_rgb": [
+        230,
+        200,
+        40
+      ],
+      "held": false,
+      "placed": false,
+      "zone": null
+    },
+    {
+      "id": "catalog-pear-1",
+      "label": "pear",
+      "shape": "compound",
+      "center": [
+        0.26,
+        0.07,
+        0.0625
+      ],
+      "size": [
+        {
+          "shape": "sphere",
+          "size": [
+            0.0425
+          ],
+          "pos": [
+            0.0,
+            0.0,
+            0.0425
+          ],
+          "yaw": 0.0,
+          "color_bgr": null
+        },
+        {
+          "shape": "ellipsoid",
+          "size": [
+            0.027,
+            0.027,
+            0.03
+          ],
+          "pos": [
+            0.0,
+            0.0,
+            0.078
+          ],
+          "yaw": 0.0,
+          "color_bgr": null
+        },
+        {
+          "shape": "ellipsoid",
+          "size": [
+            0.02,
+            0.02,
+            0.02
+          ],
+          "pos": [
+            0.0,
+            0.0,
+            0.097
+          ],
+          "yaw": 0.0,
+          "color_bgr": null
+        },
+        {
+          "shape": "cylinder",
+          "size": [
+            0.0025,
+            0.012
+          ],
+          "pos": [
+            0.0,
+            0.0,
+            0.119
+          ],
+          "yaw": 0.0,
+          "color_bgr": [
+            40,
+            75,
+            95
+          ]
+        }
+      ],
+      "dimensions": [
+        0.08499999999999999,
+        0.08500000000000002,
+        0.125
+      ],
+      "yaw": 0.6,
+      "transform": [
+        [
+          0.8253356149096783,
+          -0.5646424733950354,
+          0.0,
+          0.26
+        ],
+        [
+          0.5646424733950354,
+          0.8253356149096783,
+          0.0,
+          0.07
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "color_rgb": [
+        170,
+        190,
+        60
+      ],
+      "held": false,
+      "placed": false,
+      "zone": null
+    },
+    {
+      "id": "catalog-apple-1",
+      "label": "apple",
+      "shape": "sphere",
+      "center": [
+        0.35,
+        0.05,
+        0.031
+      ],
+      "size": [
+        0.031
+      ],
+      "dimensions": [
+        0.062000000000000055,
+        0.062,
+        0.062
+      ],
+      "yaw": 0.3,
+      "transform": [
+        [
+          0.955336489125606,
+          -0.29552020666133955,
+          0.0,
+          0.35
+        ],
+        [
+          0.29552020666133955,
+          0.955336489125606,
+          0.0,
+          0.05
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "color_rgb": [
+        185,
+        45,
+        45
+      ],
+      "held": false,
+      "placed": false,
+      "zone": null
+    }
+  ],
+  "paid_request_requested": true,
+  "result": {
+    "ok": true,
+    "stage": "done",
+    "error": "",
+    "label": "banana",
+    "zone": "zone_yellow",
+    "duration": 18.008,
+    "grasp_width": 0.04125473507983,
+    "fault": false,
+    "recovery": "",
+    "diagnostics": "",
+    "object_id": "v6-object-2",
+    "aborted": false,
+    "holding": false,
+    "scene": {
+      "scene_version": 8,
+      "objects": [
+        {
+          "label": "pear",
+          "score": 0.797,
+          "score_kind": "knn",
+          "bbox": [
+            138,
+            81,
+            296,
+            282
+          ],
+          "center_base": [
+            0.2875,
+            0.0543,
+            0.1108
+          ],
+          "top_z": 0.1108,
+          "height": 0.1108,
+          "yaw": -0.2912,
+          "length": 0.1453,
+          "width": 0.0692,
+          "n_points": 22197,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v8-object-1",
+          "in_zone": false,
+          "zone": null,
+          "view": 1
+        },
+        {
+          "label": "banana",
+          "score": 0.999,
+          "score_kind": "knn",
+          "bbox": [
+            259,
+            165,
+            410,
+            307
+          ],
+          "center_base": [
+            0.489,
+            -0.0033,
+            0.0399
+          ],
+          "top_z": 0.0399,
+          "height": 0.0399,
+          "yaw": 0.7849,
+          "length": 0.1355,
+          "width": 0.0443,
+          "n_points": 9287,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v8-object-2",
+          "in_zone": true,
+          "zone": "zone_yellow",
+          "view": 4
+        },
+        {
+          "label": "apple",
+          "score": 0.964,
+          "score_kind": "knn",
+          "bbox": [
+            178,
+            395,
+            287,
+            480
+          ],
+          "center_base": [
+            0.3591,
+            0.0464,
+            0.0613
+          ],
+          "top_z": 0.0613,
+          "height": 0.0613,
+          "yaw": 1.5175,
+          "length": 0.0539,
+          "width": 0.0386,
+          "n_points": 6998,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1,
+          "object_id": "v8-object-3",
+          "in_zone": false,
+          "zone": null,
+          "view": 4
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow",
+        "apple": "zone_red",
+        "banana": "zone_yellow",
+        "pear": "zone_green"
+      },
+      "task": "Sandbox",
+      "mode": "sim",
+      "observed_at": 1058.436205505521,
+      "warnings": []
+    },
+    "score": {
+      "correct": 1,
+      "wrong": 0,
+      "remaining": 2
+    },
+    "controller_ok": true,
+    "truth": {
+      "success": true,
+      "object_name": "catalog-banana-1",
+      "expected_zone": "zone_yellow",
+      "actual_zone": "zone_yellow"
+    },
+    "message": "已将香蕉放到黄色区域"
+  },
+  "observation": {
+    "scene_version": 6,
+    "objects": [
+      {
+        "label": "pear",
+        "score": 0.798,
+        "score_kind": "knn",
+        "bbox": [
+          138,
+          81,
+          296,
+          282
+        ],
+        "center_base": [
+          0.2874,
+          0.0543,
+          0.1108
+        ],
+        "top_z": 0.1108,
+        "height": 0.1108,
+        "yaw": -0.2898,
+        "length": 0.1451,
+        "width": 0.0691,
+        "n_points": 22196,
+        "valid": true,
+        "reject_reason": "",
+        "track_id": -1,
+        "object_id": "v6-object-1",
+        "in_zone": false,
+        "zone": null,
+        "view": 1
+      },
+      {
+        "label": "banana",
+        "score": 1.0,
+        "score_kind": "knn",
+        "bbox": [
+          438,
+          150,
+          536,
+          335
+        ],
+        "center_base": [
+          0.255,
+          -0.1091,
+          0.0398
+        ],
+        "top_z": 0.0398,
+        "height": 0.0398,
+        "yaw": -0.4005,
+        "length": 0.1317,
+        "width": 0.0461,
+        "n_points": 11327,
+        "valid": true,
+        "reject_reason": "",
+        "track_id": -1,
+        "object_id": "v6-object-2",
+        "in_zone": false,
+        "zone": null,
+        "view": 1
+      },
+      {
+        "label": "banana",
+        "score": 0.574,
+        "score_kind": "knn",
+        "bbox": [
+          614,
+          346,
+          640,
+          461
+        ],
+        "center_base": [
+          0.2192,
+          -0.0818,
+          0.0277
+        ],
+        "top_z": 0.0277,
+        "height": 0.0277,
+        "yaw": 0.1309,
+        "length": 0.0578,
+        "width": 0.0101,
+        "n_points": 1958,
+        "valid": false,
+        "reject_reason": "touches_image_border",
+        "track_id": -1,
+        "object_id": "v6-object-3",
+        "in_zone": false,
+        "zone": null,
+        "view": 2
+      },
+      {
+        "label": "apple",
+        "score": 0.973,
+        "score_kind": "knn",
+        "bbox": [
+          175,
+          395,
+          287,
+          480
+        ],
+        "center_base": [
+          0.3589,
+          0.0475,
+          0.0612
+        ],
+        "top_z": 0.0612,
+        "height": 0.0611,
+        "yaw": 1.5536,
+        "length": 0.0552,
+        "width": 0.0393,
+        "n_points": 7882,
+        "valid": false,
+        "reject_reason": "touches_image_border",
+        "track_id": -1,
+        "object_id": "v6-object-4",
+        "in_zone": false,
+        "zone": null,
+        "view": 4
+      },
+      {
+        "label": "unknown",
+        "score": 0.286,
+        "score_kind": "knn",
+        "bbox": [
+          0,
+          404,
+          15,
+          480
+        ],
+        "center_base": [
+          0.2835,
+          -0.1447,
+          0.0217
+        ],
+        "top_z": 0.0217,
+        "height": 0.0217,
+        "yaw": -0.6783,
+        "length": 0.0425,
+        "width": 0.0024,
+        "n_points": 742,
+        "valid": false,
+        "reject_reason": "touches_image_border",
+        "track_id": -1,
+        "object_id": "v6-object-5",
+        "in_zone": false,
+        "zone": null,
+        "view": 5
+      }
+    ],
+    "zones": [
+      {
+        "center": [
+          0.17,
+          0.35,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "green",
+        "name": "zone_green",
+        "color_rgb": [
+          60,
+          165,
+          70
+        ]
+      },
+      {
+        "center": [
+          0.49,
+          0.0,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "yellow",
+        "name": "zone_yellow",
+        "color_rgb": [
+          230,
+          205,
+          50
+        ]
+      },
+      {
+        "center": [
+          0.17,
+          -0.35,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "red",
+        "name": "zone_red",
+        "color_rgb": [
+          205,
+          55,
+          55
+        ]
+      }
+    ],
+    "class_to_zone": {
+      "red": "zone_red",
+      "green": "zone_green",
+      "yellow": "zone_yellow",
+      "apple": "zone_red",
+      "banana": "zone_yellow",
+      "pear": "zone_green"
+    },
+    "task": "Sandbox",
+    "mode": "sim",
+    "observed_at": 1026.1973864399226,
+    "warnings": []
+  },
+  "feedback": {
+    "grasp_plan": {
+      "label": "banana",
+      "length": 0.1317,
+      "width": 0.0461,
+      "height": 0.0398,
+      "expected_width": 0.05097645917992227,
+      "open_width": 0.1,
+      "close_width": 0.0,
+      "closing_angle_deg": 67.04752118620893,
+      "kind": "elongated",
+      "mode": "profile"
+    },
+    "checks": [
+      {
+        "stage": "close",
+        "ok": true,
+        "message": "闭合后检测到夹持",
+        "measured_width": 0.0413,
+        "expected_width": 0.05097645917992227
+      },
+      {
+        "stage": "dropped",
+        "ok": true,
+        "message": "抬升后夹持检查",
+        "measured_width": 0.04125473507983
+      },
+      {
+        "stage": "dropped_in_transit",
+        "ok": true,
+        "message": "搬运后夹持检查",
+        "measured_width": 0.04125473507983
+      },
+      {
+        "stage": "placement",
+        "ok": true,
+        "message": "已独立核验物品落入指定区域"
+      }
+    ]
+  },
+  "metrics": {
+    "requests": 1,
+    "successes": 1,
+    "model_requests": 1
+  },
+  "public_replies": [
+    "{\"scene_version\":6,\"action\":\"pick\",\"object_id\":\"v6-object-2\",\"zone_name\":\"zone_yellow\",\"message\":\"将香蕉放到黄色区域。\"}"
+  ],
+  "stream_lengths_seen": [
+    0,
+    110
+  ],
+  "error": ""
+}

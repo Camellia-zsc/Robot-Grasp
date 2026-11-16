@@ -26,6 +26,27 @@ def _square(cx, cy, side, step=0.002):
 # --------------------------------------------------------------------------- cap center
 
 
+def test_type_depth_limit_uses_measured_top_and_leaves_other_objects_unchanged():
+    cfg = make_cfg(robot__gripper__max_width=0.10, grasp__max_grasp_depth=0.04,
+                   grasp__max_grasp_depth_by_label={'pear': 0.025})
+    planner = GraspPlanner(cfg, 'L2')
+    pear = make_det('pear', 0.28, 0, size=0.049, length=0.075, height=0.112)
+    plan = planner.plan(pear)
+    assert plan.feasible
+    assert plan.T_grasp[2, 3] >= pear.top_z - 0.025
+    apple = make_det('apple', 0.28, 0, size=0.05, length=0.055, height=0.062)
+    original = GraspPlanner(make_cfg(robot__gripper__max_width=0.10,
+                                    grasp__max_grasp_depth=0.04), 'L2')
+    assert planner.plan(apple).T_grasp == pytest.approx(original.plan(apple).T_grasp)
+
+
+@pytest.mark.parametrize('depth', [0, 0.05, float('nan'), float('inf')])
+def test_type_depth_limit_refuses_values_outside_existing_depth_bounds(depth):
+    with pytest.raises(ValueError, match='max_grasp_depth_by_label'):
+        GraspPlanner(make_cfg(grasp__max_grasp_depth=0.04,
+                             grasp__max_grasp_depth_by_label={'pear': depth}), 'L2')
+
+
 def test_cap_center_is_the_grasp_point_when_close_to_the_footprint():
     gp = GraspPlanner(make_cfg(), 'L2')
     d = make_det('apple', 0.30, 0.05, size=0.048, length=0.056, height=0.062)

@@ -352,6 +352,13 @@ class GraspPlanner:
         self.max_depth = _float(cfg, 'grasp.max_grasp_depth', 0.030)
         if self.min_depth > self.max_depth:
             raise ValueError('grasp.min_grasp_depth > grasp.max_grasp_depth')
+        self.max_depth_by_label = {}
+        for label, value in (cfg.get('grasp.max_grasp_depth_by_label', {}) or {}).items():
+            depth = float(value)
+            if not math.isfinite(depth) or not self.min_depth <= depth <= self.max_depth:
+                raise ValueError('grasp.max_grasp_depth_by_label.%s must be between '
+                                 'min_grasp_depth and max_grasp_depth' % label)
+            self.max_depth_by_label[str(label)] = depth
         self.square_blocks = bool(cfg.get('grasp.block_labels_square', True))
         self.use_cap_center = bool(cfg.get('grasp.use_cap_center', True))
         #: grasp these labels at their stem (perception.stem, det.extra['stem_xy']) when it
@@ -391,6 +398,10 @@ class GraspPlanner:
     def _max_object(self, label: Optional[str]) -> float:
         """Widest footprint (m) grasped for label: grasp.fit_width or max_object_width."""
         return self.fit_width.get(str(label), self.max_object_width)
+
+    def _depth_limit(self, label: Optional[str]) -> float:
+        """Constrain a known shape's approach depth, e.g. a tall pear's neck."""
+        return self.max_depth_by_label.get(str(label), self.max_depth)
 
     def plan(self, det: Detection) -> GraspPlan:
         """Return a GraspPlan; feasible=False with a reason when it cannot be done."""
@@ -477,7 +488,7 @@ class GraspPlanner:
             info['stem'] = at_stem
         reason = ''
         if prof is None:
-            depth = min(max(self.depth_ratio * height, self.min_depth), self.max_depth)
+            depth = min(max(self.depth_ratio * height, self.min_depth), self._depth_limit(det.label))
             z_grasp = max(top - depth, z_floor)
             open_w = min(self.max_width, expected + self.open_margin)
             if expected > self._max_object(det.label):
@@ -525,7 +536,8 @@ class GraspPlanner:
         edges, widths = prof
         top_pts = float(edges[-1])
         fit = self._fit(det.label)
-        lo = max(z_floor, float(edges[0]) + self.min_grasp_height, top - self.max_depth)
+        depth_limit = self._depth_limit(det.label)
+        lo = max(z_floor, float(edges[0]) + self.min_grasp_height, top - depth_limit)
         hi = top - self.min_depth
         n = int(math.floor((hi - lo) / GRASP_Z_STEP + 1e-9)) + 1 if hi >= lo else 1
         zs = [lo + k * GRASP_Z_STEP for k in range(max(1, n))]
@@ -537,7 +549,7 @@ class GraspPlanner:
         if not ok:
             reason = ('too_wide: %s section %.3f m > %.3f m at every grasp height within the '
                       'finger reach (%.3f m below the top; widest %.3f m; gripper max_width '
-                      '%.3f m)' % (label, min(passed), fit, self.max_depth, widest,
+                      '%.3f m)' % (label, min(passed), fit, depth_limit, widest,
                                    self.max_width))
             return zs[0], min(passed), self.max_width, reason, info
         centers = (edges[:-1] + edges[1:]) / 2.0

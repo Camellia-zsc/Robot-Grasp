@@ -1,0 +1,127 @@
+"""Consolidate camera observations without consulting the simulated world.
+
+A clipped silhouette can contain surfaces from several already observed objects.
+Its fitted center is then too far away for the normal distance merge. Only an
+invalid observation whose measured geometry is explained by other views may be
+removed; incomplete, unsupported observations remain available for diagnosis.
+"""
+from __future__ import annotations
+
+import cv2
+import numpy as np
+
+from ..perception.geometry import points_in_polygon
+from ..task.views import MERGE_DIST, merge_view_detections, view_of
+
+_CELL = 0.002
+_MARGIN = 0.003
+_SURFACE_DISTANCE = 0.012
+_SUPPORT = 0.98
+_RESIDUAL_GAP = 0.006
+
+
+def _cloud(det):
+    try:
+        points = np.asarray((det.extra or {}).get('_points_base'), dtype=np.float32)
+    except (TypeError, ValueError):
+        return None
+    if (points.ndim != 2 or points.shape[1] != 3 or len(points) < 40
+            or not np.all(np.isfinite(points))):
+        return None
+    return np.ascontiguousarray(points)
+
+
+def _uniform(points):
+    # Equal spatial weight prevents a dense nearby surface from hiding a small
+    # but distinct unknown object in the same image component.
+    _, indices = np.unique(np.floor(points / _CELL).astype(np.int64),
+                           axis=0, return_index=True)
+    return np.ascontiguousarray(points[np.sort(indices)])
+
+
+def _distances(points, surface):
+    distance, _ = cv2.batchDistance(points, surface, cv2.CV_32F,
+                                   normType=cv2.NORM_L2SQR, K=1)
+    return distance[:, 0]
+
+
+def _separate_residual(points, supported):
+    """A small disconnected cluster is evidence, even below the 2% allowance."""
+    residual = points[~supported]
+    if len(residual) < 3:
+        return False
+    to_supported = _distances(residual, points[supported])
+    adjacent = np.sum((residual[:, None] - residual[None, :]) ** 2, axis=2)
+    todo = set(range(len(residual)))
+    while todo:
+        pending = [todo.pop()]
+        component = []
+        while pending:
+            index = pending.pop()
+            component.append(index)
+            neighbors = {i for i in todo if adjacent[index, i] <= _RESIDUAL_GAP ** 2}
+            todo.difference_update(neighbors)
+            pending.extend(neighbors)
+        if (len(component) >= 3
+                and np.min(to_supported[component]) > _RESIDUAL_GAP ** 2):
+            return True
+    return False
+
+
+def merge_observations(views, dist=MERGE_DIST, partial=None):
+    """Return (objects, diagnostics), retaining all original per-view data.
+
+    A 3 mm expanded measured hull/height envelope limits depth noise. Surface
+    support additionally requires a measured point within 12 mm, allowing views
+    of different sides without filling the empty interior of that envelope.
+    98% of 2 mm spatial samples must be supported, with no separate residual
+    cluster. Valid objects are never pruned; class counts and world coordinates
+    are not inputs to the test.
+    All views here are fresh captures from one dashboard scan.
+    """
+    merged = merge_view_detections(views, dist=dist, partial=partial)
+    anchors = []
+    for detections in views.values():
+        for det in detections:
+            if (not det.valid or det.label == 'unknown' or view_of(det) is None
+                    or (partial is not None and partial(det))):
+                continue
+            cloud = _cloud(det)
+            if cloud is None:
+                continue
+            hull = cv2.convexHull(cloud[:, :2].copy()).reshape(-1, 2)
+            if len(hull) >= 3:
+                anchors.append((det, cloud, hull, cloud[:, 2].min(), cloud[:, 2].max()))
+    kept, diagnostics = [], []
+    for det in merged:
+        cloud = None if det.valid or view_of(det) is None else _cloud(det)
+        if cloud is None:
+            kept.append(det)
+            continue
+        points = _uniform(cloud)
+        supported = np.zeros(len(points), dtype=bool)
+        sources = []
+        for anchor, surface, hull, low, high in anchors:
+            if view_of(anchor) == view_of(det):
+                continue
+            inside = ((points[:, 2] >= low - _MARGIN)
+                      & (points[:, 2] <= high + _MARGIN)
+                      & points_in_polygon(points[:, :2], hull, margin=_MARGIN))
+            if inside.any():
+                # The same observed object must supply BOTH the envelope and
+                # nearby surface. Combining these tests across different
+                # anchors would wrongly fill empty spaces between objects.
+                explained = inside & (_distances(points, surface) <= _SURFACE_DISTANCE ** 2)
+                if explained.any():
+                    supported |= explained
+                    sources.append(anchor)
+        ratio = float(np.mean(supported))
+        if ratio < _SUPPORT or _separate_residual(points, supported):
+            kept.append(det)
+            continue
+        diagnostics.append(dict(det.summary(), view=view_of(det),
+                                reason='supported_duplicate_or_mixed_observation',
+                                support_ratio=round(ratio, 4),
+                                supporting_views=sorted({view_of(a) for a in sources}),
+                                supporting_labels=sorted({a.label for a in sources})))
+    return kept, diagnostics

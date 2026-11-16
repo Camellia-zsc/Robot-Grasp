@@ -264,23 +264,30 @@ function renderGraspFeedback(state){
 }
 function renderObservations(state){
   const scene=state.scene||{};const objects=Array.isArray(scene.objects)?scene.objects:[];
-  setText("object-count",`${objects.length} 个目标`);
+  const unconfirmed=objects.filter(object=>object.valid===false).length;
+  setText("object-count",`${objects.length-unconfirmed} 个目标${unconfirmed?` · ${unconfirmed} 条待确认`:""}`);
+  const diagnostics=Array.isArray(scene.observation_diagnostics)?scene.observation_diagnostics:[];
+  setText("observation-note",`检测来自 RGB-D 扫描，包含工作区与放置区中的方块和水果。摆场后等待下条指令重新观测。${diagnostics.length?`已合并 ${diagnostics.length} 条重复或混合观测，可切换相机视角查看。`:""}`);
+  const rejectionNames={touches_image_border:"画面截断",touches_roi_border:"范围边缘截断",touches_zone:"轮廓接触区域边界",occluded:"轮廓被遮挡",partial_object:"轮廓不完整",few_points:"深度点不足",too_small:"轮廓过小",too_large:"轮廓过大",too_tall:"高度异常",merged:"物体轮廓粘连",low_score:"识别把握不足"};
   const selected=selectedId(state);const rows=[];
   for(const object of objects){
+    const uncertain=object.valid===false;
     const row=document.createElement("tr");
     const name=document.createElement("td");const wrapper=document.createElement("span");wrapper.className="object-name";
     const swatch=document.createElement("i");swatch.className=`swatch ${colorKey(object.label)||"blue"}`;
-    const label=document.createElement("span");label.textContent=displayLabel(object.label);wrapper.append(swatch,label);name.append(wrapper);
+    const label=document.createElement("span");label.textContent=`${uncertain?"疑似":""}${displayLabel(object.label)}`;wrapper.append(swatch,label);name.append(wrapper);
     const confidence=document.createElement("td");confidence.textContent=object.score==null?"—":`${(number(object.score)*100).toFixed(1)}%`;
     const position=document.createElement("td");position.className="position";position.textContent=Array.isArray(object.center_base)?object.center_base.slice(0,3).map(n=>number(n).toFixed(3)).join(", "):"—";
     const status=document.createElement("td");const tag=document.createElement("span");tag.className="object-status";
-    const isSelected=String(object.object_id??object.id)===selected;
+    const isSelected=!uncertain&&String(object.object_id??object.id)===selected;
+    const statusText=uncertain?`${rejectionNames[object.reject_reason]||"轮廓未确认"} · 待确认`:isSelected?"已选择":"可搬运";
+    if(uncertain)tag.title="尚未确认这是独立物体，不参与抓取。可切换相机视角查看原始轮廓。";
     if(object.in_zone){
       const zone=object.zone_name||object.zone||object.placed_zone;
       const zoneName=typeof zone==="object"?zone?.label||zone?.name:zone;
       const area=({red:"红色区域",green:"绿色区域",yellow:"黄色区域",blue:"蓝色区域"})[colorKey(zoneName)]||zoneName||"已放置区域";
-      tag.textContent=`${area} · ${object.valid===false?"不可抓取":isSelected?"已选择":"可搬运"}`;tag.classList.add("in-zone");
-    }else tag.textContent=isSelected?"已选择":object.valid===false?"不可抓取":"可搬运";
+      tag.textContent=`${area} · ${statusText}`;tag.classList.add("in-zone");
+    }else tag.textContent=statusText;
     tag.classList.toggle("selected",isSelected);
     status.append(tag);row.append(name,confidence,position,status);rows.push(row);
   }

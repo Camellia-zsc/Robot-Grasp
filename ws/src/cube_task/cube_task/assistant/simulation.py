@@ -25,10 +25,11 @@ from ..core.zones import parse_zones
 from ..robot.factory import make_arm
 from ..task.operator import Operator
 from ..task.runner import TaskRunner, pick_summary
-from ..task.views import merge_view_detections, tag_view
+from ..task.views import tag_view
 from ..tools.common import load_cfg_for
 from .catalog import CatalogEditor
 from .catalog_perception import configure_sandbox, make_sandbox_perception
+from .observations import merge_observations
 
 _LOG = logging.getLogger(__name__)
 _STAGE_MESSAGES = {
@@ -347,7 +348,8 @@ class SimulationSession:
             warnings = list(result.warnings)
             # The official L1 scene uses several taught wrist views. Scan with
             # the runner's same camera/perception path, then use its existing
-            # merge rule so an incomplete border view cannot hide a whole cube.
+            # merge rule, then explain clipped mixed silhouettes using only
+            # measured geometry from the other views of this same scan.
             for view in range(1, len(self.runner.views)):
                 self._emit_scan_view(view)
                 status, next_result, frame = self.runner._observe(view)
@@ -361,7 +363,7 @@ class SimulationSession:
                 self._cache_observation(view, result, frame)
                 views[view] = tag_view(result.detections, view)
                 warnings.extend(result.warnings)
-            detections = merge_view_detections(
+            detections, diagnostics = merge_observations(
                 views, dist=self.runner.view_merge,
                 partial=lambda d: not d.valid or self.runner._partial(d))
             self._scene_version += 1
@@ -390,6 +392,7 @@ class SimulationSession:
                            'zones': self._zones(),
                            'class_to_zone': dict(self.runner.class_to_zone),
                            'task': 'Sandbox', 'mode': 'sim',
+                           'observation_diagnostics': diagnostics,
                            'observed_at': float(result.frame_stamp),
                            'warnings': warnings}
             self._status = 'ready'

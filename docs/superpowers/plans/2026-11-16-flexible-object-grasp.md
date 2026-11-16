@@ -29,4 +29,4 @@
 
 - [x] 更新中文说明和来源，记录当前运动学/遮挡/类别限制。
 - [x] 运行助手、恢复、相关旧规划测试和脚本语法检查；独立审查真值泄漏、编辑并发、几何不一致。已记录各组通过结果及 1 项在发布基线同样失败的旧规划测试；最终 `test_assistant_catalog_simulation.py`、`test_assistant_simulation.py`、`test_assistant_recovery_simulation.py` 为 15 passed in 483.33s。
-- [ ] 按功能提交、推送 Robot-Grasp，并将已验证改动同步回用户指定项目目录，保留当前上游原始分支和运行材料。
+- [x] 按功能提交、推送 Robot-Grasp，并将已验证改动同步回用户指定项目目录，保留当前上游原始分支和运行材料。功能版本 `be139b2` 已发布并同步；本地 `main` 跟踪新仓库，原上游保留为 `upstream`，原始分支为 `codex/agilex-original`，覆盖前文件及索引备份保存在本地 `.git/robot-grasp-sync-backup-*`。8767 已使用 D 盘新版重启，8768 临时测试服务已关闭。

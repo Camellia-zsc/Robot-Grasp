@@ -2,9 +2,9 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const stateLabels = {preparing:"正在准备",ready:"场景就绪",observing:"相机观测中",thinking:"模型决策中",executing:"机械臂执行中",recovering:"自动恢复中",verifying:"结果验证中",complete:"任务已完成",stopping:"正在停止",stopped:"已停止",error:"执行异常"};
-const labelNames = {red:"红色方块",red_cube:"红色方块",green:"绿色方块",green_cube:"绿色方块",yellow:"黄色方块",yellow_cube:"黄色方块",blue:"蓝色方块",blue_cube:"蓝色方块"};
-const palette = {red:"#cc7771",green:"#7cab90",yellow:"#d1b76d",blue:"#789fc3"};
+const stateLabels = {preparing:"正在准备",editing:"正在更新摆场",ready:"场景就绪",observing:"相机观测中",thinking:"模型决策中",executing:"机械臂执行中",recovering:"自动恢复中",verifying:"结果验证中",complete:"任务已完成",stopping:"正在停止",stopped:"已停止",error:"执行异常"};
+const labelNames = {red:"红色方块",red_cube:"红色方块",green:"绿色方块",green_cube:"绿色方块",yellow:"黄色方块",yellow_cube:"黄色方块",blue:"蓝色方块",blue_cube:"蓝色方块",apple:"苹果",banana:"香蕉",pear:"梨"};
+const palette = {red:"#cc7771",green:"#7cab90",yellow:"#d1b76d",blue:"#789fc3",apple:"#cf766b",banana:"#d5b85f",pear:"#a9b76a"};
 const ui = {state:null,connected:false,pending:false,messageNodes:new Map(),eventNodes:new Map(),trail:[],lastScene:null,lastCameraAt:0,lastCameraVersion:null,lastTime:null,cameraMode:"live",cameraViews:[],cameraKey:null,cameraLoading:false};
 const canvas = $("scene-canvas");
 const context = canvas.getContext("2d");
@@ -140,7 +140,7 @@ function renderMessages(state){
   if(!messages.length && !$("welcome").childNodes.length){
     const icon=document.createElement("div");icon.className="welcome-icon";icon.append(svgIcon("cube"));
     const heading=document.createElement("h3");heading.textContent="从一句话开始";
-    const description=document.createElement("p");description.textContent="告诉我你想抓取哪个方块，\n我会根据相机观测选择目标，并调用机械臂执行。";
+    const description=document.createElement("p");description.textContent="告诉我你想抓取哪个物品，\n我会根据相机观测选择目标，并调用机械臂执行。";
     const note=document.createElement("div");note.className="welcome-note";note.textContent="观测场景 → 选择目标 → 执行与验证";
     $("welcome").append(icon,heading,description,note);
   }
@@ -229,6 +229,7 @@ function renderPipeline(state){
   const text=state.message||state.stage||latest?.message||stateLabels[state.status]||"等待一条指令";
   setText("stage-message",text);$("stage-message").title=text;
   renderRecovery(state);
+  renderGraspFeedback(state);
   const panel=$("task-result");panel.hidden=!result||Boolean(state.busy);
   if(result&&!state.busy){
     const failed=result.ok===false||result.truth?.success===false||state.status==="error";
@@ -237,6 +238,29 @@ function renderPipeline(state){
     description.textContent=result.message||result.summary||result.truth?.message||state.stage||(truthSuccess?"抓取与落位验证通过":failed?"本次任务未完成，请查看执行反馈":"模型回复已完成");
     panel.append(description);
   }
+}
+function renderGraspFeedback(state){
+  const feedback=state.simulation?.feedback||{},plan=feedback.grasp_plan||{};
+  const checks=Array.isArray(feedback.checks)?feedback.checks:[];
+  const panel=$("grasp-feedback");if(!panel)return;
+  panel.hidden=!Object.keys(plan).length&&!checks.length;
+  const mm=value=>value!=null&&Number.isFinite(Number(value))?`${(Number(value)*1000).toFixed(1)} mm`:"—";
+  const parts=[];
+  if(plan.label)parts.push(displayLabel(plan.label));
+  if([plan.length,plan.width,plan.height].some(v=>v!=null))parts.push(`测量长 / 宽 / 高 ${mm(plan.length)} / ${mm(plan.width)} / ${mm(plan.height)}`);
+  if(plan.expected_width!=null)parts.push(`预计夹持宽度 ${mm(plan.expected_width)}`);
+  if(plan.open_width!=null)parts.push(`张开 ${mm(plan.open_width)}`);
+  if(plan.close_width!=null)parts.push(`闭合目标 ${mm(plan.close_width)}`);
+  if(plan.closing_angle_deg!=null)parts.push(`夹持角 ${number(plan.closing_angle_deg).toFixed(1)}°`);
+  setText("grasp-plan-feedback",parts.join(" · "));
+  const nodes=checks.map(check=>{
+    const li=document.createElement("li");li.className=check.ok===false?"failed":check.ok===true?"passed":"pending";
+    const mark=document.createElement("span");mark.className="feedback-check-mark";mark.textContent=check.ok===false?"!":check.ok===true?"✓":"·";
+    const text=document.createElement("span");text.textContent=check.message||({verify_close:"闭合后检查夹持",lift:"抬升后检查夹持",transit:"搬运后检查夹持",placement:"检查目标落位"})[check.stage]||check.stage||"等待检查";
+    if(check.measured_width!=null){const detail=document.createElement("small");detail.textContent=`实测夹爪 ${mm(check.measured_width)}${check.expected_width!=null?` / 预计 ${mm(check.expected_width)}`:""}`;text.append(detail);}
+    li.append(mark,text);return li;
+  });
+  $("grasp-checks").replaceChildren(...nodes);
 }
 function renderObservations(state){
   const scene=state.scene||{};const objects=Array.isArray(scene.objects)?scene.objects:[];
@@ -351,6 +375,7 @@ function renderState(state){
   $("scene-state-dot").className=state.status==="error"?"error":state.simulation?"active":"";
   if(state.error){showError(typeof state.error==="string"?state.error:JSON.stringify(state.error));ui.backendError=true;}
   renderMessages(state);renderPipeline(state);renderObservations(state);
+  window.SceneEditor?.update(state);
   const sim=state.simulation;
   if(sim&&Array.isArray(sim.tcp_xyz)){
     $("canvas-empty").hidden=true;setText("sim-time",number(sim.sim_time).toFixed(1));
@@ -401,7 +426,78 @@ function normalizedZones(sim,state){
   return Array.isArray(zones)?zones:Object.entries(zones).map(([name,z])=>({...z,name}));
 }
 function objectPosition(object){return vec(object.center||object.position||object.center_base);}
-function objectSize(object){const size=object.size||object.dimensions||[.03,.03,.03];return typeof size==="number"?[size,size,size]:vec(size,[.03,.03,.03]);}
+function objectSize(object){
+  if(Array.isArray(object.dimensions))return vec(object.dimensions,[.03,.03,.03]);
+  const size=object.size||[.03,.03,.03];
+  if(object.shape==="sphere")return Array(3).fill(2*number(size[0],.015));
+  if(object.shape==="ellipsoid")return vec(size,[.015,.015,.015]).map(v=>2*v);
+  if(object.shape==="cylinder")return [2*number(size[0],.015),2*number(size[0],.015),number(size[1],.03)];
+  return typeof size==="number"?[size,size,size]:vec(size,[.03,.03,.03]);
+}
+function rgbHex(rgb,fallback="#9daeb8"){
+  return Array.isArray(rgb)&&rgb.length===3?"#"+rgb.map(v=>Math.max(0,Math.min(255,Math.round(number(v)))).toString(16).padStart(2,"0")).join(""):fallback;
+}
+// Expand the same bottom-origin primitives used by SimObject. Both views use
+// these world-space parts, so an editor preview never substitutes a cube.
+function objectPrimitives(object){
+  const axes=matrixAxes(object.transform)||[[Math.cos(number(object.yaw)),Math.sin(number(object.yaw)),0],[-Math.sin(number(object.yaw)),Math.cos(number(object.yaw)),0],[0,0,1]];
+  const transform=object.transform;
+  const origin=Array.isArray(transform)&&Array.isArray(transform[0])?[number(transform[0][3]),number(transform[1][3]),number(transform[2][3])]:sub(objectPosition(object),[0,0,objectSize(object)[2]/2]);
+  const point=local=>add(origin,axes.reduce((out,axis,i)=>add(out,mul(axis,number(local[i]))),[0,0,0]));
+  const color=rgbHex(object.color_rgb,palette[colorKey(object.label)]||"#9daeb8");
+  const parts=[];
+  function primitive(kind,size,position=[0,0,0],yaw=0,partColor=color,centered=true){
+    const c=Math.cos(yaw),s=Math.sin(yaw),basis=[add(mul(axes[0],c),mul(axes[1],s)),add(mul(axes[0],-s),mul(axes[1],c)),axes[2]];
+    let center=point(position);
+    if(!centered){const h=kind==="sphere"?size[0]:kind==="ellipsoid"?size[2]:kind==="box"?size[2]/2:kind==="cylinder"?size[1]/2:0;center=add(center,mul(basis[2],h));}
+    if(kind==="capsule"){
+      parts.push({kind:"capsule",start:add(center,mul(basis[0],-size[1])),end:add(center,mul(basis[0],size[1])),radius:size[0],color:partColor});
+    }else if(kind==="cylinder"){
+      parts.push({kind:"cylinder",start:add(center,mul(basis[2],-size[1]/2)),end:add(center,mul(basis[2],size[1]/2)),radius:size[0],color:partColor});
+    }else parts.push({kind,center,size,axes:basis,color:partColor});
+  }
+  const size=Array.isArray(object.size)?object.size:objectSize(object);
+  if(object.shape==="compound"){
+    for(const part of size){if(!part||!Array.isArray(part.size))continue;primitive(part.shape,part.size,vec(part.pos),number(part.yaw),part.color_bgr?rgbHex([...part.color_bgr].reverse(),color):color);}
+  }else if(object.shape==="capsule_chain"||object.shape==="sphere_cluster"){
+    const radius=number(size[0],.01),points=Array.isArray(size[1])?size[1].map(p=>point(vec(p))):[];
+    points.forEach(center=>parts.push({kind:"sphere",center,size:[radius],axes,color}));
+    if(object.shape==="capsule_chain")for(let i=1;i<points.length;i++)parts.push({kind:"cylinder",start:points[i-1],end:points[i],radius,color});
+  }else primitive(object.shape||"box",size,[0,0,0],0,color,false);
+  return parts;
+}
+function ellipsoid(center,radii,axes,color){
+  const rings=8,segments=14,light=normalize([-.6,-.8,1.8]);
+  const surface=(latitude,longitude)=>add(center,axes.reduce((out,axis,i)=>add(out,mul(axis,[radii[0]*Math.cos(latitude)*Math.cos(longitude),radii[1]*Math.cos(latitude)*Math.sin(longitude),radii[2]*Math.sin(latitude)][i])),[0,0,0]));
+  for(let ring=0;ring<rings;ring++)for(let segment=0;segment<segments;segment++){
+    const a=-Math.PI/2+ring/rings*Math.PI,b=-Math.PI/2+(ring+1)/rings*Math.PI,c=segment/segments*Math.PI*2,d=(segment+1)/segments*Math.PI*2;
+    const middle=[Math.cos((a+b)/2)*Math.cos((c+d)/2)/radii[0],Math.cos((a+b)/2)*Math.sin((c+d)/2)/radii[1],Math.sin((a+b)/2)/radii[2]];
+    const normal=normalize(axes.reduce((out,axis,i)=>add(out,mul(axis,middle[i])),[0,0,0]));
+    if(dot(normal,facing)>0)polygon([surface(a,c),surface(a,d),surface(b,d),surface(b,c)],shade(color,.72+.33*Math.max(0,dot(normal,light))));
+  }
+}
+function drawObjectShape(object){
+  for(const part of objectPrimitives(object)){
+    if(part.kind==="box")box(part.center,part.size,part.color,0,part.axes);
+    else if(part.kind==="sphere")sphere(part.center,part.size[0],part.color);
+    else if(part.kind==="ellipsoid")ellipsoid(part.center,part.size,part.axes,part.color);
+    else if(part.kind==="cylinder"||part.kind==="capsule"){
+      cylinder(part.start,part.end,part.radius,part.color);
+      if(part.kind==="capsule"){sphere(part.start,part.radius,part.color);sphere(part.end,part.radius,part.color);}
+    }
+  }
+}
+function objectGeometryBounds(object){
+  const low=[Infinity,Infinity,Infinity],high=[-Infinity,-Infinity,-Infinity];
+  for(const part of objectPrimitives(object))for(let axis=0;axis<3;axis++){
+    let lo,hi;
+    if(part.start){const direction=normalize(sub(part.end,part.start)),radius=part.radius*(part.kind==="capsule"?1:Math.sqrt(Math.max(0,1-direction[axis]**2)));lo=Math.min(part.start[axis],part.end[axis])-radius;hi=Math.max(part.start[axis],part.end[axis])+radius;}
+    else{const ext=part.kind==="sphere"?part.size[0]:part.kind==="box"?part.axes.reduce((s,basis,i)=>s+Math.abs(basis[axis])*part.size[i]/2,0):Math.sqrt(part.axes.reduce((s,basis,i)=>s+(basis[axis]*part.size[i])**2,0));lo=part.center[axis]-ext;hi=part.center[axis]+ext;}
+    low[axis]=Math.min(low[axis],lo);high[axis]=Math.max(high[axis],hi);
+  }
+  return {low,high};
+}
+window.RobotGeometry={primitives:objectPrimitives,dimensions:objectSize,bounds:objectGeometryBounds};
 function drawTable(sim,state){
   const tableZ=number(sim.table_z);const bounds=sim.table_bounds||{};
   const minX=number(bounds.min_x,-.14),maxX=number(bounds.max_x,.75),minY=number(bounds.min_y,-.48),maxY=number(bounds.max_y,.48);
@@ -425,9 +521,9 @@ function drawTable(sim,state){
 }
 function drawObjects(sim,state){
   for(const object of Array.isArray(sim.objects)?sim.objects:[]){
-    const p=objectPosition(object),s=objectSize(object);const color=palette[colorKey(object.label)]||"#9daeb8";const selected=String(object.id??object.object_id)===selectedTruthId(state);
+    const p=objectPosition(object),s=objectSize(object);const color=rgbHex(object.color_rgb,palette[colorKey(object.label)]||"#9daeb8");const selected=String(object.id??object.object_id)===selectedTruthId(state);
     if(selected){const z=number(sim.table_z)+.002;floorEllipse([p[0],p[1],z],s[0]*1.02,s[1]*1.02,"#57a88b1c");const points=[];for(let i=0;i<=36;i++){const a=i/36*Math.PI*2;points.push([p[0]+Math.cos(a)*s[0],p[1]+Math.sin(a)*s[1],z]);}line(points,"#6caa9699",1.1,[3,3]);}
-    box(p,s,color,number(object.yaw),matrixAxes(object.transform));
+    drawObjectShape(object);
     const suffix=object.held?" · 已夹持":object.placed?" · 已放置":"";
     label(add(p,[0,0,s[2]*.5+.028]),displayLabel(object.label)+suffix,selected?"#368e7b":"#82959d",selected?"#f5fcf8ed":"#ffffffdd",selected);
   }

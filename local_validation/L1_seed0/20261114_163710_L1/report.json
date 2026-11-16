@@ -1,0 +1,47 @@
+{
+  "task": "L1",
+  "ok": true,
+  "placed": 3,
+  "required": 3,
+  "attempts": 3,
+  "elapsed": 54.83,
+  "time_limit": 180.0,
+  "stop_reason": "done",
+  "fault_detail": "",
+  "dry_run": false,
+  "picks": [
+    {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "green",
+      "zone": "zone_green",
+      "duration": 17.094,
+      "grasp_width": 0.05093237924849038,
+      "fault": false,
+      "recovery": ""
+    },
+    {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "yellow",
+      "zone": "zone_yellow",
+      "duration": 16.466,
+      "grasp_width": 0.04808818233400425,
+      "fault": false,
+      "recovery": ""
+    },
+    {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "red",
+      "zone": "zone_red",
+      "duration": 17.65,
+      "grasp_width": 0.05047711057398915,
+      "fault": false,
+      "recovery": ""
+    }
+  ]
+}

@@ -7,7 +7,7 @@ package_name = 'cube_task'
 
 TOOLS = [
     'run_task', 'check_setup', 'capture', 'view', 'calib_points', 'calib_verify',
-    'teach_poses', 'teach_classes', 'color_calib', 'sim_bench',
+    'teach_poses', 'teach_classes', 'color_calib', 'sim_bench', 'assistant_ui',
 ]
 
 
@@ -19,6 +19,7 @@ setup(
     name=package_name,
     version='0.1.0',
     packages=find_packages(exclude=['test']),
+    package_data={'cube_task': ['assistant/static/*']},
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),

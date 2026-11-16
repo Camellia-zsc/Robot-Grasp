@@ -42,3 +42,23 @@ ws/src/camera_drivers/
 ws/third_party_include/
 # OrbbecSDK 在当前目录写的日志
 Log/
+
+# 本机凭据和环境变量（仅在本机配置，不发布）
+.env
+.env.*
+!.env.example
+.codex/
+auth.json
+
+# 验收证据保留；运行时缓存、进程号和服务日志不发布
+local_validation/cache/
+local_validation/*.pid
+local_validation/*.stdout.log
+local_validation/*.stderr.log
+local_validation/assistant_sim/
+local_validation/assistant_ui/
+local_validation/capacity_recovery/
+
+# 仅发布所需 PiPER 模型，排除嵌套仓库元数据和其他模型库文件
+local_assets/mujoco_menagerie/*
+!local_assets/mujoco_menagerie/agilex_piper/

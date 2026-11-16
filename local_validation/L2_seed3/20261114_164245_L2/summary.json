@@ -1,0 +1,37 @@
+{
+  "task": "L2",
+  "mode": "sim",
+  "dry_run": false,
+  "targets": [],
+  "speed_percent": 30,
+  "argv": [
+    "--task",
+    "L2",
+    "--mode",
+    "sim",
+    "--seed",
+    "3",
+    "--log-dir",
+    "D:\\大四上\\智能车项目\\local_validation\\L2_seed3"
+  ],
+  "stop_reason": "no_targets",
+  "ok": false,
+  "placed": 4,
+  "required": 6,
+  "elapsed": 175.564,
+  "attempts": 10,
+  "fault_detail": "",
+  "ground_truth": {
+    "correct": 3,
+    "wrong": 0,
+    "remaining": 3
+  },
+  "exit_code": 1,
+  "_logger": {
+    "elapsed_s": 180.757,
+    "events": 192,
+    "failures": 0,
+    "wall_end": "2026-11-14T16:43:55",
+    "dir": "D:\\大四上\\智能车项目\\local_validation\\L2_seed3\\20261114_164245_L2"
+  }
+}

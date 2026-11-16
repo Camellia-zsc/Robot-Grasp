@@ -21,6 +21,7 @@ Poses are base-frame 4x4 TCP poses (m, rad); time is the injected Clock (s).
 """
 from __future__ import annotations
 
+import copy
 import logging
 import math
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
@@ -304,6 +305,7 @@ class TaskRunner:
         self._observe_failures = 0
         self._deadline = math.inf
         self.fault_detail = ''
+        self._held_recovery_context = None
 
     # ------------------------------------------------------------------ public
     def run(self) -> TaskReport:
@@ -940,6 +942,7 @@ class TaskRunner:
         if watcher is not None:
             self.skill.on_stage = watcher.stage
         try:
+            self._held_recovery_context = None
             res = self.skill.execute(gp, pp, dry_run=self.dry_run)
         finally:
             if watcher is not None:
@@ -947,6 +950,7 @@ class TaskRunner:
                 self._live_dets = watcher.finish()
                 self._event('decision', action='live_watch', label=det.label,
                             n=len(self._live_dets), **watcher.stats)
+        self._save_held_recovery(det, gp, pp, res)
         self._at_observe = False
         if res.detail.get('fault') or res.detail.get('holding'):
             # A held object that could not be put down is a fault as well.
@@ -970,6 +974,118 @@ class TaskRunner:
             if track['attempts'] >= self.max_attempts:
                 self._blacklist(track, 'max_attempts (%s)' % res.error)
         return None, res
+
+    @property
+    def has_held_recovery(self) -> bool:
+        """Whether a measured grasp from this runner can continue its placement."""
+        return self._held_recovery_context is not None
+
+    def _save_held_recovery(self, det, gp, pp, result) -> None:
+        """Remember only recoverable motion failures of a verified held grasp."""
+        errors = [s.get('error') for s in result.detail.get('steps', ()) if s.get('error')]
+        allowed = ('rejected', 'unreachable', 'timeout', 'stalled')
+        width = result.grasp_width
+        if (not result.detail.get('holding') or result.error not in allowed + ('holding_object',)
+                or any(error not in allowed for error in errors)
+                or width is None or not math.isfinite(float(width))
+                or width < self.skill.empty_width):
+            self._held_recovery_context = None
+            return
+        self._held_recovery_context = {
+            'det': copy.deepcopy(det), 'grasp': copy.deepcopy(gp),
+            'place': copy.deepcopy(pp), 'width': float(width), 'zone': pp.zone,
+            'avoid': [(float(pp.T_release[0, 3]), float(pp.T_release[1, 3]))]}
+
+    def retry_held_placement(self, det: Detection, zone_name: str,
+                             neighbors: Sequence[Detection] = (),
+                             avoid: Sequence[Sequence[float]] = ()
+                             ) -> Tuple[Optional[PickResult], str]:
+        """Explicitly replan the same held object's placement in the same zone.
+
+        This opt-in seam does not change competition retry rules. It accepts
+        measured geometry saved by the failed pick, never arbitrary model TCP
+        coordinates. Abort/health/held-width checks and the full SafeArm path
+        checks remain active; a refusal sends no motion or gripper commands.
+        """
+        from .reach import adjust_plan_poses, release_workspace_reason
+
+        context = self._held_recovery_context
+        if context is None:
+            return None, 'no recoverable held grasp from the last pick'
+        if self._aborted() or not self._healthy():
+            return None, 'arm stopped or unhealthy'
+        original = context['det']
+        if (zone_name != context['zone'] or zone_name not in self.zones
+                or det.label != original.label or not _has_xy(det)
+                or np.linalg.norm(np.asarray(det.center_base[:2])
+                                  - np.asarray(original.center_base[:2])) > 0.02):
+            return None, 'held recovery target or destination changed'
+        width = self.skill._read_width()
+        if (width is None or width < self.skill.empty_width
+                or abs(width - context['width']) > self.skill.width_tolerance):
+            return None, 'held grasp feedback missing or changed'
+        gp = copy.deepcopy(context['grasp'])
+        self._neighbors = list(neighbors)
+        held = held_offset_of(gp)
+        tops = [float(d.top_z) for d in neighbors if d is not det and d.top_z is not None
+                and math.isfinite(float(d.top_z))]
+        transit = transit_height(self.cfg, list(self.zones.values()),
+                                 detection_table_z(original), held, max(tops) if tops else None)
+        occupied = list(self._placed.get(zone_name, ()))
+        shape = held_shape(original, gp, self.nominal.get(det.label))
+        if shape is not None:
+            shape['grip_width'] = max(shape['grip_width'], width)
+        banned = list(context['avoid'])
+        for point in avoid:
+            try:
+                x, y = float(point[0]), float(point[1])
+            except (TypeError, ValueError, IndexError):
+                return None, 'invalid avoided release position'
+            if not (math.isfinite(x) and math.isfinite(y)):
+                return None, 'invalid avoided release position'
+            banned.append((x, y))
+        pp, why = None, 'no reachable alternative release position'
+        for _ in range(RELEASE_RETRIES + 1):
+            candidate = self.placer.plan(
+                self.zones[zone_name], held, transit, footprint=self._footprint(original),
+                occupied=occupied, held=shape, avoid=banned,
+                candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
+                center_first=self._center_first(zone_name),
+                lower=self.release_lower.get(det.label, 0.0))
+            xy = tuple(float(v) for v in candidate.T_release[:2, 3])
+            if (not candidate.feasible or any(math.hypot(xy[0] - a, xy[1] - b) < 1e-6
+                                              for a, b in banned)):
+                break
+            info = self.placer.last_info
+            if any(info.get(k) is not None and info[k] < 0.0
+                   for k in ('footprint_clearance', 'finger_clearance', 'edge_margin')):
+                banned.append(xy)
+                continue
+            ok, why, _tilts = adjust_plan_poses(
+                self.arm, gp, candidate, self._floors(original, gp, candidate, held),
+                self.free_tilt)
+            if ok:
+                pp = candidate
+                break
+            banned.append(xy)
+        if pp is None:
+            return None, why
+        self._event('decision', action='retry_held_placement', label=det.label, zone=zone_name,
+                    release_xyz=[round(float(v), 4) for v in pp.T_release[:3, 3]],
+                    avoided=[[round(a, 4), round(b, 4)] for a, b in banned])
+        result = self.skill.place_held(gp, pp, width)
+        self._save_held_recovery(original, gp, pp, result)
+        if self._held_recovery_context is not None:
+            self._held_recovery_context['avoid'] = banned + self._held_recovery_context['avoid']
+        if result.ok:
+            self.fault_detail = ''
+            self._placed_labels.setdefault(zone_name, []).append(det.label)
+            self._placed.setdefault(zone_name, []).append(
+                (float(pp.T_release[0, 3]), float(pp.T_release[1, 3]),
+                 self._footprint(original) or 0.0, original.height or 0.0,
+                 shape['length'] if shape else None, shape['width'] if shape else None,
+                 self.placer.last_info.get('axis') if shape else None))
+        return result, ''
 
     def ready_for_pick(self, go_observe: bool = False) -> Tuple[bool, str]:
         """

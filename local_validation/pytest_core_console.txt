@@ -1,0 +1,146 @@
+.................sssss..........FF............FF...ssssFFsss....F        [100%]
+================================== FAILURES ===================================
+________________ test_basic_block_plan_heights_and_orientation ________________
+
+    def test_basic_block_plan_heights_and_orientation():
+        cfg = make_cfg()
+        p = GraspPlanner(cfg, 'L1').plan(make_det('red', 0.30, 0.05, size=0.03, height=0.03))
+        assert p.feasible, p.reason
+        top = 0.03
+        assert p.T_pre[2, 3] == pytest.approx(top + 0.08)
+>       assert p.T_grasp[2, 3] == pytest.approx(top - 0.015)       # 0.5 * height
+E       assert 0.012 == 0.015 ± 1.5e-08
+E        +  where 0.015 ± 1.5e-08 = <function approx at 0x0000022C6362C700>((0.03 - 0.015))
+E        +    where <function approx at 0x0000022C6362C700> = pytest.approx
+
+test\test_task_grasp.py:27: AssertionError
+_____________ test_grasp_depth_clipped_and_z_clamped_above_table ______________
+
+    def test_grasp_depth_clipped_and_z_clamped_above_table():
+        cfg = make_cfg()
+        gp = GraspPlanner(cfg, 'L1')
+        tall = gp.plan(make_det('red', 0.3, 0.0, height=0.10, table_z=0.02))
+>       assert tall.T_grasp[2, 3] == pytest.approx(0.12 - 0.030)     # max_grasp_depth
+E       assert 0.08000000000000002 == 0.09 ± 9.0e-08
+E        +  where 0.09 ± 9.0e-08 = <function approx at 0x0000022C6362C700>((0.12 - 0.03))
+E        +    where <function approx at 0x0000022C6362C700> = pytest.approx
+
+test\test_task_grasp.py:41: AssertionError
+_______________________ test_place_plan_flat_and_walled _______________________
+
+    def test_place_plan_flat_and_walled():
+        cfg = make_cfg()
+        pp = PlacePlanner(cfg)
+        flat = Zone('flat', np.array([0.2, 0.3, 0.01]))
+        p = pp.plan(flat, held_offset=0.015, transit_z=0.2)
+        assert p.feasible
+>       assert p.T_release[2, 3] == pytest.approx(0.01 + 0.015 + 0.015)   # release_height_flat
+E       assert 0.035 == 0.04 ± 4.0e-08
+E        +  where 0.04 ± 4.0e-08 = <function approx at 0x0000022C6362C700>(((0.01 + 0.015) + 0.015))
+E        +    where <function approx at 0x0000022C6362C700> = pytest.approx
+
+test\test_task_grasp.py:154: AssertionError
+__________________________ test_held_offset_of_plan ___________________________
+
+    def test_held_offset_of_plan():
+        gp = GraspPlanner(make_cfg(), 'L1')
+        p = gp.plan(make_det('red', 0.3, 0.0, height=0.04, table_z=0.01))
+>       assert held_offset_of(p) == pytest.approx(0.04 - 0.02)
+E       AssertionError: assert 0.016 == 0.02 ± 2.0e-08
+E        +  where 0.016 = held_offset_of(GraspPlan(target=Detection(label='red', score=0.9, score_kind='color', bbox=(10, 10, 20, 20), center_px=(0.0, 0.0), ma...]]), open_width=0.07, close_width=0.0, expected_width=0.03, closing_angle=1.5707963267948966, feasible=True, reason=''))
+E        +  and   0.02 ± 2.0e-08 = <function approx at 0x0000022C6362C700>((0.04 - 0.02))
+E        +    where <function approx at 0x0000022C6362C700> = pytest.approx
+
+test\test_task_grasp.py:173: AssertionError
+______ test_l1_hard_never_places_distractor_or_wrong_zone[0-eye_in_hand] ______
+
+seed = 0, mount = 'eye_in_hand'
+
+    @pytest.mark.parametrize('seed,mount', [(0, 'eye_in_hand'), (1, 'eye_in_hand')])
+    def test_l1_hard_never_places_distractor_or_wrong_zone(seed, mount):
+        # Touching blocks + a yellow distractor. The merged pair may be missed (being fixed
+        # elsewhere), so only the safety properties are asserted here.
+        with SimRig('L1', seed, mount, difficulty='hard') as rig:
+            yellow = [o.name for o in rig.world.objects if o.label == 'yellow']
+            assert yellow, 'hard scenario must contain the distractor'
+            runner = rig.runner()
+            rep = runner.run()
+            assert rig.truth()['wrong'] == 0, describe(rep, rig)
+            for name in yellow:
+>               assert rig.zone_of(name) is None
+E               AssertionError: assert 'zone_yellow' is None
+E                +  where 'zone_yellow' = <bound method SimRig.zone_of of <test_e2e_common.SimRig object at 0x0000022C659AAF40>>('yellow_cube')
+E                +    where <bound method SimRig.zone_of of <test_e2e_common.SimRig object at 0x0000022C659AAF40>> = <test_e2e_common.SimRig object at 0x0000022C659AAF40>.zone_of
+
+test\test_e2e_l1.py:43: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] label orange has no zone in class_to_zone: it is never picked
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_green corner (0.070, 0.250) outside the workspace: x=0.070 outside [0.080, 0.600]
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_green grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_yellow grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_red corner (0.070, -0.450) outside the workspace: x=0.070 outside [0.080, 0.600]
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_red grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:1373 observe views cover 93% of the pick area (an object fits whole in one image); per view [682, 824, 682] grid points; uncovered x 0.12..0.16 y -0.24..0.25 m
+______ test_l1_hard_never_places_distractor_or_wrong_zone[1-eye_in_hand] ______
+
+seed = 1, mount = 'eye_in_hand'
+
+    @pytest.mark.parametrize('seed,mount', [(0, 'eye_in_hand'), (1, 'eye_in_hand')])
+    def test_l1_hard_never_places_distractor_or_wrong_zone(seed, mount):
+        # Touching blocks + a yellow distractor. The merged pair may be missed (being fixed
+        # elsewhere), so only the safety properties are asserted here.
+        with SimRig('L1', seed, mount, difficulty='hard') as rig:
+            yellow = [o.name for o in rig.world.objects if o.label == 'yellow']
+            assert yellow, 'hard scenario must contain the distractor'
+            runner = rig.runner()
+            rep = runner.run()
+            assert rig.truth()['wrong'] == 0, describe(rep, rig)
+            for name in yellow:
+>               assert rig.zone_of(name) is None
+E               AssertionError: assert 'zone_yellow' is None
+E                +  where 'zone_yellow' = <bound method SimRig.zone_of of <test_e2e_common.SimRig object at 0x0000022C659DD3A0>>('yellow_cube')
+E                +    where <bound method SimRig.zone_of of <test_e2e_common.SimRig object at 0x0000022C659DD3A0>> = <test_e2e_common.SimRig object at 0x0000022C659DD3A0>.zone_of
+
+test\test_e2e_l1.py:43: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] label purple has no zone in class_to_zone: it is never picked
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_green corner (0.070, 0.250) outside the workspace: x=0.070 outside [0.080, 0.600]
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_green grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_yellow grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_red corner (0.070, -0.450) outside the workspace: x=0.070 outside [0.080, 0.600]
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_red grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:1373 observe views cover 93% of the pick area (an object fits whole in one image); per view [682, 824, 682] grid points; uncovered x 0.12..0.16 y -0.24..0.25 m
+______________ test_targets_pick_only_the_given_labels_in_order _______________
+
+    def test_targets_pick_only_the_given_labels_in_order():
+        with SimRig('L1', 0, 'eye_in_hand', sets=['tasks.L1.required=2']) as rig:
+            rep = rig.run(targets=['blue', 'red'])
+>           assert rep.ok, describe(rep, rig)
+E           AssertionError: stop=no_targets placed=1/2 attempts=1 truth={'correct': 1, 'wrong': 0, 'remaining': 2} picks=[('red', 'done', '')]
+E           assert False
+E            +  where False = TaskReport(task='L1', ok=False, placed=1, required=2, attempts=1, elapsed=36.08086913648458, time_limit=180.0, stop_re... 'duration': 2.572, 'target': [0.17, -0.35, 0.1206], 'linear': True, 'pos_err': 1.064182024169296e-07}]})], log_dir='').ok
+
+test\test_e2e_l1.py:107: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_green corner (0.070, 0.250) outside the workspace: x=0.070 outside [0.080, 0.600]
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_green grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_yellow grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_red corner (0.070, -0.450) outside the workspace: x=0.070 outside [0.080, 0.600]
+WARNING  cube_task.task.runner:runner.py:363 self check [WARN] zone zone_red grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+WARNING  cube_task.task.runner:runner.py:1373 observe views cover 93% of the pick area (an object fits whole in one image); per view [682, 824, 682] grid points; uncovered x 0.12..0.16 y -0.24..0.25 m
+WARNING  cube_task.task.runner:runner.py:498 TCP z 0.121 m is below the transit height 0.150 m but the straight lift is not possible (tool tilt 57.2 deg from straight down exceeds 30.0 deg)
+============================== warnings summary ===============================
+..\..\..\..\..\Anaconda\lib\site-packages\pyreadline\py3k_compat.py:8
+  D:\Anaconda\lib\site-packages\pyreadline\py3k_compat.py:8: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3, and in 3.9 it will stop working
+    return isinstance(x, collections.Callable)
+
+-- Docs: https://docs.pytest.org/en/stable/warnings.html
+=========================== short test summary info ===========================
+FAILED test/test_task_grasp.py::test_basic_block_plan_heights_and_orientation
+FAILED test/test_task_grasp.py::test_grasp_depth_clipped_and_z_clamped_above_table
+FAILED test/test_task_grasp.py::test_place_plan_flat_and_walled - assert 0.03...
+FAILED test/test_task_grasp.py::test_held_offset_of_plan - AssertionError: as...
+FAILED test/test_e2e_l1.py::test_l1_hard_never_places_distractor_or_wrong_zone[0-eye_in_hand]
+FAILED test/test_e2e_l1.py::test_l1_hard_never_places_distractor_or_wrong_zone[1-eye_in_hand]
+FAILED test/test_e2e_l1.py::test_targets_pick_only_the_given_labels_in_order
+7 failed, 46 passed, 12 skipped, 1 warning in 176.36s (0:02:56)

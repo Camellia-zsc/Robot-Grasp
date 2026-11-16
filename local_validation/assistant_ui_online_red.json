@@ -1,0 +1,4807 @@
+{
+  "instruction": "抓取红色方块",
+  "elapsed_wall_s": 51.47,
+  "stream_lengths_seen": [
+    0,
+    98,
+    117
+  ],
+  "distinct_joint_states": 175,
+  "held_states": [
+    null,
+    "red_cube"
+  ],
+  "timeline": [
+    {
+      "elapsed": 0.02,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 6.329999999995152,
+      "held": null
+    },
+    {
+      "elapsed": 0.19,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 6.47603174602682,
+      "held": null
+    },
+    {
+      "elapsed": 0.36,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 6.572063492058533,
+      "held": null
+    },
+    {
+      "elapsed": 0.52,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 6.714126984122004,
+      "held": null
+    },
+    {
+      "elapsed": 0.69,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 6.8101587301537165,
+      "held": null
+    },
+    {
+      "elapsed": 0.84,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 6.956190476185384,
+      "held": null
+    },
+    {
+      "elapsed": 1.03,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 7.052222222217097,
+      "held": null
+    },
+    {
+      "elapsed": 1.2,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 7.194285714280568,
+      "held": null
+    },
+    {
+      "elapsed": 1.38,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 7.290317460312281,
+      "held": null
+    },
+    {
+      "elapsed": 1.55,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 7.3863492063439935,
+      "held": null
+    },
+    {
+      "elapsed": 1.7,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 7.532380952375661,
+      "held": null
+    },
+    {
+      "elapsed": 1.86,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 7.628412698407374,
+      "held": null
+    },
+    {
+      "elapsed": 2.02,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 7.770476190470845,
+      "held": null
+    },
+    {
+      "elapsed": 2.19,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 7.916507936502512,
+      "held": null
+    },
+    {
+      "elapsed": 2.36,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.058571428565983,
+      "held": null
+    },
+    {
+      "elapsed": 2.53,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.154603174597696,
+      "held": null
+    },
+    {
+      "elapsed": 2.7,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.300634920629363,
+      "held": null
+    },
+    {
+      "elapsed": 2.88,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.44666666666103,
+      "held": null
+    },
+    {
+      "elapsed": 3.05,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.54666666666094,
+      "held": null
+    },
+    {
+      "elapsed": 3.22,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.696666666660803,
+      "held": null
+    },
+    {
+      "elapsed": 3.39,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.746666666660758,
+      "held": null
+    },
+    {
+      "elapsed": 3.56,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.746666666660758,
+      "held": null
+    },
+    {
+      "elapsed": 3.73,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.779999999994061,
+      "held": null
+    },
+    {
+      "elapsed": 3.91,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.813333333327364,
+      "held": null
+    },
+    {
+      "elapsed": 4.08,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.813333333327364,
+      "held": null
+    },
+    {
+      "elapsed": 4.25,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.813333333327364,
+      "held": null
+    },
+    {
+      "elapsed": 4.41,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 8.896666666660622,
+      "held": null
+    },
+    {
+      "elapsed": 4.58,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 9.043888888882748,
+      "held": null
+    },
+    {
+      "elapsed": 4.75,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 9.142499999993788,
+      "held": null
+    },
+    {
+      "elapsed": 4.92,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 9.291111111104783,
+      "held": null
+    },
+    {
+      "elapsed": 5.09,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 9.43833333332691,
+      "held": null
+    },
+    {
+      "elapsed": 5.27,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 9.586944444437904,
+      "held": null
+    },
+    {
+      "elapsed": 5.44,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 9.685555555548945,
+      "held": null
+    },
+    {
+      "elapsed": 5.61,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 9.83277777777107,
+      "held": null
+    },
+    {
+      "elapsed": 5.78,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 9.981388888882066,
+      "held": null
+    },
+    {
+      "elapsed": 5.95,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.079999999993106,
+      "held": null
+    },
+    {
+      "elapsed": 6.11,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.22999999999297,
+      "held": null
+    },
+    {
+      "elapsed": 6.28,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.379999999992833,
+      "held": null
+    },
+    {
+      "elapsed": 6.45,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.429999999992788,
+      "held": null
+    },
+    {
+      "elapsed": 6.62,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.46333333332609,
+      "held": null
+    },
+    {
+      "elapsed": 6.78,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.46333333332609,
+      "held": null
+    },
+    {
+      "elapsed": 6.94,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.496666666659394,
+      "held": null
+    },
+    {
+      "elapsed": 7.11,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.496666666659394,
+      "held": null
+    },
+    {
+      "elapsed": 7.28,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.529999999992697,
+      "held": null
+    },
+    {
+      "elapsed": 7.45,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.628611111103737,
+      "held": null
+    },
+    {
+      "elapsed": 7.62,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.777222222214732,
+      "held": null
+    },
+    {
+      "elapsed": 7.8,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 10.924444444436858,
+      "held": null
+    },
+    {
+      "elapsed": 7.97,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 11.023055555547899,
+      "held": null
+    },
+    {
+      "elapsed": 8.12,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 11.171666666658894,
+      "held": null
+    },
+    {
+      "elapsed": 8.28,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 11.270277777769934,
+      "held": null
+    },
+    {
+      "elapsed": 8.47,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 11.368888888880974,
+      "held": null
+    },
+    {
+      "elapsed": 8.62,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 11.467499999992015,
+      "held": null
+    },
+    {
+      "elapsed": 8.8,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 11.61472222221414,
+      "held": null
+    },
+    {
+      "elapsed": 8.97,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 11.763333333325136,
+      "held": null
+    },
+    {
+      "elapsed": 9.14,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 11.913333333325,
+      "held": null
+    },
+    {
+      "elapsed": 9.31,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 12.013333333324908,
+      "held": null
+    },
+    {
+      "elapsed": 9.47,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 12.113333333324817,
+      "held": null
+    },
+    {
+      "elapsed": 9.62,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 12.113333333324817,
+      "held": null
+    },
+    {
+      "elapsed": 9.8,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 12.113333333324817,
+      "held": null
+    },
+    {
+      "elapsed": 9.95,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 12.14666666665812,
+      "held": null
+    },
+    {
+      "elapsed": 10.14,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 12.14666666665812,
+      "held": null
+    },
+    {
+      "elapsed": 10.31,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 12.179999999991423,
+      "held": null
+    },
+    {
+      "elapsed": 10.48,
+      "status": "observing",
+      "chars": 0,
+      "sim_time": 12.179999999991423,
+      "held": null
+    },
+    {
+      "elapsed": 10.64,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 10.81,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 10.98,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 11.16,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 11.33,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 11.5,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 11.67,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 11.83,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 12.0,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 12.17,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 12.34,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 12.52,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 12.69,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 12.86,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 13.03,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 13.2,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 13.38,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 13.53,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 13.7,
+      "status": "thinking",
+      "chars": 0,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 13.86,
+      "status": "thinking",
+      "chars": 98,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 14.02,
+      "status": "thinking",
+      "chars": 117,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 14.2,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 14.38,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 12.213333333324726,
+      "held": null
+    },
+    {
+      "elapsed": 14.53,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 12.263333333324681,
+      "held": null
+    },
+    {
+      "elapsed": 14.7,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 12.36333333332459,
+      "held": null
+    },
+    {
+      "elapsed": 14.88,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 12.513333333324454,
+      "held": null
+    },
+    {
+      "elapsed": 15.05,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 12.613333333324363,
+      "held": null
+    },
+    {
+      "elapsed": 15.2,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 12.713333333324272,
+      "held": null
+    },
+    {
+      "elapsed": 15.38,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 12.863333333324135,
+      "held": null
+    },
+    {
+      "elapsed": 15.55,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.00618783753157,
+      "held": null
+    },
+    {
+      "elapsed": 15.72,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.102615089635265,
+      "held": null
+    },
+    {
+      "elapsed": 15.89,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.249042341738914,
+      "held": null
+    },
+    {
+      "elapsed": 16.05,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.391896845946349,
+      "held": null
+    },
+    {
+      "elapsed": 16.22,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.538324098049998,
+      "held": null
+    },
+    {
+      "elapsed": 16.38,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.634751350153692,
+      "held": null
+    },
+    {
+      "elapsed": 16.53,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.777605854361127,
+      "held": null
+    },
+    {
+      "elapsed": 16.69,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.874033106464822,
+      "held": null
+    },
+    {
+      "elapsed": 16.84,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 13.970460358568516,
+      "held": null
+    },
+    {
+      "elapsed": 17.02,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 14.116887610672165,
+      "held": null
+    },
+    {
+      "elapsed": 17.19,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 14.2597421148796,
+      "held": null
+    },
+    {
+      "elapsed": 17.34,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 14.356169366983295,
+      "held": null
+    },
+    {
+      "elapsed": 17.5,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 14.502596619086944,
+      "held": null
+    },
+    {
+      "elapsed": 17.67,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 14.645451123294379,
+      "held": null
+    },
+    {
+      "elapsed": 17.84,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 14.741878375398073,
+      "held": null
+    },
+    {
+      "elapsed": 18.0,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 14.888305627501722,
+      "held": null
+    },
+    {
+      "elapsed": 18.17,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 15.031160131709157,
+      "held": null
+    },
+    {
+      "elapsed": 18.33,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 15.128471957054444,
+      "held": null
+    },
+    {
+      "elapsed": 18.5,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 15.275783782399685,
+      "held": null
+    },
+    {
+      "elapsed": 18.66,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 15.373095607744972,
+      "held": null
+    },
+    {
+      "elapsed": 18.83,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 15.51771925843559,
+      "held": null
+    },
+    {
+      "elapsed": 19.0,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 15.665031083780832,
+      "held": null
+    },
+    {
+      "elapsed": 19.17,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 15.762342909126119,
+      "held": null
+    },
+    {
+      "elapsed": 19.33,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 15.906966559816738,
+      "held": null
+    },
+    {
+      "elapsed": 19.48,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.004278385162024,
+      "held": null
+    },
+    {
+      "elapsed": 19.66,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.151590210507266,
+      "held": null
+    },
+    {
+      "elapsed": 19.83,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.248902035852552,
+      "held": null
+    },
+    {
+      "elapsed": 20.0,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.39352568654317,
+      "held": null
+    },
+    {
+      "elapsed": 20.17,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.490837511888458,
+      "held": null
+    },
+    {
+      "elapsed": 20.34,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.6381493372337,
+      "held": null
+    },
+    {
+      "elapsed": 20.52,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.735461162578986,
+      "held": null
+    },
+    {
+      "elapsed": 20.66,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.832772987924272,
+      "held": null
+    },
+    {
+      "elapsed": 20.83,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 16.93008481326956,
+      "held": null
+    },
+    {
+      "elapsed": 20.98,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.027396638614846,
+      "held": null
+    },
+    {
+      "elapsed": 21.14,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.124708463960133,
+      "held": null
+    },
+    {
+      "elapsed": 21.31,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.22202028930542,
+      "held": null
+    },
+    {
+      "elapsed": 21.47,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.319332114650706,
+      "held": null
+    },
+    {
+      "elapsed": 21.64,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.463955765341325,
+      "held": null
+    },
+    {
+      "elapsed": 21.81,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.56126759068661,
+      "held": null
+    },
+    {
+      "elapsed": 21.98,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.708579416031853,
+      "held": null
+    },
+    {
+      "elapsed": 22.14,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.80589124137714,
+      "held": null
+    },
+    {
+      "elapsed": 22.31,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 17.95051489206776,
+      "held": null
+    },
+    {
+      "elapsed": 22.48,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 18.047826717413045,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 22.66,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 18.147826717412954,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 22.83,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 18.297826717412818,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 23.0,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 18.44782671741268,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 23.17,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 18.597826717412545,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 23.34,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 18.697826717412454,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 23.52,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 18.844873637258843,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 23.67,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 18.943397097182014,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 23.83,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 19.09192055710514,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 24.0,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 19.190444017028312,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 24.17,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 19.3374909368747,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 24.34,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 19.486014396797827,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 24.52,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 19.633061316644216,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 24.69,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 19.731584776567388,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 24.84,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 19.880108236490514,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 25.02,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 19.978631696413686,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 25.2,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 20.077155156336858,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 25.38,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 20.224202076183246,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 25.53,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 20.322725536106418,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 25.7,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 20.42124899602959,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 25.88,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 20.569772455952716,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 26.06,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 20.668295915875888,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 26.22,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 20.815342835722277,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 26.39,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 20.913866295645448,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 26.56,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 21.062389755568574,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 26.73,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 21.209436675414963,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 26.91,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 21.307960135338135,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 27.06,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 21.45648359526126,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 27.23,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 21.555007055184433,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 27.41,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 21.70205397503082,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 27.56,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 21.800577434953993,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 27.73,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 21.94910089487712,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 27.91,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 22.09614781472351,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 28.08,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 22.192642999199165,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 28.23,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 22.339138183674777,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 28.41,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 22.482128552626136,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 28.58,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 22.628623737101748,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 28.75,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 22.771614106053107,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 28.91,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 22.868109290528764,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 29.08,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 23.014604475004376,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 29.25,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 23.157594843955735,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 29.42,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 23.304090028431347,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 29.59,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 23.400585212907004,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 29.77,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 23.543575581858363,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 29.94,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 23.690070766333974,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 30.11,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 23.833061135285334,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 30.27,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 23.92955631976099,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 30.44,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 24.076051504236602,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 30.61,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 24.219041873187734,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 30.78,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 24.365537057663232,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 30.94,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 24.462032242138775,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 31.11,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 24.605022611089908,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 31.28,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 24.751517795565405,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 31.44,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 24.84801298004095,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 31.61,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 24.993551246582456,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 31.77,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 25.091320379853187,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 31.94,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 25.189089513123918,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 32.08,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 25.28685864639465,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 32.27,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 25.434627779665334,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 32.44,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 25.532396912936065,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 32.61,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 25.677935179477572,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 32.77,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 25.775704312748303,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 32.94,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 25.92347344601899,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 33.09,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 26.02124257928972,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 33.27,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 26.166780845831227,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 33.44,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 26.264549979101957,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 33.61,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 26.412319112372643,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 33.78,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 26.510088245643374,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 33.95,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 26.65562651218488,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 34.11,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 26.803395645455566,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 34.28,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 26.901164778726297,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 34.45,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 27.046703045267805,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 34.62,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 27.19447217853849,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 34.81,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 27.29224131180922,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 34.95,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 27.437779578350728,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 35.12,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 27.53554871162146,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 35.3,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 27.683317844892144,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 35.45,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 27.82885611143365,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 35.62,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 27.926625244704383,
+      "held": "red_cube"
+    },
+    {
+      "elapsed": 35.8,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 28.074394377975068,
+      "held": null
+    },
+    {
+      "elapsed": 35.97,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 28.22439437797493,
+      "held": null
+    },
+    {
+      "elapsed": 36.14,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 28.374394377974795,
+      "held": null
+    },
+    {
+      "elapsed": 36.31,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 28.474394377974704,
+      "held": null
+    },
+    {
+      "elapsed": 36.48,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 28.624394377974568,
+      "held": null
+    },
+    {
+      "elapsed": 36.66,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 28.723326002813792,
+      "held": null
+    },
+    {
+      "elapsed": 36.83,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 28.87225762765297,
+      "held": null
+    },
+    {
+      "elapsed": 37.0,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.020120877331465,
+      "held": null
+    },
+    {
+      "elapsed": 37.16,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.11905250217069,
+      "held": null
+    },
+    {
+      "elapsed": 37.33,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.267984127009868,
+      "held": null
+    },
+    {
+      "elapsed": 37.5,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.366915751849092,
+      "held": null
+    },
+    {
+      "elapsed": 37.67,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.465847376688316,
+      "held": null
+    },
+    {
+      "elapsed": 37.81,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.56477900152754,
+      "held": null
+    },
+    {
+      "elapsed": 38.0,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.663710626366765,
+      "held": null
+    },
+    {
+      "elapsed": 38.17,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.81157387604526,
+      "held": null
+    },
+    {
+      "elapsed": 38.34,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 29.910505500884483,
+      "held": null
+    },
+    {
+      "elapsed": 38.52,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 30.05943712572366,
+      "held": null
+    },
+    {
+      "elapsed": 38.67,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 30.207300375402156,
+      "held": null
+    },
+    {
+      "elapsed": 38.84,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 30.30623200024138,
+      "held": null
+    },
+    {
+      "elapsed": 39.02,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 30.45516362508056,
+      "held": null
+    },
+    {
+      "elapsed": 39.19,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 30.603026874759053,
+      "held": null
+    },
+    {
+      "elapsed": 39.36,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 30.75195849959823,
+      "held": null
+    },
+    {
+      "elapsed": 39.53,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 30.850890124437456,
+      "held": null
+    },
+    {
+      "elapsed": 39.69,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 30.94982174927668,
+      "held": null
+    },
+    {
+      "elapsed": 39.86,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.048753374115904,
+      "held": null
+    },
+    {
+      "elapsed": 40.03,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.196616623794398,
+      "held": null
+    },
+    {
+      "elapsed": 40.2,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.2938784447756,
+      "held": null
+    },
+    {
+      "elapsed": 40.38,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.391140265756803,
+      "held": null
+    },
+    {
+      "elapsed": 40.55,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.488402086738006,
+      "held": null
+    },
+    {
+      "elapsed": 40.72,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.58566390771921,
+      "held": null
+    },
+    {
+      "elapsed": 40.88,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.68292572870041,
+      "held": null
+    },
+    {
+      "elapsed": 41.03,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.83018754968157,
+      "held": null
+    },
+    {
+      "elapsed": 41.2,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 31.92744937066277,
+      "held": null
+    },
+    {
+      "elapsed": 41.36,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.02471119164397,
+      "held": null
+    },
+    {
+      "elapsed": 41.55,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.121973012625176,
+      "held": null
+    },
+    {
+      "elapsed": 41.72,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.26649665458763,
+      "held": null
+    },
+    {
+      "elapsed": 41.86,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.36375847556883,
+      "held": null
+    },
+    {
+      "elapsed": 42.02,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.46102029655003,
+      "held": null
+    },
+    {
+      "elapsed": 42.2,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.558282117531235,
+      "held": null
+    },
+    {
+      "elapsed": 42.38,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.70554393851239,
+      "held": null
+    },
+    {
+      "elapsed": 42.55,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.802805759493594,
+      "held": null
+    },
+    {
+      "elapsed": 42.72,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 32.9000675804748,
+      "held": null
+    },
+    {
+      "elapsed": 42.89,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 33.04459122243725,
+      "held": null
+    },
+    {
+      "elapsed": 43.05,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 33.14185304341845,
+      "held": null
+    },
+    {
+      "elapsed": 43.22,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 33.28911486439961,
+      "held": null
+    },
+    {
+      "elapsed": 43.39,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 33.43363850636206,
+      "held": null
+    },
+    {
+      "elapsed": 43.56,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 33.53090032734326,
+      "held": null
+    },
+    {
+      "elapsed": 43.73,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 33.67816214832442,
+      "held": null
+    },
+    {
+      "elapsed": 43.91,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 33.825423969305575,
+      "held": null
+    },
+    {
+      "elapsed": 44.08,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 33.97542396930544,
+      "held": null
+    },
+    {
+      "elapsed": 44.23,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.07542396930535,
+      "held": null
+    },
+    {
+      "elapsed": 44.41,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.1254239693053,
+      "held": null
+    },
+    {
+      "elapsed": 44.58,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.158757302638605,
+      "held": null
+    },
+    {
+      "elapsed": 44.73,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.158757302638605,
+      "held": null
+    },
+    {
+      "elapsed": 44.91,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.158757302638605,
+      "held": null
+    },
+    {
+      "elapsed": 45.08,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.19209063597191,
+      "held": null
+    },
+    {
+      "elapsed": 45.23,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.19209063597191,
+      "held": null
+    },
+    {
+      "elapsed": 45.39,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.275423969305166,
+      "held": null
+    },
+    {
+      "elapsed": 45.56,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.374035080416206,
+      "held": null
+    },
+    {
+      "elapsed": 45.73,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.52125730263833,
+      "held": null
+    },
+    {
+      "elapsed": 45.91,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.66986841374933,
+      "held": null
+    },
+    {
+      "elapsed": 46.08,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.817090635971454,
+      "held": null
+    },
+    {
+      "elapsed": 46.25,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 34.915701747082494,
+      "held": null
+    },
+    {
+      "elapsed": 46.41,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.06431285819349,
+      "held": null
+    },
+    {
+      "elapsed": 46.58,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.211535080415615,
+      "held": null
+    },
+    {
+      "elapsed": 46.75,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.310146191526655,
+      "held": null
+    },
+    {
+      "elapsed": 46.92,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.45875730263765,
+      "held": null
+    },
+    {
+      "elapsed": 47.09,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.608757302637514,
+      "held": null
+    },
+    {
+      "elapsed": 47.27,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.70875730263742,
+      "held": null
+    },
+    {
+      "elapsed": 47.44,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.80875730263733,
+      "held": null
+    },
+    {
+      "elapsed": 47.61,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.80875730263733,
+      "held": null
+    },
+    {
+      "elapsed": 47.77,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.842090635970635,
+      "held": null
+    },
+    {
+      "elapsed": 47.92,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.87542396930394,
+      "held": null
+    },
+    {
+      "elapsed": 48.08,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.87542396930394,
+      "held": null
+    },
+    {
+      "elapsed": 48.23,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.87542396930394,
+      "held": null
+    },
+    {
+      "elapsed": 48.41,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 35.958757302637196,
+      "held": null
+    },
+    {
+      "elapsed": 48.58,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 36.10597952485932,
+      "held": null
+    },
+    {
+      "elapsed": 48.75,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 36.25459063597032,
+      "held": null
+    },
+    {
+      "elapsed": 48.94,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 36.35320174708136,
+      "held": null
+    },
+    {
+      "elapsed": 49.09,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 36.50042396930348,
+      "held": null
+    },
+    {
+      "elapsed": 49.27,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 36.64903508041448,
+      "held": null
+    },
+    {
+      "elapsed": 49.42,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 36.74764619152552,
+      "held": null
+    },
+    {
+      "elapsed": 49.59,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 36.84625730263656,
+      "held": null
+    },
+    {
+      "elapsed": 49.77,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 36.9448684137476,
+      "held": null
+    },
+    {
+      "elapsed": 49.94,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.092090635969726,
+      "held": null
+    },
+    {
+      "elapsed": 50.11,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.24209063596959,
+      "held": null
+    },
+    {
+      "elapsed": 50.28,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.3420906359695,
+      "held": null
+    },
+    {
+      "elapsed": 50.44,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.49209063596936,
+      "held": null
+    },
+    {
+      "elapsed": 50.61,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.49209063596936,
+      "held": null
+    },
+    {
+      "elapsed": 50.78,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.525423969302665,
+      "held": null
+    },
+    {
+      "elapsed": 50.95,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.525423969302665,
+      "held": null
+    },
+    {
+      "elapsed": 51.12,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.55875730263597,
+      "held": null
+    },
+    {
+      "elapsed": 51.3,
+      "status": "executing",
+      "chars": 117,
+      "sim_time": 37.55875730263597,
+      "held": null
+    },
+    {
+      "elapsed": 51.47,
+      "status": "complete",
+      "chars": 117,
+      "sim_time": 37.59209063596927,
+      "held": null
+    }
+  ],
+  "final": {
+    "status": "complete",
+    "stage": "已将红色方块放到红色区域",
+    "busy": false,
+    "error": "",
+    "model": {
+      "configured": true,
+      "provider": "custom",
+      "model": "gpt-6.1-sol",
+      "api_style": "responses"
+    },
+    "scene": {
+      "scene_version": 4,
+      "objects": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            132,
+            213,
+            242,
+            315
+          ],
+          "center_base": [
+            0.2405,
+            -0.0402,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 1.1021,
+          "length": 0.0499,
+          "width": 0.0498,
+          "n_points": 9784,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v4-object-1",
+          "in_zone": false,
+          "view": 0
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.1012,
+          "length": 0.0467,
+          "width": 0.0465,
+          "n_points": 6409,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v4-object-2",
+          "in_zone": false,
+          "view": 1
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      },
+      "task": "L1",
+      "mode": "sim",
+      "observed_at": 1037.5920906359693,
+      "warnings": []
+    },
+    "speed": 1.0,
+    "needs_reset": false,
+    "metrics": {
+      "requests": 1,
+      "successes": 1,
+      "model_requests": 1
+    },
+    "usage": {
+      "input_tokens": 4865,
+      "output_tokens": 45,
+      "total_tokens": 4910
+    },
+    "messages": [
+      {
+        "id": 9,
+        "role": "user",
+        "content": "抓取红色方块",
+        "status": "complete"
+      },
+      {
+        "id": 17,
+        "role": "assistant",
+        "content": "{\"scene_version\":2,\"action\":\"pick\",\"object_id\":\"v2-object-3\",\"zone_name\":\"zone_red\",\"message\":\"抓取红色方块并放入zone_red区域。\"}",
+        "status": "complete",
+        "decision": {
+          "scene_version": 2,
+          "action": "pick",
+          "object_id": "v2-object-3",
+          "zone_name": "zone_red",
+          "message": "抓取红色方块并放入zone_red区域。"
+        }
+      }
+    ],
+    "events": [
+      {
+        "id": 1,
+        "kind": "observe_move",
+        "time": "19:18:11",
+        "ok": true,
+        "error": "",
+        "duration": 2.297,
+        "view": 0
+      },
+      {
+        "id": 2,
+        "kind": "observation",
+        "time": "19:18:12",
+        "ok": true,
+        "n": 1,
+        "stamp": 1002.9633333333311,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1022,
+            "length": 0.05,
+            "width": 0.0498,
+            "n_points": 9774,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              264,
+              62,
+              329,
+              144
+            ],
+            "center_base": [
+              0.3367,
+              -0.1638,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": -0.471,
+            "length": 0.0466,
+            "width": 0.0459,
+            "n_points": 4956,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              0,
+              237,
+              28,
+              286
+            ],
+            "center_base": [
+              0.3155,
+              0.0715,
+              0.0277
+            ],
+            "top_z": 0.0277,
+            "height": 0.0276,
+            "yaw": -0.265,
+            "length": 0.031,
+            "width": 0.0172,
+            "n_points": 718,
+            "valid": false,
+            "reject_reason": "touches_image_border",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 3,
+        "kind": "observe_move",
+        "time": "19:18:12",
+        "ok": true,
+        "error": "",
+        "duration": 1.183,
+        "view": 1
+      },
+      {
+        "id": 4,
+        "kind": "observation",
+        "time": "19:18:13",
+        "ok": true,
+        "n": 2,
+        "stamp": 1004.6466666666631,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              328,
+              189,
+              440,
+              311
+            ],
+            "center_base": [
+              0.2406,
+              -0.0397,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": -0.468,
+            "length": 0.0497,
+            "width": 0.0489,
+            "n_points": 8394,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              138,
+              99,
+              238,
+              205
+            ],
+            "center_base": [
+              0.3223,
+              0.0969,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": 0.4243,
+            "length": 0.0491,
+            "width": 0.0483,
+            "n_points": 6694,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              189
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.0966,
+            "length": 0.0467,
+            "width": 0.0466,
+            "n_points": 6426,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 5,
+        "kind": "observe_move",
+        "time": "19:18:13",
+        "ok": true,
+        "error": "",
+        "duration": 1.183,
+        "view": 2
+      },
+      {
+        "id": 6,
+        "kind": "observation",
+        "time": "19:18:14",
+        "ok": true,
+        "n": 3,
+        "stamp": 1006.3299999999952,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              497,
+              256,
+              640,
+              392
+            ],
+            "center_base": [
+              0.2406,
+              -0.0396,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": -0.4707,
+            "length": 0.0496,
+            "width": 0.0495,
+            "n_points": 12225,
+            "valid": false,
+            "reject_reason": "touches_image_border",
+            "track_id": -1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              374,
+              97,
+              457,
+              191
+            ],
+            "center_base": [
+              0.3222,
+              0.0973,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": -1.1494,
+            "length": 0.0494,
+            "width": 0.0491,
+            "n_points": 6722,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 7,
+        "kind": "scene",
+        "time": "19:18:14",
+        "scene_version": 1,
+        "objects": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1022,
+            "length": 0.05,
+            "width": 0.0498,
+            "n_points": 9774,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v1-object-1",
+            "in_zone": false,
+            "view": 0
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              189
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.0966,
+            "length": 0.0467,
+            "width": 0.0466,
+            "n_points": 6426,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v1-object-2",
+            "in_zone": false,
+            "view": 1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              374,
+              97,
+              457,
+              191
+            ],
+            "center_base": [
+              0.3222,
+              0.0973,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": -1.1494,
+            "length": 0.0494,
+            "width": 0.0491,
+            "n_points": 6722,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v1-object-3",
+            "in_zone": false,
+            "view": 2
+          }
+        ],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "observed_at": 1006.3299999999952,
+        "warnings": []
+      },
+      {
+        "id": 8,
+        "kind": "ready",
+        "time": "19:18:14",
+        "message": "L1 场景已就绪",
+        "scene_version": 1
+      },
+      {
+        "id": 10,
+        "kind": "observe_move",
+        "time": "19:19:05",
+        "ok": true,
+        "error": "",
+        "duration": 2.017,
+        "view": 0
+      },
+      {
+        "id": 11,
+        "kind": "observation",
+        "time": "19:19:07",
+        "ok": true,
+        "n": 4,
+        "stamp": 1008.8466666666607,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1017,
+            "length": 0.0499,
+            "width": 0.0498,
+            "n_points": 9785,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              265,
+              62,
+              329,
+              144
+            ],
+            "center_base": [
+              0.3367,
+              -0.1638,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": -0.4711,
+            "length": 0.0466,
+            "width": 0.0459,
+            "n_points": 4956,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              0,
+              237,
+              28,
+              286
+            ],
+            "center_base": [
+              0.3155,
+              0.0716,
+              0.0276
+            ],
+            "top_z": 0.0276,
+            "height": 0.0276,
+            "yaw": -0.2868,
+            "length": 0.0312,
+            "width": 0.0176,
+            "n_points": 725,
+            "valid": false,
+            "reject_reason": "touches_image_border",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 12,
+        "kind": "observe_move",
+        "time": "19:19:08",
+        "ok": true,
+        "error": "",
+        "duration": 1.183,
+        "view": 1
+      },
+      {
+        "id": 13,
+        "kind": "observation",
+        "time": "19:19:10",
+        "ok": true,
+        "n": 5,
+        "stamp": 1010.5299999999927,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              328,
+              189,
+              440,
+              311
+            ],
+            "center_base": [
+              0.2406,
+              -0.0398,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": -0.4688,
+            "length": 0.0497,
+            "width": 0.0489,
+            "n_points": 8402,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              138,
+              99,
+              238,
+              205
+            ],
+            "center_base": [
+              0.3224,
+              0.0969,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": 0.426,
+            "length": 0.0492,
+            "width": 0.0483,
+            "n_points": 6697,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              89,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.0993,
+            "length": 0.0468,
+            "width": 0.0465,
+            "n_points": 6424,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 14,
+        "kind": "observe_move",
+        "time": "19:19:11",
+        "ok": true,
+        "error": "",
+        "duration": 1.183,
+        "view": 2
+      },
+      {
+        "id": 15,
+        "kind": "observation",
+        "time": "19:19:13",
+        "ok": true,
+        "n": 6,
+        "stamp": 1012.2133333333247,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              498,
+              256,
+              640,
+              392
+            ],
+            "center_base": [
+              0.2406,
+              -0.0395,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": -0.4695,
+            "length": 0.0496,
+            "width": 0.0495,
+            "n_points": 12230,
+            "valid": false,
+            "reject_reason": "touches_image_border",
+            "track_id": -1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              374,
+              97,
+              457,
+              191
+            ],
+            "center_base": [
+              0.3222,
+              0.0973,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": -1.148,
+            "length": 0.0494,
+            "width": 0.0491,
+            "n_points": 6707,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 16,
+        "kind": "scene",
+        "time": "19:19:13",
+        "scene_version": 2,
+        "objects": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1017,
+            "length": 0.0499,
+            "width": 0.0498,
+            "n_points": 9785,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v2-object-1",
+            "in_zone": false,
+            "view": 0
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              89,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.0993,
+            "length": 0.0468,
+            "width": 0.0465,
+            "n_points": 6424,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v2-object-2",
+            "in_zone": false,
+            "view": 1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              374,
+              97,
+              457,
+              191
+            ],
+            "center_base": [
+              0.3222,
+              0.0973,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": -1.148,
+            "length": 0.0494,
+            "width": 0.0491,
+            "n_points": 6707,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v2-object-3",
+            "in_zone": false,
+            "view": 2
+          }
+        ],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "observed_at": 1012.2133333333247,
+        "warnings": []
+      },
+      {
+        "id": 18,
+        "kind": "decision",
+        "time": "19:19:17",
+        "message": "抓取红色方块并放入zone_red区域。",
+        "decision": {
+          "scene_version": 2,
+          "action": "pick",
+          "object_id": "v2-object-3",
+          "zone_name": "zone_red",
+          "message": "抓取红色方块并放入zone_red区域。"
+        }
+      },
+      {
+        "id": 19,
+        "kind": "decision",
+        "time": "19:19:17",
+        "action": "tilt",
+        "label": "red",
+        "tilt_deg": {
+          "pre_grasp": 10.0,
+          "grasp": 0.0,
+          "lift": 10.0,
+          "pre_place": 15.0,
+          "release": 0.0,
+          "retreat": 10.0
+        }
+      },
+      {
+        "id": 20,
+        "kind": "decision",
+        "time": "19:19:17",
+        "action": "pick",
+        "label": "red",
+        "zone": "zone_red",
+        "target": {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            374,
+            97,
+            457,
+            191
+          ],
+          "center_base": [
+            0.3222,
+            0.0973,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.148,
+          "length": 0.0494,
+          "width": 0.0491,
+          "n_points": 6707,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        "attempt": 1,
+        "closing_angle": 1.9936,
+        "grasp_xyz": [
+          0.3229,
+          0.0972,
+          0.0106
+        ],
+        "release_xyz": [
+          0.17,
+          -0.35,
+          0.0206
+        ],
+        "transit_z": 0.15,
+        "place": {
+          "xy": [
+            0.17,
+            -0.35
+          ],
+          "reserved_diagonal": false,
+          "axis": null,
+          "edge_margin": 0.075,
+          "clearance": null,
+          "footprint_clearance": null,
+          "finger_clearance": null,
+          "tier": "slot",
+          "open_width": 0.0702
+        },
+        "grasp": {
+          "kind": "square",
+          "mode": "profile",
+          "section_max": 0.0502,
+          "fit": 0.09,
+          "z_rel": 0.0106
+        },
+        "remaining": 3590.68
+      },
+      {
+        "id": 21,
+        "kind": "skill_step",
+        "time": "19:19:18",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "open",
+        "ok": true,
+        "error": "",
+        "duration": 0.6,
+        "command": 0.1,
+        "width": 0.1,
+        "message": "张开夹爪"
+      },
+      {
+        "id": 22,
+        "kind": "stage",
+        "time": "19:19:18",
+        "stage": "pre",
+        "message": "移动到目标上方"
+      },
+      {
+        "id": 23,
+        "kind": "skill_step",
+        "time": "19:19:21",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "pre",
+        "ok": true,
+        "error": "",
+        "duration": 2.218,
+        "target": [
+          0.3229,
+          0.0972,
+          0.1306
+        ],
+        "linear": false,
+        "pos_err": 3.04719405263318e-08,
+        "message": "移动到目标上方"
+      },
+      {
+        "id": 24,
+        "kind": "stage",
+        "time": "19:19:21",
+        "stage": "descend",
+        "message": "下降到抓取位置"
+      },
+      {
+        "id": 25,
+        "kind": "skill_step",
+        "time": "19:19:25",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "descend",
+        "ok": true,
+        "error": "",
+        "duration": 3.017,
+        "target": [
+          0.3229,
+          0.0972,
+          0.0106
+        ],
+        "linear": true,
+        "pos_err": 7.624262922461566e-08,
+        "message": "下降到抓取位置"
+      },
+      {
+        "id": 26,
+        "kind": "skill_step",
+        "time": "19:19:26",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "close",
+        "ok": true,
+        "error": "",
+        "duration": 0.6,
+        "command": 0.0,
+        "width": 0.0505,
+        "message": "闭合夹爪抓取方块"
+      },
+      {
+        "id": 27,
+        "kind": "stage",
+        "time": "19:19:26",
+        "stage": "lift",
+        "message": "提起方块"
+      },
+      {
+        "id": 28,
+        "kind": "skill_step",
+        "time": "19:19:30",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "lift",
+        "ok": true,
+        "error": "",
+        "duration": 3.448,
+        "target": [
+          0.3229,
+          0.0972,
+          0.15
+        ],
+        "linear": true,
+        "pos_err": 4.028200553128066e-09,
+        "message": "提起方块"
+      },
+      {
+        "id": 29,
+        "kind": "stage",
+        "time": "19:19:30",
+        "stage": "transit",
+        "message": "移动到放置区域上方"
+      },
+      {
+        "id": 30,
+        "kind": "skill_step",
+        "time": "19:19:34",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "transit",
+        "ok": true,
+        "error": "",
+        "duration": 2.702,
+        "target": [
+          0.17,
+          -0.35,
+          0.15
+        ],
+        "linear": false,
+        "pos_err": 4.367637271499031e-09,
+        "message": "移动到放置区域上方"
+      },
+      {
+        "id": 31,
+        "kind": "stage",
+        "time": "19:19:34",
+        "stage": "release",
+        "message": "下降到放置位置"
+      },
+      {
+        "id": 32,
+        "kind": "skill_step",
+        "time": "19:19:38",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "release",
+        "ok": true,
+        "error": "",
+        "duration": 3.226,
+        "target": [
+          0.17,
+          -0.35,
+          0.0206
+        ],
+        "linear": true,
+        "pos_err": 4.458436946731576e-09,
+        "message": "下降到放置位置"
+      },
+      {
+        "id": 33,
+        "kind": "skill_step",
+        "time": "19:19:39",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "open_release",
+        "ok": true,
+        "error": "",
+        "duration": 0.6,
+        "command": 0.0705,
+        "width": 0.0705,
+        "message": "张开夹爪放下方块"
+      },
+      {
+        "id": 34,
+        "kind": "stage",
+        "time": "19:19:39",
+        "stage": "retreat",
+        "message": "抬起并离开放置区域"
+      },
+      {
+        "id": 35,
+        "kind": "skill_step",
+        "time": "19:19:42",
+        "label": "red",
+        "zone": "zone_red",
+        "stage": "retreat",
+        "ok": true,
+        "error": "",
+        "duration": 2.572,
+        "target": [
+          0.17,
+          -0.35,
+          0.1206
+        ],
+        "linear": true,
+        "pos_err": 1.0641869220171226e-07,
+        "message": "抬起并离开放置区域"
+      },
+      {
+        "id": 36,
+        "kind": "pick_result",
+        "time": "19:19:42",
+        "ok": true,
+        "stage": "done",
+        "error": "",
+        "label": "red",
+        "zone": "zone_red",
+        "duration": 18.983,
+        "grasp_width": 0.0504717474790643,
+        "fault": false,
+        "holding": false
+      },
+      {
+        "id": 37,
+        "kind": "observe_move",
+        "time": "19:19:46",
+        "ok": true,
+        "error": "",
+        "duration": 2.529,
+        "view": 0
+      },
+      {
+        "id": 38,
+        "kind": "observation",
+        "time": "19:19:48",
+        "ok": true,
+        "n": 7,
+        "stamp": 1034.2254239693052,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1021,
+            "length": 0.0499,
+            "width": 0.0498,
+            "n_points": 9784,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              265,
+              62,
+              329,
+              144
+            ],
+            "center_base": [
+              0.3366,
+              -0.1638,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": -0.471,
+            "length": 0.0465,
+            "width": 0.0459,
+            "n_points": 4972,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 39,
+        "kind": "observe_move",
+        "time": "19:19:49",
+        "ok": true,
+        "error": "",
+        "duration": 1.183,
+        "view": 1
+      },
+      {
+        "id": 40,
+        "kind": "observation",
+        "time": "19:19:51",
+        "ok": true,
+        "n": 8,
+        "stamp": 1035.9087573026372,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              328,
+              189,
+              440,
+              311
+            ],
+            "center_base": [
+              0.2406,
+              -0.0398,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": -0.4693,
+            "length": 0.0498,
+            "width": 0.049,
+            "n_points": 8409,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.1012,
+            "length": 0.0467,
+            "width": 0.0465,
+            "n_points": 6409,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 41,
+        "kind": "observe_move",
+        "time": "19:19:52",
+        "ok": true,
+        "error": "",
+        "duration": 1.183,
+        "view": 2
+      },
+      {
+        "id": 42,
+        "kind": "observation",
+        "time": "19:19:54",
+        "ok": true,
+        "n": 9,
+        "stamp": 1037.5920906359693,
+        "detections": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              497,
+              256,
+              640,
+              392
+            ],
+            "center_base": [
+              0.2406,
+              -0.0395,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": -0.4691,
+            "length": 0.0496,
+            "width": 0.0495,
+            "n_points": 12243,
+            "valid": false,
+            "reject_reason": "touches_image_border",
+            "track_id": -1
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": 43,
+        "kind": "scene",
+        "time": "19:19:54",
+        "scene_version": 4,
+        "objects": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1021,
+            "length": 0.0499,
+            "width": 0.0498,
+            "n_points": 9784,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v4-object-1",
+            "in_zone": false,
+            "view": 0
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.1012,
+            "length": 0.0467,
+            "width": 0.0465,
+            "n_points": 6409,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v4-object-2",
+            "in_zone": false,
+            "view": 1
+          }
+        ],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "observed_at": 1037.5920906359693,
+        "warnings": []
+      },
+      {
+        "id": 44,
+        "kind": "execution_result",
+        "time": "19:19:54",
+        "ok": true,
+        "stage": "done",
+        "error": "",
+        "label": "red",
+        "zone": "zone_red",
+        "duration": 18.983,
+        "grasp_width": 0.0504717474790643,
+        "fault": false,
+        "recovery": "",
+        "object_id": "v2-object-3",
+        "aborted": false,
+        "holding": false,
+        "scene": {
+          "scene_version": 4,
+          "objects": [
+            {
+              "label": "green",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                132,
+                213,
+                242,
+                315
+              ],
+              "center_base": [
+                0.2405,
+                -0.0402,
+                0.051
+              ],
+              "top_z": 0.051,
+              "height": 0.051,
+              "yaw": 1.1021,
+              "length": 0.0499,
+              "width": 0.0498,
+              "n_points": 9784,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v4-object-1",
+              "in_zone": false,
+              "view": 0
+            },
+            {
+              "label": "yellow",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                484,
+                88,
+                586,
+                188
+              ],
+              "center_base": [
+                0.3368,
+                -0.1634,
+                0.0482
+              ],
+              "top_z": 0.0482,
+              "height": 0.0482,
+              "yaw": 1.1012,
+              "length": 0.0467,
+              "width": 0.0465,
+              "n_points": 6409,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v4-object-2",
+              "in_zone": false,
+              "view": 1
+            }
+          ],
+          "zones": [
+            {
+              "center": [
+                0.17,
+                0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "green",
+              "name": "zone_green",
+              "color_rgb": [
+                60,
+                165,
+                70
+              ]
+            },
+            {
+              "center": [
+                0.49,
+                0.0,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "yellow",
+              "name": "zone_yellow",
+              "color_rgb": [
+                230,
+                205,
+                50
+              ]
+            },
+            {
+              "center": [
+                0.17,
+                -0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "red",
+              "name": "zone_red",
+              "color_rgb": [
+                205,
+                55,
+                55
+              ]
+            }
+          ],
+          "class_to_zone": {
+            "red": "zone_red",
+            "green": "zone_green",
+            "yellow": "zone_yellow"
+          },
+          "task": "L1",
+          "mode": "sim",
+          "observed_at": 1037.5920906359693,
+          "warnings": []
+        },
+        "score": {
+          "correct": 1,
+          "wrong": 0,
+          "remaining": 2
+        },
+        "controller_ok": true,
+        "truth": {
+          "success": true,
+          "object_name": "red_cube",
+          "expected_zone": "zone_red",
+          "actual_zone": "zone_red"
+        },
+        "message": "已将红色方块放到红色区域"
+      },
+      {
+        "id": 45,
+        "kind": "result",
+        "time": "19:19:54",
+        "message": "已将红色方块放到红色区域",
+        "result": {
+          "ok": true,
+          "stage": "done",
+          "error": "",
+          "label": "red",
+          "zone": "zone_red",
+          "duration": 18.983,
+          "grasp_width": 0.0504717474790643,
+          "fault": false,
+          "recovery": "",
+          "object_id": "v2-object-3",
+          "aborted": false,
+          "holding": false,
+          "scene": {
+            "scene_version": 4,
+            "objects": [
+              {
+                "label": "green",
+                "score": 1.0,
+                "score_kind": "color",
+                "bbox": [
+                  132,
+                  213,
+                  242,
+                  315
+                ],
+                "center_base": [
+                  0.2405,
+                  -0.0402,
+                  0.051
+                ],
+                "top_z": 0.051,
+                "height": 0.051,
+                "yaw": 1.1021,
+                "length": 0.0499,
+                "width": 0.0498,
+                "n_points": 9784,
+                "valid": true,
+                "reject_reason": "",
+                "track_id": -1,
+                "object_id": "v4-object-1",
+                "in_zone": false,
+                "view": 0
+              },
+              {
+                "label": "yellow",
+                "score": 1.0,
+                "score_kind": "color",
+                "bbox": [
+                  484,
+                  88,
+                  586,
+                  188
+                ],
+                "center_base": [
+                  0.3368,
+                  -0.1634,
+                  0.0482
+                ],
+                "top_z": 0.0482,
+                "height": 0.0482,
+                "yaw": 1.1012,
+                "length": 0.0467,
+                "width": 0.0465,
+                "n_points": 6409,
+                "valid": true,
+                "reject_reason": "",
+                "track_id": -1,
+                "object_id": "v4-object-2",
+                "in_zone": false,
+                "view": 1
+              }
+            ],
+            "zones": [
+              {
+                "center": [
+                  0.17,
+                  0.35,
+                  0.0
+                ],
+                "size": [
+                  0.2,
+                  0.2
+                ],
+                "yaw": 0.0,
+                "wall_height": 0.0,
+                "label": "green",
+                "name": "zone_green",
+                "color_rgb": [
+                  60,
+                  165,
+                  70
+                ]
+              },
+              {
+                "center": [
+                  0.49,
+                  0.0,
+                  0.0
+                ],
+                "size": [
+                  0.2,
+                  0.2
+                ],
+                "yaw": 0.0,
+                "wall_height": 0.0,
+                "label": "yellow",
+                "name": "zone_yellow",
+                "color_rgb": [
+                  230,
+                  205,
+                  50
+                ]
+              },
+              {
+                "center": [
+                  0.17,
+                  -0.35,
+                  0.0
+                ],
+                "size": [
+                  0.2,
+                  0.2
+                ],
+                "yaw": 0.0,
+                "wall_height": 0.0,
+                "label": "red",
+                "name": "zone_red",
+                "color_rgb": [
+                  205,
+                  55,
+                  55
+                ]
+              }
+            ],
+            "class_to_zone": {
+              "red": "zone_red",
+              "green": "zone_green",
+              "yellow": "zone_yellow"
+            },
+            "task": "L1",
+            "mode": "sim",
+            "observed_at": 1037.5920906359693,
+            "warnings": []
+          },
+          "score": {
+            "correct": 1,
+            "wrong": 0,
+            "remaining": 2
+          },
+          "controller_ok": true,
+          "truth": {
+            "success": true,
+            "object_name": "red_cube",
+            "expected_zone": "zone_red",
+            "actual_zone": "zone_red"
+          },
+          "message": "已将红色方块放到红色区域"
+        }
+      }
+    ],
+    "last_result": {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "red",
+      "zone": "zone_red",
+      "duration": 18.983,
+      "grasp_width": 0.0504717474790643,
+      "fault": false,
+      "recovery": "",
+      "object_id": "v2-object-3",
+      "aborted": false,
+      "holding": false,
+      "scene": {
+        "scene_version": 4,
+        "objects": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1021,
+            "length": 0.0499,
+            "width": 0.0498,
+            "n_points": 9784,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v4-object-1",
+            "in_zone": false,
+            "view": 0
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.1012,
+            "length": 0.0467,
+            "width": 0.0465,
+            "n_points": 6409,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v4-object-2",
+            "in_zone": false,
+            "view": 1
+          }
+        ],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "observed_at": 1037.5920906359693,
+        "warnings": []
+      },
+      "score": {
+        "correct": 1,
+        "wrong": 0,
+        "remaining": 2
+      },
+      "controller_ok": true,
+      "truth": {
+        "success": true,
+        "object_name": "red_cube",
+        "expected_zone": "zone_red",
+        "actual_zone": "zone_red"
+      },
+      "message": "已将红色方块放到红色区域"
+    },
+    "simulation": {
+      "mode": "sim",
+      "simulation_kind": "kinematic",
+      "seed": 0,
+      "status": "ready",
+      "stage": "",
+      "scene_version": 4,
+      "sim_time": 37.59209063596927,
+      "camera_available": true,
+      "speed": 1.0,
+      "joints": [
+        0.5,
+        0.486,
+        -0.47,
+        0.0,
+        1.168,
+        0.0
+      ],
+      "tcp_xyz": [
+        0.1083452359074307,
+        0.05918927213894227,
+        0.12105595238978792
+      ],
+      "tcp_transform": [
+        [
+          -0.7808035936893205,
+          -0.479425538604203,
+          0.4006206447699772,
+          0.1083452359074307
+        ],
+        [
+          -0.42655494731145516,
+          0.8775825618903728,
+          0.21886005572066344,
+          0.05918927213894227
+        ],
+        [
+          -0.45650479187623455,
+          1.1571203584573163e-16,
+          -0.8897209534421655,
+          0.12105595238978792
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "gripper_width": 0.0704717474790643,
+      "link_points": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.123
+        ],
+        [
+          0.0,
+          0.0,
+          0.123
+        ],
+        [
+          -0.20332141755315303,
+          -0.11107499664785649,
+          0.2890266460055585
+        ],
+        [
+          0.014800315353641014,
+          0.00808544912816736,
+          0.3288057950185336
+        ],
+        [
+          0.014800315353641014,
+          0.00808544912816736,
+          0.3288057950185336
+        ],
+        [
+          0.05125679402770895,
+          0.02800171419874773,
+          0.2478411882552965
+        ],
+        [
+          0.1083452359074307,
+          0.05918927213894227,
+          0.12105595238978792
+        ]
+      ],
+      "link_frames": [
+        [
+          [
+            0.8775825618903728,
+            -0.479425538604203,
+            0.0,
+            0.0
+          ],
+          [
+            0.479425538604203,
+            0.8775825618903728,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.123
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          [
+            -0.7133333949168617,
+            0.511181592617002,
+            -0.479425538604203,
+            0.0
+          ],
+          [
+            -0.38969580973180545,
+            0.27925977680898234,
+            0.8775825618903728,
+            0.0
+          ],
+          [
+            0.5824883205471654,
+            0.8128390716655682,
+            6.123233995736766e-17,
+            0.123
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          [
+            0.062489277243017505,
+            -0.8753549241100522,
+            -0.479425538604203,
+            -0.20332141755315303
+          ],
+          [
+            0.03413804774639945,
+            -0.4782085745383438,
+            0.8775825618903728,
+            -0.11107499664785649
+          ],
+          [
+            -0.9974616202770461,
+            -0.07120615194131857,
+            6.123233995736766e-17,
+            0.2890266460055585
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          [
+            0.062489277243017505,
+            -0.47942553860420306,
+            0.8753549241100522,
+            0.014800315353641014
+          ],
+          [
+            0.03413804774639945,
+            0.8775825618903728,
+            0.47820857453834387,
+            0.00808544912816736
+          ],
+          [
+            -0.9974616202770461,
+            5.687222065464086e-17,
+            0.07120615194131857,
+            0.3288057950185336
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          [
+            -0.7808035936893205,
+            -0.4006206447699773,
+            -0.479425538604203,
+            0.014800315353641014
+          ],
+          [
+            -0.42655494731145516,
+            -0.2188600557206634,
+            0.8775825618903728,
+            0.00808544912816736
+          ],
+          [
+            -0.45650479187623455,
+            0.8897209534421655,
+            6.123233995736766e-17,
+            0.3288057950185336
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          [
+            -0.7808035936893205,
+            -0.479425538604203,
+            0.4006206447699772,
+            0.05125679402770895
+          ],
+          [
+            -0.42655494731145516,
+            0.8775825618903728,
+            0.21886005572066344,
+            0.02800171419874773
+          ],
+          [
+            -0.45650479187623455,
+            1.1571203584573163e-16,
+            -0.8897209534421655,
+            0.2478411882552965
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      ],
+      "objects": [
+        {
+          "id": "yellow_cube",
+          "label": "yellow",
+          "shape": "box",
+          "center": [
+            0.3376246272669903,
+            -0.16424512249721407,
+            0.024037013203815464
+          ],
+          "size": [
+            0.04807402640763093,
+            0.04807402640763093,
+            0.04807402640763093
+          ],
+          "yaw": -2.0425141150644635,
+          "transform": [
+            [
+              -0.4544171419853673,
+              0.8907890104114725,
+              0.0,
+              0.3376246272669903
+            ],
+            [
+              -0.8907890104114725,
+              -0.4544171419853673,
+              0.0,
+              -0.16424512249721407
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "color_rgb": [
+            224,
+            198,
+            34
+          ],
+          "held": false,
+          "placed": false,
+          "zone": null
+        },
+        {
+          "id": "green_cube",
+          "label": "green",
+          "shape": "box",
+          "center": [
+            0.24126613332391994,
+            -0.04000699673363822,
+            0.02546323280782978
+          ],
+          "size": [
+            0.05092646561565956,
+            0.05092646561565956,
+            0.05092646561565956
+          ],
+          "yaw": 2.6726933887787814,
+          "transform": [
+            [
+              -0.8920662558455699,
+              -0.4519046306264921,
+              0.0,
+              0.24126613332391994
+            ],
+            [
+              0.4519046306264921,
+              -0.8920662558455699,
+              0.0,
+              -0.04000699673363822
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "color_rgb": [
+            60,
+            164,
+            54
+          ],
+          "held": false,
+          "placed": false,
+          "zone": null
+        },
+        {
+          "id": "red_cube",
+          "label": "red",
+          "shape": "box",
+          "center": [
+            0.17013624276480221,
+            -0.3502804985992223,
+            0.025230841929938738
+          ],
+          "size": [
+            0.050461683859877475,
+            0.050461683859877475,
+            0.050461683859877475
+          ],
+          "yaw": -1.1180438354851505,
+          "transform": [
+            [
+              0.4374423561120435,
+              0.8992464540264499,
+              0.0,
+              0.17013624276480221
+            ],
+            [
+              -0.8992464540264499,
+              0.4374423561120435,
+              0.0,
+              -0.3502804985992223
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "color_rgb": [
+            200,
+            40,
+            46
+          ],
+          "held": false,
+          "placed": true,
+          "zone": "zone_red"
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "table_z": 0.0,
+      "pick_polygon": [
+        [
+          0.12,
+          -0.25
+        ],
+        [
+          0.4,
+          -0.25
+        ],
+        [
+          0.4,
+          0.25
+        ],
+        [
+          0.12,
+          0.25
+        ]
+      ],
+      "held_object": null,
+      "score": {
+        "correct": 1,
+        "wrong": 0,
+        "remaining": 2
+      },
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      }
+    },
+    "camera_available": true
+  }
+}

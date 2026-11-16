@@ -1,4 +1,14 @@
-# PiPER 视觉抓取与分拣
+# Robot-Grasp：机械臂视觉抓取仿真与大模型交互
+
+本仓库在 [Oner-Z/agileX](https://github.com/Oner-Z/agileX) 的基础上，面向机械臂视觉抓取课题开展仿真复现与算法实验。当前新增能力为中文指令、大模型实时回复、可视化抓放和失败反馈恢复，采用 L1 运动学仿真。Gazebo、MoveIt2 与接触物理的完整抓取闭环仍属于后续工作。
+
+仓库最初两次提交分别保留原始下载版本和本地开发版本，来源与依赖版本见 [UPSTREAM.md](UPSTREAM.md)。课题路线见 [仿真复现与课题路线](仿真复现与课题路线.md)，文件导览与 L1 操作见 [项目文件导览与L1复现](项目文件导览与L1复现.md)。
+
+## 本地大模型抓取界面（2026-11-16）
+
+双击根目录的 **启动智能抓取界面.cmd**，或在 `ws/src/cube_task` 运行 `python -m cube_task assistant_ui --open-browser`，打开 <http://127.0.0.1:8767>。执行异常时，助手会重新观测并向模型请求恢复方案，最多自动尝试 3 次。
+
+本地新增首版支持中文指令、复用当前中转站模型、实时公开回复、机械臂与物块可视化、停止/重置及结果核验。执行使用 L1 运动学仿真，详细操作见 [大模型抓取界面使用说明](大模型抓取界面使用说明.md)。下文保留上游原有项目说明与历史状态。
 
 面向松灵高校具身智能交流赛的视觉操作项目，使用 PiPER 六轴机械臂、平行夹爪和 RGB-D 相机完成方块抓取、果蔬分拣及自然语言指令任务。主要代码位于 [`ws/src/cube_task`](ws/src/cube_task)。
 
@@ -77,7 +87,7 @@ vision/
 以下示例将仓库放在 `~/vision`；已有本地仓库时，直接在现有目录执行子模块初始化即可。
 
 ```bash
-git clone --recurse-submodules https://github.com/Oner-Z/agileX.git ~/vision
+git clone --recurse-submodules https://github.com/Camellia-zsc/Robot-Grasp.git ~/vision
 cd ~/vision
 git submodule update --init --recursive
 ```

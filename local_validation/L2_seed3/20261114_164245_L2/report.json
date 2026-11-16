@@ -1,0 +1,124 @@
+{
+  "task": "L2",
+  "ok": false,
+  "placed": 4,
+  "required": 6,
+  "attempts": 10,
+  "elapsed": 175.564,
+  "time_limit": 300.0,
+  "stop_reason": "no_targets",
+  "fault_detail": "",
+  "dry_run": false,
+  "picks": [
+    {
+      "ok": false,
+      "stage": "grasp_miss",
+      "error": "grasp_miss",
+      "label": "bell_pepper",
+      "zone": "zone_red",
+      "duration": 9.094,
+      "grasp_width": 0.0,
+      "fault": false,
+      "recovery": "retreated"
+    },
+    {
+      "ok": false,
+      "stage": "grasp_miss",
+      "error": "grasp_miss",
+      "label": "bell_pepper",
+      "zone": "zone_red",
+      "duration": 8.865,
+      "grasp_width": 0.0,
+      "fault": false,
+      "recovery": "retreated"
+    },
+    {
+      "ok": false,
+      "stage": "grasp_miss",
+      "error": "grasp_miss",
+      "label": "bell_pepper",
+      "zone": "zone_red",
+      "duration": 8.865,
+      "grasp_width": 0.0,
+      "fault": false,
+      "recovery": "retreated"
+    },
+    {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "persimmon",
+      "zone": "zone_red",
+      "duration": 18.567,
+      "grasp_width": 0.06998724987799922,
+      "fault": false,
+      "recovery": ""
+    },
+    {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "potato",
+      "zone": "zone_yellow",
+      "duration": 18.599,
+      "grasp_width": 0.07010307207466654,
+      "fault": false,
+      "recovery": ""
+    },
+    {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "banana",
+      "zone": "zone_yellow",
+      "duration": 20.642,
+      "grasp_width": 0.04154312458010456,
+      "fault": false,
+      "recovery": ""
+    },
+    {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "cucumber",
+      "zone": "zone_green",
+      "duration": 18.99,
+      "grasp_width": 0.040521591775821444,
+      "fault": false,
+      "recovery": ""
+    },
+    {
+      "ok": false,
+      "stage": "grasp_miss",
+      "error": "grasp_miss",
+      "label": "pear",
+      "zone": "zone_green",
+      "duration": 10.746,
+      "grasp_width": 0.0,
+      "fault": false,
+      "recovery": "retreated"
+    },
+    {
+      "ok": false,
+      "stage": "grasp_miss",
+      "error": "grasp_miss",
+      "label": "pear",
+      "zone": "zone_green",
+      "duration": 10.499,
+      "grasp_width": 0.0,
+      "fault": false,
+      "recovery": "retreated"
+    },
+    {
+      "ok": false,
+      "stage": "grasp_miss",
+      "error": "grasp_miss",
+      "label": "pear",
+      "zone": "zone_green",
+      "duration": 10.727,
+      "grasp_width": 0.0,
+      "fault": false,
+      "recovery": "retreated"
+    }
+  ]
+}

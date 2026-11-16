@@ -1,0 +1,60 @@
+{
+  "status": "complete",
+  "three_cubes_in_red": true,
+  "pairwise_no_overlap": true,
+  "recovery_attempt": 1,
+  "metrics": {
+    "requests": 1,
+    "successes": 1,
+    "model_requests": 2
+  },
+  "positions": [
+    {
+      "label": "yellow",
+      "center": [
+        0.20514729623625647,
+        -0.39528381489120806,
+        0.024037013203815464
+      ],
+      "zone": "zone_red"
+    },
+    {
+      "label": "green",
+      "center": [
+        0.12008447791826639,
+        -0.30021119013980735,
+        0.02546323280782978
+      ],
+      "zone": "zone_red"
+    },
+    {
+      "label": "red",
+      "center": [
+        0.17011961118109212,
+        -0.3502462571155328,
+        0.025230841929938738
+      ],
+      "zone": "zone_red"
+    }
+  ],
+  "camera_detections": [
+    {
+      "label": "red",
+      "valid": true,
+      "reject_reason": "",
+      "zone": "zone_red"
+    },
+    {
+      "label": "yellow",
+      "valid": false,
+      "reject_reason": "occluded",
+      "zone": "zone_red"
+    },
+    {
+      "label": "green",
+      "valid": true,
+      "reject_reason": "",
+      "zone": "zone_red"
+    }
+  ]
+}

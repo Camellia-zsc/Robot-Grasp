@@ -55,7 +55,7 @@ MAX_GRIPPER_FORCE = 3.0
 TASK_GRIPPER_FORCE = {'L1': 1.5, 'L2': 2.5}
 #: stages whose target is a free-space pose (may lean up to max_tilt_free_deg).
 FREE_STAGES = ('pre', 'lift', 'transit', 'retreat', 'recover_retreat', 'recover_up',
-               'putback_lift', 'putback_retreat', 'up')
+               'putback_lift', 'putback_retreat', 'up', 'retry_lift')
 
 
 def _force_value(v) -> Optional[float]:
@@ -185,6 +185,69 @@ class PickPlaceSkill:
                     fault=r.detail.get('fault', False), holding=r.detail.get('holding', False))
         return r
 
+    def place_held(self, grasp: GraspPlan, place: PlacePlan, grasp_width: float) -> PickResult:
+        """Continue an explicitly requested placement without reopening a held grasp.
+
+        This does not reset an abort or unhealthy arm. It first lifts vertically
+        at the current XY when below the planned transit height; then the same
+        checked transit, release and retreat primitives as a normal pick apply.
+        A failed continuation holds position and keeps the gripper closed.
+        """
+        t0 = self.clock.now()
+        r = PickResult(ok=False, stage='retry_place', label=grasp.target.label,
+                       zone=place.zone, grasp_width=grasp_width,
+                       detail={'fault': False, 'holding': True, 'steps': [],
+                               'continuation': True})
+        try:
+            self._check_abort('retry_place')
+            if not self._healthy():
+                raise _StepFailed('retry_place', 'arm_error', 'arm unhealthy', fault=True)
+            if not place.feasible or not grasp.feasible:
+                raise _StepFailed('retry_place', 'infeasible', 'placement plan infeasible')
+            if not math.isfinite(float(grasp_width)) or grasp_width < self.empty_width:
+                raise _StepFailed('retry_place', 'no_gripper_feedback', 'invalid held width',
+                                  fault=True)
+            self._verify_held(r, 'dropped_before_retry')
+            current = self.arm.get_tcp_pose()
+            if (current is None or current.value is None or
+                    self.clock.now() - float(current.stamp) > self.feedback_max_age):
+                raise _StepFailed('retry_place', 'no_pose_feedback', 'missing current TCP',
+                                  fault=True)
+            lift = np.array(current.value, dtype=float, copy=True)
+            if lift.shape != (4, 4) or not np.all(np.isfinite(lift)):
+                raise _StepFailed('retry_place', 'no_pose_feedback', 'invalid current TCP',
+                                  fault=True)
+            height = float(place.T_pre[2, 3])
+            if float(lift[2, 3]) < height - 1e-4:
+                lift[2, 3] = height
+                self._move(r, 'retry_lift', lift, True)
+                self._verify_held(r, 'dropped')
+            self._move(r, 'transit', place.T_pre, False)
+            self._verify_held(r, 'dropped_in_transit')
+            self._move(r, 'release', place.T_release, self.linear_moves)
+            self._release_and_retreat(r, grasp, place)
+        except _Lost as exc:
+            r.detail['holding'] = False
+            r.stage = r.error = exc.stage
+            r.detail['lost_width'] = exc.width
+        except _StepFailed as exc:
+            r.stage, r.error = exc.stage, exc.error
+            r.detail['reason'] = exc.detail
+            r.detail['fault'] = bool(exc.fault)
+        except Exception as exc:  # noqa: B902
+            r.error = 'exception: %s' % exc
+            r.detail['fault'] = True
+            try:
+                self.arm.stop()
+            except Exception:  # noqa: B902
+                _LOG.exception('arm.stop() raised during held placement')
+        r.duration = self.clock.now() - t0
+        self._event('pick_result', ok=r.ok, stage=r.stage, error=r.error, label=r.label,
+                    zone=r.zone, duration=round(r.duration, 3), grasp_width=r.grasp_width,
+                    fault=r.detail.get('fault', False), holding=r.detail.get('holding', False),
+                    continuation=True)
+        return r
+
     # -------------------------------------------------------------- primitives
     def _event(self, kind: str, **fields: Any) -> None:
         if self.logger is None:
@@ -233,8 +296,9 @@ class PickPlaceSkill:
         else:
             m = self.arm.move_tcp(T, linear=linear)
         self._record(r, stage, m.ok, m.error, t, target=_xyz(T), linear=bool(linear),
-                     pos_err=m.pos_err)
+                     pos_err=m.pos_err, **({'detail': str(m.detail)[:500]} if not m.ok else {}))
         if not m.ok:
+            r.detail['last_motion_detail'] = str(m.detail)[:500]
             err = m.error or 'unknown'
             raise _StepFailed(stage, err, m.detail, fault=is_fault_motion_error(err))
         return m

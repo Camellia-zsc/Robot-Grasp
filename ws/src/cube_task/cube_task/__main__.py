@@ -5,7 +5,8 @@ import importlib
 import sys
 
 TOOLS = ['run_task', 'check_setup', 'capture', 'view', 'calib_points', 'calib_verify',
-         'teach_poses', 'teach_classes', 'color_calib', 'sim_bench', 'motion_ctl']
+         'teach_poses', 'teach_classes', 'color_calib', 'sim_bench', 'motion_ctl',
+         'assistant_ui']
 
 
 def main() -> int:

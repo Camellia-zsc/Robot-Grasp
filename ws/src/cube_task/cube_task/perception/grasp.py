@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -941,7 +941,8 @@ class PlacePlanner:
     def release_pose(self, zone: Zone, held: dict, occupied: Sequence[Sequence[float]] = (),
                      center_first: bool = True, pending: Sequence[Sequence[float]] = (),
                      center_only: bool = False, avoid: Sequence[Sequence[float]] = (),
-                     lower: float = 0.0, near_center: Optional[float] = None
+                     lower: float = 0.0, near_center: Optional[float] = None,
+                     candidate_filter: Optional[Callable[[float, float], bool]] = None
                      ) -> Tuple[float, float, float, dict]:
         """
         Return (x, y, closing angle, info) of a shaped release (see plan, held).
@@ -964,11 +965,14 @@ class PlacePlanner:
         keeps place.slot_margin to the edge, NEAR_CENTER_GAP (else 0) to the objects
         and finger band, and room for the fingers of a pending long object on its
         strip (tier near_center); the usual tiers when none does.
+        candidate_filter: optional local feasibility predicate for XY candidates;
+        rejected positions are excluded before ranking slots and grid positions.
         """
         banned = [(float(a[0]), float(a[1])) for a in avoid]
 
         def skip(x: float, y: float) -> bool:
-            return any(math.hypot(x - a, y - b) <= AVOID_RADIUS for a, b in banned)
+            return (candidate_filter is not None and not candidate_filter(x, y)) or any(
+                math.hypot(x - a, y - b) <= AVOID_RADIUS for a, b in banned)
 
         L = float(held.get('length', 0.0) or 0.0)
         W = float(held.get('width', 0.0) or 0.0)
@@ -1086,7 +1090,8 @@ class PlacePlanner:
              center_first: bool = True, held: Optional[dict] = None,
              pending: Sequence[Sequence[float]] = (), center_only: bool = False,
              avoid: Sequence[Sequence[float]] = (), lower: float = 0.0,
-             near_center: Optional[float] = None) -> PlacePlan:
+             near_center: Optional[float] = None,
+             candidate_filter: Optional[Callable[[float, float], bool]] = None) -> PlacePlan:
         """
         Return a PlacePlan for releasing into zone (poses in the base frame, m).
 
@@ -1101,6 +1106,8 @@ class PlacePlanner:
         near_center: see release_pose (place.center_labels).
         lower: m the release goes below the release height (place.release_lower
         per label); the wall rim and stack clearances still apply.
+        candidate_filter: optional local XY feasibility predicate, applied before
+        choosing a shaped release. If it rejects every candidate, the plan is infeasible.
         """
         eye = np.eye(4)
         self.last_info = {}
@@ -1131,7 +1138,8 @@ class PlacePlanner:
             W = float(held.get('width', 0.0) or 0.0)
         if held is not None and _finite(L) and _finite(W) and max(L, W) > 0.0:
             x, y, ang, info = self.release_pose(zone, held, occupied, center_first, pending,
-                                                center_only, avoid, lower, near_center)
+                                                center_only, avoid, lower, near_center,
+                                                candidate_filter)
             open_w = info['open_width']
             self.last_info = info
             # On a flat card a footprint clear of the objects already there drops from the
@@ -1145,6 +1153,9 @@ class PlacePlanner:
             x, y = self.release_xy(zone, None if center_only else footprint, occupied,
                                    center_first)
             ang = neutral_closing_angle(x, y)
+        if candidate_filter is not None and not candidate_filter(x, y):
+            return PlacePlan(zone.name, eye, eye.copy(), eye.copy(), self.open_width, False,
+                             'no_release_in_workspace')
         tallest = [float(o[3]) for o in occupied if len(o) >= 4 and _finite(o[3])]
         if tallest and stack:
             # Objects already in the zone may have rolled anywhere: clear the tallest.

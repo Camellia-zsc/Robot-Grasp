@@ -1,0 +1,10 @@
+{
+  "url": "http://127.0.0.1:8767",
+  "validation_complete": true,
+  "instrumentation_removed": true,
+  "metrics": {
+    "requests": 1,
+    "successes": 1,
+    "model_requests": 2
+  }
+}

@@ -30,6 +30,10 @@ FREE_POSES = ('pre_grasp', 'lift', 'pre_place', 'retreat')
 VERTICAL_FIRST = ('lift', 'retreat')
 #: default of robot.workspace.max_tilt_free_deg (deg).
 DEFAULT_MAX_TILT_FREE_DEG = 40.0
+#: Reserve room for FK/IK residuals before choosing a release slot. A target on
+#: the exact guard boundary can pass its own check but fail the descent from
+#: the controller's measured pose a few micrometres beyond that boundary.
+RELEASE_WORKSPACE_MARGIN = 0.002
 
 
 def accepts_kwarg(fn, name: str) -> bool:
@@ -174,6 +178,9 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
     floors[name] (m, base z; missing = never lowered). report (dict) gets
     'lowered' {name: m} of the lowered poses.
     """
+    reason = release_workspace_reason(arm, place.T_release[:2, 3])
+    if reason:
+        return False, 'release: ' + reason, {}
     floors = dict(floors or {})
     new = {}
     tilts = {}
@@ -205,3 +212,23 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
     if report is not None:
         report['lowered'] = lowered
     return True, '', tilts
+
+
+def release_workspace_reason(arm, xy) -> str:
+    """Return why a release XY lacks interior workspace margin, else empty."""
+    guard = getattr(arm, 'guard', None)
+    if guard is None:
+        return ''
+    x, y = (float(v) for v in xy)
+    for name, value in (('x', x), ('y', y)):
+        limits = getattr(guard, name, None)
+        if limits is not None and not (
+                limits[0] + RELEASE_WORKSPACE_MARGIN <= value
+                <= limits[1] - RELEASE_WORKSPACE_MARGIN):
+            return '%s needs workspace margin' % name
+    radius = math.hypot(x, y)
+    if (hasattr(guard, 'r_min') and hasattr(guard, 'r_max') and not (
+            guard.r_min + RELEASE_WORKSPACE_MARGIN <= radius
+            <= guard.r_max - RELEASE_WORKSPACE_MARGIN)):
+        return 'radius needs workspace margin'
+    return ''

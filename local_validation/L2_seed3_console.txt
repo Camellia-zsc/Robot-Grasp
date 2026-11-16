@@ -1,0 +1,372 @@
+16:38:59 I cube_task.tools: training a simulation KNN model -> D:\大四上\智能车项目\local_validation\cache\knn_sim_eye_in_hand_2d14592d78.npz (one time)
+16:39:08 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:11 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:14 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:17 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:20 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:24 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:28 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:32 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:48 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:39:54 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:40:02 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:40:05 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:40:07 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:40:11 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:40:18 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:40:25 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:40:41 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:40:49 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:03 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:10 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:27 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:34 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:39 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:43 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:46 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:49 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:52 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:41:57 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:02 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:04 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:06 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:09 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:11 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:13 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:17 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:20 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:22 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:26 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:36 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:44 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:45 I cube_task.sim.teach: sim KNN: 164 samples, 6 classes, leave-one-out accuracy 1.0 -> D:\大四上\智能车项目\local_validation\cache\knn_sim_eye_in_hand_2d14592d78.npz
+16:42:45 I cube_task.perception.classify_knn: loaded KNN model D:\大四上\智能车项目\local_validation\cache\knn_sim_eye_in_hand_2d14592d78.npz: 164 samples, labels ['banana', 'bell_pepper', 'cucumber', 'pear', 'persimmon', 'potato']
+16:42:45 I cube_task.perception.factory: perception for L2: backend knn, classifier KnnClassifier, detector None
+16:42:45 I cube_task.logger: run log directory: D:\大四上\智能车项目\local_validation\L2_seed3\20261114_164245_L2
+16:42:45 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+==============================================================================
+run_task L2 | SIM mode
+==============================================================================
+config:       config\default.yaml + sim:L2:3
+round:        time limit 300 s, required 6
+labels:       cucumber -> zone_green, pear -> zone_green, banana -> zone_yellow, potato -> zone_yellow, persimmon -> zone_red, bell_pepper -> zone_red
+zones:        zone_green (0.170, 0.350), zone_red (0.170, -0.350), zone_yellow (0.490, 0.000)
+camera:       eye_in_hand, backend sim
+extrinsics:   eye_in_hand T_flange_camera: t = [-70.0, 0.0, 30.0] mm, rpy = [0.00, -0.00, -90.00] deg, source = config camera.extrinsics_inline [matrix], rms unknown
+speed:        30 %
+observe pose: taught joints [0.0, 27.8, -26.9, 0.0, 66.9, 0.0] deg
+classifier:   knn (model D:\大四上\智能车项目\local_validation\cache\knn_sim_eye_in_hand_2d14592d78.npz)
+start:        at once (simulation)
+arm:          ready, joints [0.0, 0.0, 0.0, 0.0, 0.0, 0.0] deg
+sim:          seed 3, difficulty normal, extrinsics error 0 m / 0 deg
+log dir:      D:\大四上\智能车项目\local_validation\L2_seed3\20261114_164245_L2
+16:42:45 I cube_task.events: [   0.000] run_task summary=["==============================================================================","run_task L2 | SIM mode","=========... task="L2" mode="sim" dry_run=false targets=[] speed_percent=30 argv=["--task","L2","--mode","sim","--seed","3","--log-dir","D:\\大四上\\智能车项目\\local_validation\\L2_seed3"]
+16:42:46 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:48 I cube_task.task.runner: self check [ OK ] L2 labels: cucumber, pear, banana, potato, persimmon, bell_pepper
+16:42:48 W cube_task.task.runner: self check [WARN] zone zone_green corner (0.070, 0.250) outside the workspace: x=0.070 outside [0.080, 0.600]
+16:42:48 W cube_task.task.runner: self check [WARN] zone zone_green grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+16:42:48 W cube_task.task.runner: self check [WARN] zone zone_yellow grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+16:42:48 W cube_task.task.runner: self check [WARN] zone zone_red corner (0.070, -0.450) outside the workspace: x=0.070 outside [0.080, 0.600]
+16:42:48 W cube_task.task.runner: self check [WARN] zone zone_red grown by perception.roi.zone_exclude_margin (0.020 m) overlaps the pick polygon: objects there are ignored (touches_zone)
+16:42:48 I cube_task.task.runner: self check [ OK ] zones: zone_green, zone_red, zone_yellow
+16:42:48 I cube_task.task.runner: self check [ OK ] tcp_offset z = 0.142 m
+16:42:48 I cube_task.task.runner: self check [ OK ] observe pose: taught joints
+16:42:48 I cube_task.task.runner: self check [ OK ] extrinsics: mount eye_in_hand, translation [-0.07, 0.0, 0.03]
+16:42:48 I cube_task.task.runner: self check [ OK ] classifier backend knn
+16:42:48 I cube_task.task.runner: self check [ OK ] zone zone_green transit and release reachable with the tool leaned 15 deg
+16:42:48 I cube_task.task.runner: self check [ OK ] zone zone_yellow transit and release reachable with the tool leaned 20 deg
+16:42:48 I cube_task.task.runner: self check [ OK ] zone zone_red transit and release reachable with the tool leaned 15 deg
+16:42:48 I cube_task.events: [   0.000] self_check ok=true mode="sim" messages=["[ OK ] L2 labels: cucumber, pear, banana, potato, persimmon, bell_pepper","[WARN] zone zone_green corner (0.070, 0....
+16:42:48 I cube_task.extrinsics: camera.extrinsics_inline: eye_in_hand without parent_frame; using T_flange_camera (for a T_tcp_camera set parent_frame: tcp and tcp_offset)
+16:42:48 I cube_task.events: [   2.297] observe_move ok=true error="" duration=2.297 view=0
+16:42:48 W cube_task.task.runner: observe views cover 93% of the pick area (an object fits whole in one image); per view [682, 824, 682] grid points; uncovered x 0.12..0.16 y -0.24..0.25 m
+16:42:48 I cube_task.events: [   2.897] view_coverage fraction=0.927 message="observe views cover 93% of the pick area (an object fits whole in one image); per view [682, 824, 682] grid points; ... views=3
+16:42:48 I cube_task.events: [   2.897] start t0=1002.8966666666677 deadline=1302.8966666666677 dry_run=false required=6 order=[]
+16:42:50 I cube_task.events: [   2.963] observation ok=true n=1 stamp=1002.9633333333343 detections=[{"label":"bell_pepper","score":0.991,"score_kind":"knn","bbox":[105,292,244,436],"center_base":[0.1777,-0.0213,0.076... warnings=[]
+16:42:50 I cube_task.events: [   2.963] decision action="view_scanned" view=0 n=4 labels=["bell_pepper","bell_pepper","pear","persimmon"]
+16:42:50 I cube_task.events: [   2.963] decision action="zone_order_wait" waiting=["pear"]
+16:42:50 I cube_task.events: [   2.963] decision action="tilt" label="bell_pepper" tilt_deg={"pre_grasp":20.0,"grasp":0.0,"lift":30.0,"pre_place":25.0,"release":5.0,"retreat":15.0}
+16:42:50 I cube_task.events: [   2.963] decision action="pick" label="bell_pepper" zone="zone_red" target={"label":"bell_pepper","score":0.991,"score_kind":"knn","bbox":[105,292,244,436],"center_base":[0.1777,-0.0213,0.0761... attempt=1 closing_angle=0.9212 grasp_xyz=[0.1799,-0.0187,0.0361] release_xyz=[0.195,-0.385,0.0411] transit_z=0.1966 place={"xy":[0.195,-0.385],"reserved_diagonal":false,"axis":null,"edge_margin":0.03,"clearance":null,"footprint_clearance":... grasp={"kind":"elongated","mode":"profile","stem":true,"section_max":0.0591,"fit":0.09,"z_rel":0.0361} remaining=299.93
+16:42:50 I cube_task.task.skills: step open           ok=True  0.60s
+16:42:50 I cube_task.events: [   3.563] skill_step label="bell_pepper" zone="zone_red" stage="open" ok=true error="" duration=0.6 command=0.1 width=0.1
+16:42:50 I cube_task.task.skills: step pre            ok=True  1.26s
+16:42:50 I cube_task.events: [   4.824] skill_step label="bell_pepper" zone="zone_red" stage="pre" ok=true error="" duration=1.26 target=[0.1799,-0.0187,0.1561] linear=false pos_err=9.072586346326798e-09
+16:42:50 I cube_task.task.skills: step descend        ok=True  3.02s
+16:42:50 I cube_task.events: [   7.840] skill_step label="bell_pepper" zone="zone_red" stage="descend" ok=true error="" duration=3.017 target=[0.1799,-0.0187,0.0361] linear=true pos_err=1.1963255605996104e-07
+16:42:50 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'collision_palm', 'object': 'bell_pepper_3', 'du': -0.0012, 'dv': 0.0054, 'collided': 'bell_pepper_3'}
+16:42:50 I cube_task.task.skills: step close          ok=True  0.60s
+16:42:50 I cube_task.events: [   8.440] skill_step label="bell_pepper" zone="zone_red" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0
+16:42:50 I cube_task.task.skills: step recover_open   ok=True  0.60s
+16:42:50 I cube_task.events: [   9.040] skill_step label="bell_pepper" zone="zone_red" stage="recover_open" ok=true error="" duration=0.6 command=0.1 width=0.1
+16:42:50 I cube_task.task.skills: step recover_retreat ok=True  3.02s
+16:42:50 I cube_task.events: [  12.057] skill_step label="bell_pepper" zone="zone_red" stage="recover_retreat" ok=true error="" duration=3.017 target=[0.1799,-0.0187,0.1561] linear=true pos_err=3.7348911233629124e-08
+16:42:50 I cube_task.events: [  12.057] pick_result ok=false stage="grasp_miss" error="grasp_miss" label="bell_pepper" zone="zone_red" duration=9.094 grasp_width=0.0 fault=false holding=false
+16:42:50 I cube_task.events: [  12.057] decision action="zone_order_wait" waiting=["pear"]
+16:42:50 I cube_task.events: [  13.317] observe_move ok=true error="" duration=1.26 view=0
+16:42:52 I cube_task.events: [  13.817] observation ok=true n=2 stamp=1013.8173343347087 detections=[{"label":"bell_pepper","score":0.999,"score_kind":"knn","bbox":[98,292,244,436],"center_base":[0.1806,-0.0171,0.079]... warnings=[]
+16:42:52 I cube_task.events: [  13.817] decision action="view_scanned" view=0 n=3 labels=["bell_pepper","pear","persimmon"]
+16:42:52 I cube_task.events: [  13.817] decision action="zone_order_wait" waiting=["pear"]
+16:42:53 I cube_task.events: [  13.817] decision action="tilt" label="bell_pepper" tilt_deg={"pre_grasp":20.0,"grasp":0.0,"lift":30.0,"pre_place":25.0,"release":5.0,"retreat":15.0}
+16:42:53 I cube_task.events: [  13.817] decision action="pick" label="bell_pepper" zone="zone_red" target={"label":"bell_pepper","score":0.999,"score_kind":"knn","bbox":[98,292,244,436],"center_base":[0.1806,-0.0171,0.079],... attempt=2 closing_angle=1.4797 grasp_xyz=[0.1817,-0.0166,0.039] release_xyz=[0.195,-0.385,0.044] transit_z=0.1995 place={"xy":[0.195,-0.385],"reserved_diagonal":false,"axis":null,"edge_margin":0.03,"clearance":null,"footprint_clearance":... grasp={"kind":"round","mode":"profile","stem":true,"section_max":0.0655,"fit":0.09,"z_rel":0.039} remaining=289.08
+16:42:53 I cube_task.task.skills: step open           ok=True  0.60s
+16:42:53 I cube_task.events: [  14.417] skill_step label="bell_pepper" zone="zone_red" stage="open" ok=true error="" duration=0.6 command=0.1 width=0.1
+16:42:53 I cube_task.task.skills: step pre            ok=True  1.03s
+16:42:53 I cube_task.events: [  15.449] skill_step label="bell_pepper" zone="zone_red" stage="pre" ok=true error="" duration=1.032 target=[0.1817,-0.0166,0.159] linear=false pos_err=2.149784655278248e-09
+16:42:53 I cube_task.task.skills: step descend        ok=True  3.02s
+16:42:53 I cube_task.events: [  18.466] skill_step label="bell_pepper" zone="zone_red" stage="descend" ok=true error="" duration=3.017 target=[0.1817,-0.0166,0.039] linear=true pos_err=1.1529320666107922e-07
+16:42:53 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'collision_palm', 'object': 'bell_pepper_3', 'du': -0.0022, 'dv': 0.0017, 'collided': 'bell_pepper_3'}
+16:42:53 I cube_task.task.skills: step close          ok=True  0.60s
+16:42:53 I cube_task.events: [  19.066] skill_step label="bell_pepper" zone="zone_red" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0
+16:42:53 I cube_task.task.skills: step recover_open   ok=True  0.60s
+16:42:53 I cube_task.events: [  19.666] skill_step label="bell_pepper" zone="zone_red" stage="recover_open" ok=true error="" duration=0.6 command=0.1 width=0.1
+16:42:53 I cube_task.task.skills: step recover_retreat ok=True  3.02s
+16:42:53 I cube_task.events: [  22.682] skill_step label="bell_pepper" zone="zone_red" stage="recover_retreat" ok=true error="" duration=3.017 target=[0.1817,-0.0166,0.159] linear=true pos_err=3.334738344954103e-08
+16:42:53 I cube_task.events: [  22.682] pick_result ok=false stage="grasp_miss" error="grasp_miss" label="bell_pepper" zone="zone_red" duration=8.865 grasp_width=0.0 fault=false holding=false
+16:42:53 I cube_task.events: [  22.682] decision action="zone_order_wait" waiting=["pear"]
+16:42:53 I cube_task.events: [  23.714] observe_move ok=true error="" duration=1.032 view=0
+16:42:55 I cube_task.events: [  24.214] observation ok=true n=3 stamp=1024.2137775244005 detections=[{"label":"bell_pepper","score":0.999,"score_kind":"knn","bbox":[98,292,244,436],"center_base":[0.1807,-0.0173,0.079]... warnings=[]
+16:42:55 I cube_task.events: [  24.214] decision action="view_scanned" view=0 n=5 labels=["bell_pepper","pear","pear","pear","persimmon"]
+16:42:55 I cube_task.events: [  24.214] decision action="zone_order_wait" waiting=["pear"]
+16:42:56 I cube_task.events: [  24.214] decision action="tilt" label="bell_pepper" tilt_deg={"pre_grasp":20.0,"grasp":0.0,"lift":30.0,"pre_place":25.0,"release":5.0,"retreat":15.0}
+16:42:56 I cube_task.events: [  24.214] decision action="pick" label="bell_pepper" zone="zone_red" target={"label":"bell_pepper","score":0.999,"score_kind":"knn","bbox":[98,292,244,436],"center_base":[0.1807,-0.0173,0.079],... attempt=3 closing_angle=1.4797 grasp_xyz=[0.1817,-0.0166,0.039] release_xyz=[0.195,-0.385,0.044] transit_z=0.2034 place={"xy":[0.195,-0.385],"reserved_diagonal":false,"axis":null,"edge_margin":0.03,"clearance":null,"footprint_clearance":... grasp={"kind":"round","mode":"profile","stem":true,"section_max":0.0656,"fit":0.09,"z_rel":0.039} remaining=278.68
+16:42:56 I cube_task.task.skills: step open           ok=True  0.60s
+16:42:56 I cube_task.events: [  24.814] skill_step label="bell_pepper" zone="zone_red" stage="open" ok=true error="" duration=0.6 command=0.1 width=0.1
+16:42:56 I cube_task.task.skills: step pre            ok=True  1.03s
+16:42:56 I cube_task.events: [  25.845] skill_step label="bell_pepper" zone="zone_red" stage="pre" ok=true error="" duration=1.031 target=[0.1817,-0.0166,0.159] linear=false pos_err=2.154358725268929e-09
+16:42:56 I cube_task.task.skills: step descend        ok=True  3.02s
+16:42:56 I cube_task.events: [  28.862] skill_step label="bell_pepper" zone="zone_red" stage="descend" ok=true error="" duration=3.017 target=[0.1817,-0.0166,0.039] linear=true pos_err=1.1529601748404496e-07
+16:42:56 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'collision_palm', 'object': 'bell_pepper_3', 'du': -0.0022, 'dv': 0.0017, 'collided': 'bell_pepper_3'}
+16:42:56 I cube_task.task.skills: step close          ok=True  0.60s
+16:42:56 I cube_task.events: [  29.462] skill_step label="bell_pepper" zone="zone_red" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0
+16:42:56 I cube_task.task.skills: step recover_open   ok=True  0.60s
+16:42:56 I cube_task.events: [  30.062] skill_step label="bell_pepper" zone="zone_red" stage="recover_open" ok=true error="" duration=0.6 command=0.1 width=0.1
+16:42:56 I cube_task.task.skills: step recover_retreat ok=True  3.02s
+16:42:56 I cube_task.events: [  33.079] skill_step label="bell_pepper" zone="zone_red" stage="recover_retreat" ok=true error="" duration=3.017 target=[0.1817,-0.0166,0.159] linear=true pos_err=3.3350843836524675e-08
+16:42:56 I cube_task.events: [  33.079] pick_result ok=false stage="grasp_miss" error="grasp_miss" label="bell_pepper" zone="zone_red" duration=8.865 grasp_width=0.0 fault=false holding=false
+16:42:56 I cube_task.events: [  33.079] decision action="blacklist" label="bell_pepper" xy=[0.1807,-0.0173] reason="max_attempts (grasp_miss)" attempts=3
+16:42:56 I cube_task.events: [  33.079] decision action="zone_order_wait" waiting=["pear"]
+16:42:56 I cube_task.events: [  34.110] observe_move ok=true error="" duration=1.031 view=0
+16:42:58 I cube_task.events: [  34.610] observation ok=true n=4 stamp=1034.6100397811051 detections=[{"label":"bell_pepper","score":0.999,"score_kind":"knn","bbox":[98,292,244,436],"center_base":[0.1807,-0.0172,0.079]... warnings=[]
+16:42:58 I cube_task.events: [  34.610] decision action="view_scanned" view=0 n=4 labels=["bell_pepper","pear","pear","persimmon"]
+16:42:58 I cube_task.events: [  34.610] decision action="zone_order_wait" waiting=["pear"]
+16:42:58 I cube_task.events: [  34.610] decision action="lowered" label="persimmon" lowered={"lift":0.05}
+16:42:58 I cube_task.events: [  34.610] decision action="tilt" label="persimmon" tilt_deg={"pre_grasp":5.0,"grasp":0.0,"lift":0.0,"pre_place":15.0,"release":0.0,"retreat":15.0}
+16:42:58 I cube_task.events: [  34.610] decision action="pick" label="persimmon" zone="zone_red" target={"label":"persimmon","score":0.997,"score_kind":"knn","bbox":[300,186,403,282],"center_base":[0.2109,-0.1385,0.05],"t... attempt=1 closing_angle=2.4554 grasp_xyz=[0.2159,-0.1423,0.01] release_xyz=[0.195,-0.385,0.02] transit_z=0.15 place={"xy":[0.195,-0.385],"reserved_diagonal":false,"axis":null,"edge_margin":0.03,"clearance":null,"footprint_clearance":... grasp={"kind":"elongated","mode":"profile","section_max":0.0692,"fit":0.09,"z_rel":0.01} remaining=268.29
+16:42:58 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'no_object', 'object': None}
+16:42:58 I cube_task.task.skills: step open           ok=True  0.60s
+16:42:58 I cube_task.events: [  35.210] skill_step label="persimmon" zone="zone_red" stage="open" ok=true error="" duration=0.6 command=0.0992 width=0.0992
+16:42:58 I cube_task.task.skills: step pre            ok=True  2.80s
+16:42:58 I cube_task.events: [  38.006] skill_step label="persimmon" zone="zone_red" stage="pre" ok=true error="" duration=2.796 target=[0.2159,-0.1423,0.13] linear=false pos_err=6.589532323445923e-08
+16:42:58 I cube_task.task.skills: step descend        ok=True  3.02s
+16:42:58 I cube_task.events: [  41.022] skill_step label="persimmon" zone="zone_red" stage="descend" ok=true error="" duration=3.017 target=[0.2159,-0.1423,0.01] linear=true pos_err=5.3023115890942465e-08
+16:42:58 I cube_task.task.skills: step close          ok=True  0.60s
+16:42:58 I cube_task.events: [  41.622] skill_step label="persimmon" zone="zone_red" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.07
+16:42:58 I cube_task.task.skills: step lift           ok=True  2.35s
+16:42:58 I cube_task.events: [  43.971] skill_step label="persimmon" zone="zone_red" stage="lift" ok=true error="" duration=2.349 target=[0.2159,-0.1423,0.1] linear=true pos_err=6.251864289148058e-08
+16:42:58 I cube_task.task.skills: step transit        ok=True  2.80s
+16:42:58 I cube_task.events: [  46.767] skill_step label="persimmon" zone="zone_red" stage="transit" ok=true error="" duration=2.796 target=[0.195,-0.385,0.15] linear=false pos_err=2.964907067128867e-08
+16:42:58 I cube_task.task.skills: step release        ok=True  3.24s
+16:42:58 I cube_task.events: [  50.005] skill_step label="persimmon" zone="zone_red" stage="release" ok=true error="" duration=3.238 target=[0.195,-0.385,0.02] linear=true pos_err=1.0971242560353638e-08
+16:42:58 I cube_task.task.skills: step open_release   ok=True  0.60s
+16:42:58 I cube_task.events: [  50.605] skill_step label="persimmon" zone="zone_red" stage="open_release" ok=true error="" duration=0.6 command=0.09 width=0.09
+16:42:58 I cube_task.task.skills: step retreat        ok=True  2.57s
+16:42:58 I cube_task.events: [  53.177] skill_step label="persimmon" zone="zone_red" stage="retreat" ok=true error="" duration=2.572 target=[0.195,-0.385,0.12] linear=true pos_err=7.314910714998781e-08
+16:42:58 I cube_task.events: [  53.177] pick_result ok=true stage="done" error="" label="persimmon" zone="zone_red" duration=18.567 grasp_width=0.06998724987799922 fault=false holding=false
+16:42:58 I cube_task.events: [  53.177] decision action="zone_order_wait" waiting=["pear"]
+16:42:58 I cube_task.events: [  55.845] observe_move ok=true error="" duration=2.668 view=1
+16:43:00 I cube_task.events: [  56.345] observation ok=true n=5 stamp=1056.345035861459 detections=[{"label":"cucumber","score":0.996,"score_kind":"knn","bbox":[0,156,350,242],"center_base":[0.2782,0.1026,0.0399],"to... warnings=[]
+16:43:00 I cube_task.events: [  56.345] decision action="view_scanned" view=1 n=6 labels=["potato","pear","pear","bell_pepper","bell_pepper","banana"]
+16:43:00 I cube_task.events: [  56.345] decision action="zone_order_wait" waiting=["pear"]
+16:43:01 I cube_task.events: [  56.345] decision action="tilt" label="potato" tilt_deg={"pre_grasp":10.0,"grasp":0.0,"lift":15.0,"pre_place":25.0,"release":10.0,"retreat":20.0}
+16:43:01 I cube_task.events: [  56.345] decision action="pick" label="potato" zone="zone_yellow" target={"label":"potato","score":1.0,"score_kind":"knn","bbox":[17,296,203,425],"center_base":[0.1725,0.1138,0.0539],"top_z"... attempt=1 closing_angle=-2.9211 grasp_xyz=[0.1745,0.1186,0.0139] release_xyz=[0.515,0.025,0.0239] transit_z=0.15 place={"xy":[0.515,0.025],"reserved_diagonal":false,"axis":0.0485,"edge_margin":0.025,"clearance":null,"footprint_clearance... grasp={"kind":"elongated","mode":"profile","section_max":0.0692,"fit":0.09,"z_rel":0.0139} remaining=246.55
+16:43:01 I cube_task.task.skills: step open           ok=True  0.60s
+16:43:01 I cube_task.events: [  56.945] skill_step label="potato" zone="zone_yellow" stage="open" ok=true error="" duration=0.6 command=0.0992 width=0.0992
+16:43:01 I cube_task.task.skills: step pre            ok=True  2.34s
+16:43:01 I cube_task.events: [  59.286] skill_step label="potato" zone="zone_yellow" stage="pre" ok=true error="" duration=2.341 target=[0.1745,0.1186,0.1339] linear=false pos_err=3.4442522875049727e-09
+16:43:01 I cube_task.task.skills: step descend        ok=True  3.02s
+16:43:01 I cube_task.events: [  62.303] skill_step label="potato" zone="zone_yellow" stage="descend" ok=true error="" duration=3.017 target=[0.1745,0.1186,0.0139] linear=true pos_err=8.825421069614583e-08
+16:43:01 I cube_task.task.skills: step close          ok=True  0.60s
+16:43:01 I cube_task.events: [  62.903] skill_step label="potato" zone="zone_yellow" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0701
+16:43:01 I cube_task.task.skills: step lift           ok=True  3.38s
+16:43:01 I cube_task.events: [  66.278] skill_step label="potato" zone="zone_yellow" stage="lift" ok=true error="" duration=3.375 target=[0.1745,0.1186,0.15] linear=true pos_err=4.956046160774886e-08
+16:43:01 I cube_task.task.skills: step transit        ok=True  2.34s
+16:43:01 I cube_task.events: [  68.619] skill_step label="potato" zone="zone_yellow" stage="transit" ok=true error="" duration=2.341 target=[0.515,0.025,0.15] linear=false pos_err=4.632487236026591e-09
+16:43:01 I cube_task.task.skills: step release        ok=True  3.15s
+16:43:01 I cube_task.events: [  71.772] skill_step label="potato" zone="zone_yellow" stage="release" ok=true error="" duration=3.153 target=[0.515,0.025,0.0239] linear=true pos_err=6.482576872910975e-08
+16:43:01 I cube_task.task.skills: step open_release   ok=True  0.60s
+16:43:01 I cube_task.events: [  72.372] skill_step label="potato" zone="zone_yellow" stage="open_release" ok=true error="" duration=0.6 command=0.0901 width=0.0901
+16:43:01 I cube_task.task.skills: step retreat        ok=True  2.57s
+16:43:01 I cube_task.events: [  74.944] skill_step label="potato" zone="zone_yellow" stage="retreat" ok=true error="" duration=2.572 target=[0.515,0.025,0.1239] linear=true pos_err=1.271126030237169e-08
+16:43:01 I cube_task.events: [  74.944] pick_result ok=true stage="done" error="" label="potato" zone="zone_yellow" duration=18.599 grasp_width=0.07010307207466654 fault=false holding=false
+16:43:01 I cube_task.events: [  74.944] decision action="zone_order_wait" waiting=["pear"]
+16:43:01 I cube_task.events: [  78.046] observe_move ok=true error="" duration=3.102 view=1
+16:43:03 I cube_task.events: [  78.546] observation ok=true n=6 stamp=1078.5458501702396 detections=[{"label":"cucumber","score":0.996,"score_kind":"knn","bbox":[0,156,350,242],"center_base":[0.2782,0.1026,0.0399],"to... warnings=[]
+16:43:03 I cube_task.events: [  78.546] decision action="view_scanned" view=1 n=5 labels=["pear","pear","bell_pepper","bell_pepper","banana"]
+16:43:03 I cube_task.events: [  78.546] decision action="zone_order_wait" waiting=["pear"]
+16:43:07 I cube_task.events: [  78.546] decision action="tilt" label="banana" tilt_deg={"pre_grasp":10.0,"grasp":0.0,"lift":15.0,"pre_place":25.0,"release":5.0,"retreat":20.0}
+16:43:07 I cube_task.events: [  78.546] decision action="pick" label="banana" zone="zone_yellow" target={"label":"banana","score":0.998,"score_kind":"knn","bbox":[167,98,357,163],"center_base":[0.3456,0.0455,0.0398],"top_... attempt=1 closing_angle=-3.0969 grasp_xyz=[0.3517,0.0423,0.008] release_xyz=[0.49,-0.06,0.018] transit_z=0.1716 place={"xy":[0.49,-0.06],"reserved_diagonal":false,"axis":-0.1218,"edge_margin":0.0105,"clearance":0.0033,"footprint_cleara... grasp={"kind":"elongated","mode":"profile","section_max":0.0511,"fit":0.09,"z_rel":0.008} remaining=224.35
+16:43:07 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'no_object', 'object': None}
+16:43:07 I cube_task.task.skills: step open           ok=True  0.60s
+16:43:07 I cube_task.events: [  79.146] skill_step label="banana" zone="zone_yellow" stage="open" ok=true error="" duration=0.6 command=0.0811 width=0.0811
+16:43:07 I cube_task.task.skills: step pre            ok=True  2.84s
+16:43:07 I cube_task.events: [  81.989] skill_step label="banana" zone="zone_yellow" stage="pre" ok=true error="" duration=2.843 target=[0.3517,0.0423,0.1198] linear=false pos_err=7.860819183644334e-08
+16:43:07 I cube_task.task.skills: step descend        ok=True  2.83s
+16:43:07 I cube_task.events: [  84.823] skill_step label="banana" zone="zone_yellow" stage="descend" ok=true error="" duration=2.834 target=[0.3517,0.0423,0.008] linear=true pos_err=7.38972780123188e-08
+16:43:07 I cube_task.task.skills: step close          ok=True  0.60s
+16:43:07 I cube_task.events: [  85.423] skill_step label="banana" zone="zone_yellow" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0415
+16:43:07 I cube_task.task.skills: step lift           ok=True  3.99s
+16:43:07 I cube_task.events: [  89.409] skill_step label="banana" zone="zone_yellow" stage="lift" ok=true error="" duration=3.986 target=[0.3517,0.0423,0.1716] linear=true pos_err=1.0788503609657074e-08
+16:43:07 I cube_task.task.skills: step transit        ok=True  2.84s
+16:43:07 I cube_task.events: [  92.252] skill_step label="banana" zone="zone_yellow" stage="transit" ok=true error="" duration=2.843 target=[0.49,-0.06,0.1716] linear=false pos_err=6.002059242618268e-08
+16:43:07 I cube_task.task.skills: step release        ok=True  3.76s
+16:43:07 I cube_task.events: [  96.015] skill_step label="banana" zone="zone_yellow" stage="release" ok=true error="" duration=3.764 target=[0.49,-0.06,0.018] linear=true pos_err=1.346094656788661e-09
+16:43:07 I cube_task.task.skills: step open_release   ok=True  0.60s
+16:43:07 I cube_task.events: [  96.615] skill_step label="banana" zone="zone_yellow" stage="open_release" ok=true error="" duration=0.6 command=0.0631 width=0.0631
+16:43:08 I cube_task.task.skills: step retreat        ok=True  2.57s
+16:43:08 I cube_task.events: [  99.188] skill_step label="banana" zone="zone_yellow" stage="retreat" ok=true error="" duration=2.572 target=[0.49,-0.06,0.118] linear=true pos_err=2.4115631375939706e-08
+16:43:08 I cube_task.events: [  99.188] pick_result ok=true stage="done" error="" label="banana" zone="zone_yellow" duration=20.642 grasp_width=0.04154312458010456 fault=false holding=false
+16:43:08 I cube_task.events: [  99.188] decision action="zone_order_wait" waiting=["pear"]
+16:43:08 I cube_task.events: [ 102.133] observe_move ok=true error="" duration=2.945 view=2
+16:43:11 I cube_task.events: [ 102.633] observation ok=true n=7 stamp=1102.6327131997025 detections=[{"label":"bell_pepper","score":0.995,"score_kind":"knn","bbox":[445,319,593,472],"center_base":[0.1765,-0.0059,0.076... warnings=[]
+16:43:11 I cube_task.events: [ 102.633] decision action="view_scanned" view=2 n=3 labels=["bell_pepper","bell_pepper","cucumber"]
+16:43:11 I cube_task.events: [ 102.633] decision action="zone_order_wait" waiting=["pear"]
+16:43:13 I cube_task.events: [ 102.633] decision action="tilt" label="cucumber" tilt_deg={"pre_grasp":5.0,"grasp":0.0,"lift":15.0,"pre_place":15.0,"release":0.0,"retreat":10.0}
+16:43:13 I cube_task.events: [ 102.633] decision action="pick" label="cucumber" zone="zone_green" target={"label":"cucumber","score":0.997,"score_kind":"knn","bbox":[242,91,554,285],"center_base":[0.2776,0.1043,0.0399],"to... attempt=1 closing_angle=3.0363 grasp_xyz=[0.283,0.1064,0.008] release_xyz=[0.115,0.35,0.018] transit_z=0.1716 place={"xy":[0.115,0.35],"reserved_diagonal":false,"axis":1.5708,"edge_margin":-0.03,"clearance":null,"footprint_clearance"... grasp={"kind":"elongated","mode":"profile","section_max":0.0509,"fit":0.09,"z_rel":0.008} remaining=200.26
+16:43:13 I cube_task.task.skills: step open           ok=True  0.60s
+16:43:13 I cube_task.events: [ 103.233] skill_step label="cucumber" zone="zone_green" stage="open" ok=true error="" duration=0.6 command=0.0809 width=0.0809
+16:43:13 I cube_task.task.skills: step pre            ok=True  2.19s
+16:43:13 I cube_task.events: [ 105.426] skill_step label="cucumber" zone="zone_green" stage="pre" ok=true error="" duration=2.193 target=[0.283,0.1064,0.1199] linear=false pos_err=3.91005835956452e-09
+16:43:13 I cube_task.task.skills: step descend        ok=True  2.84s
+16:43:13 I cube_task.events: [ 108.262] skill_step label="cucumber" zone="zone_green" stage="descend" ok=true error="" duration=2.836 target=[0.283,0.1064,0.008] linear=true pos_err=3.51851099205255e-08
+16:43:13 I cube_task.task.skills: step close          ok=True  0.60s
+16:43:13 I cube_task.events: [ 108.862] skill_step label="cucumber" zone="zone_green" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0405
+16:43:13 I cube_task.task.skills: step lift           ok=True  3.99s
+16:43:13 I cube_task.events: [ 112.847] skill_step label="cucumber" zone="zone_green" stage="lift" ok=true error="" duration=3.986 target=[0.283,0.1064,0.1716] linear=true pos_err=6.875537203692143e-08
+16:43:14 I cube_task.task.skills: step transit        ok=True  1.84s
+16:43:14 I cube_task.events: [ 114.687] skill_step label="cucumber" zone="zone_green" stage="transit" ok=true error="" duration=1.84 target=[0.115,0.35,0.1716] linear=false pos_err=8.918101716328914e-08
+16:43:14 I cube_task.task.skills: step release        ok=True  3.76s
+16:43:14 I cube_task.events: [ 118.451] skill_step label="cucumber" zone="zone_green" stage="release" ok=true error="" duration=3.764 target=[0.115,0.35,0.018] linear=true pos_err=4.909248219950289e-09
+16:43:14 I cube_task.task.skills: step open_release   ok=True  0.60s
+16:43:14 I cube_task.events: [ 119.051] skill_step label="cucumber" zone="zone_green" stage="open_release" ok=true error="" duration=0.6 command=0.0709 width=0.0709
+16:43:14 I cube_task.task.skills: step retreat        ok=True  2.57s
+16:43:14 I cube_task.events: [ 121.623] skill_step label="cucumber" zone="zone_green" stage="retreat" ok=true error="" duration=2.572 target=[0.115,0.35,0.118] linear=true pos_err=8.931538747982875e-08
+16:43:14 I cube_task.events: [ 121.623] pick_result ok=true stage="done" error="" label="cucumber" zone="zone_green" duration=18.99 grasp_width=0.040521591775821444 fault=false holding=false
+16:43:21 I cube_task.events: [ 121.623] decision action="tilt" label="pear" tilt_deg={"pre_grasp":20.0,"grasp":0.0,"lift":20.0,"pre_place":20.0,"release":5.0,"retreat":20.0}
+16:43:21 I cube_task.events: [ 121.623] decision action="pick" label="pear" zone="zone_green" target={"label":"pear","score":0.997,"score_kind":"knn","bbox":[393,27,519,186],"center_base":[0.3118,-0.0893,0.1136],"top_z... attempt=1 closing_angle=2.661 grasp_xyz=[0.3207,-0.0936,0.0736] release_xyz=[0.1875,0.35,0.0786] transit_z=0.1998 place={"xy":[0.1875,0.35],"reserved_diagonal":false,"axis":null,"edge_margin":0.04,"clearance":0.01,"footprint_clearance":0... grasp={"kind":"elongated","mode":"profile","section_max":0.0478,"fit":0.098,"z_rel":0.0736} remaining=181.27
+16:43:21 I cube_task.task.skills: step open           ok=True  0.60s
+16:43:21 I cube_task.events: [ 122.223] skill_step label="pear" zone="zone_green" stage="open" ok=true error="" duration=0.6 command=0.0778 width=0.0778
+16:43:21 I cube_task.task.skills: step pre            ok=True  2.91s
+16:43:21 I cube_task.events: [ 125.135] skill_step label="pear" zone="zone_green" stage="pre" ok=true error="" duration=2.912 target=[0.3207,-0.0936,0.1936] linear=false pos_err=2.343685541002031e-08
+16:43:21 I cube_task.task.skills: step descend        ok=True  3.02s
+16:43:21 I cube_task.events: [ 128.152] skill_step label="pear" zone="zone_green" stage="descend" ok=true error="" duration=3.017 target=[0.3207,-0.0936,0.0736] linear=true pos_err=2.3949094186724382e-09
+16:43:21 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'collision_palm', 'object': 'pear_4', 'du': -0.0001, 'dv': -0.0047, 'collided': 'pear_4'}
+16:43:21 I cube_task.task.skills: step close          ok=True  0.60s
+16:43:22 I cube_task.events: [ 128.752] skill_step label="pear" zone="zone_green" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0
+16:43:22 I cube_task.task.skills: step recover_open   ok=True  0.60s
+16:43:22 I cube_task.events: [ 129.352] skill_step label="pear" zone="zone_green" stage="recover_open" ok=true error="" duration=0.6 command=0.0778 width=0.0778
+16:43:22 I cube_task.task.skills: step recover_retreat ok=True  3.02s
+16:43:22 I cube_task.events: [ 132.369] skill_step label="pear" zone="zone_green" stage="recover_retreat" ok=true error="" duration=3.017 target=[0.3207,-0.0936,0.1936] linear=true pos_err=7.811738177776757e-08
+16:43:22 I cube_task.events: [ 132.369] pick_result ok=false stage="grasp_miss" error="grasp_miss" label="pear" zone="zone_green" duration=10.746 grasp_width=0.0 fault=false holding=false
+16:43:22 I cube_task.events: [ 135.009] observe_move ok=true error="" duration=2.64 view=1
+16:43:24 I cube_task.events: [ 135.509] observation ok=true n=8 stamp=1135.5088267257354 detections=[{"label":"pear","score":0.994,"score_kind":"knn","bbox":[424,27,519,139],"center_base":[0.3169,-0.0889,0.115],"top_z... warnings=[]
+16:43:24 I cube_task.events: [ 135.509] decision action="view_scanned" view=1 n=3 labels=["pear","pear","bell_pepper"]
+16:43:31 I cube_task.events: [ 135.509] decision action="lowered" label="pear" lowered={"lift":0.069}
+16:43:31 I cube_task.events: [ 135.509] decision action="tilt" label="pear" tilt_deg={"pre_grasp":10.0,"grasp":0.0,"lift":0.0,"pre_place":15.0,"release":0.0,"retreat":15.0}
+16:43:31 I cube_task.events: [ 135.509] decision action="pick" label="pear" zone="zone_green" target={"label":"pear","score":0.99,"score_kind":"knn","bbox":[393,76,519,197],"center_base":[0.3076,-0.0871,0.073],"top_z":... attempt=2 closing_angle=2.6775 grasp_xyz=[0.3143,-0.0912,0.033] release_xyz=[0.195,0.35,0.038] transit_z=0.1619 place={"xy":[0.195,0.35],"reserved_diagonal":false,"axis":null,"edge_margin":0.0325,"clearance":0.0093,"footprint_clearance... grasp={"kind":"elongated","mode":"profile","section_max":0.0617,"fit":0.098,"z_rel":0.033} remaining=167.39
+16:43:31 I cube_task.task.skills: step open           ok=True  0.60s
+16:43:31 I cube_task.events: [ 136.109] skill_step label="pear" zone="zone_green" stage="open" ok=true error="" duration=0.6 command=0.0917 width=0.0917
+16:43:31 I cube_task.task.skills: step pre            ok=True  2.67s
+16:43:31 I cube_task.events: [ 138.774] skill_step label="pear" zone="zone_green" stage="pre" ok=true error="" duration=2.665 target=[0.3143,-0.0912,0.153] linear=false pos_err=7.016952431542642e-09
+16:43:31 I cube_task.task.skills: step descend        ok=True  3.02s
+16:43:31 I cube_task.events: [ 141.791] skill_step label="pear" zone="zone_green" stage="descend" ok=true error="" duration=3.017 target=[0.3143,-0.0912,0.033] linear=true pos_err=6.828950133830843e-08
+16:43:31 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'collision_finger', 'object': 'pear_4', 'du': -0.0008, 'dv': -0.0116, 'collided': 'pear_4'}
+16:43:31 I cube_task.task.skills: step close          ok=True  0.60s
+16:43:31 I cube_task.events: [ 142.391] skill_step label="pear" zone="zone_green" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0
+16:43:31 I cube_task.task.skills: step recover_open   ok=True  0.60s
+16:43:31 I cube_task.events: [ 142.991] skill_step label="pear" zone="zone_green" stage="recover_open" ok=true error="" duration=0.6 command=0.0917 width=0.0917
+16:43:32 I cube_task.task.skills: step recover_retreat ok=True  3.02s
+16:43:32 I cube_task.events: [ 146.007] skill_step label="pear" zone="zone_green" stage="recover_retreat" ok=true error="" duration=3.017 target=[0.3143,-0.0912,0.153] linear=true pos_err=2.6321391777189515e-09
+16:43:32 I cube_task.events: [ 146.007] pick_result ok=false stage="grasp_miss" error="grasp_miss" label="pear" zone="zone_green" duration=10.499 grasp_width=0.0 fault=false holding=false
+16:43:32 I cube_task.events: [ 148.673] observe_move ok=true error="" duration=2.665 view=1
+16:43:34 I cube_task.events: [ 149.173] observation ok=true n=9 stamp=1149.1726230443144 detections=[{"label":"pear","score":0.998,"score_kind":"knn","bbox":[408,27,519,139],"center_base":[0.3174,-0.0864,0.1147],"top_... warnings=[]
+16:43:34 I cube_task.events: [ 149.173] decision action="view_scanned" view=1 n=3 labels=["pear","pear","bell_pepper"]
+16:43:40 I cube_task.events: [ 149.173] decision action="lowered" label="pear" lowered={"lift":0.069}
+16:43:40 I cube_task.events: [ 149.173] decision action="tilt" label="pear" tilt_deg={"pre_grasp":10.0,"grasp":0.0,"lift":0.0,"pre_place":15.0,"release":0.0,"retreat":15.0}
+16:43:40 I cube_task.events: [ 149.173] decision action="pick" label="pear" zone="zone_green" target={"label":"pear","score":0.989,"score_kind":"knn","bbox":[393,95,519,197],"center_base":[0.3055,-0.0875,0.0717],"top_z... attempt=3 closing_angle=2.8085 grasp_xyz=[0.3099,-0.092,0.0317] release_xyz=[0.1925,0.35,0.0367] transit_z=0.1607 place={"xy":[0.1925,0.35],"reserved_diagonal":false,"axis":null,"edge_margin":0.035,"clearance":0.01,"footprint_clearance":... grasp={"kind":"elongated","mode":"profile","section_max":0.0541,"fit":0.098,"z_rel":0.0317} remaining=153.72
+16:43:40 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'no_object', 'object': None}
+16:43:40 I cube_task.task.skills: step open           ok=True  0.60s
+16:43:40 I cube_task.events: [ 149.773] skill_step label="pear" zone="zone_green" stage="open" ok=true error="" duration=0.6 command=0.0841 width=0.0841
+16:43:40 I cube_task.task.skills: step pre            ok=True  2.89s
+16:43:40 I cube_task.events: [ 152.667] skill_step label="pear" zone="zone_green" stage="pre" ok=true error="" duration=2.894 target=[0.3099,-0.092,0.1517] linear=false pos_err=4.055544911238186e-08
+16:43:40 I cube_task.task.skills: step descend        ok=True  3.02s
+16:43:40 I cube_task.events: [ 155.683] skill_step label="pear" zone="zone_green" stage="descend" ok=true error="" duration=3.017 target=[0.3099,-0.092,0.0317] linear=true pos_err=6.723667450824762e-08
+16:43:40 I cube_task.sim.world: sim grasp failed: {'ok': False, 'reason': 'no_object', 'object': None}
+16:43:40 I cube_task.task.skills: step close          ok=True  0.60s
+16:43:40 I cube_task.events: [ 156.283] skill_step label="pear" zone="zone_green" stage="close" ok=true error="" duration=0.6 command=0.0 width=0.0
+16:43:40 I cube_task.task.skills: step recover_open   ok=True  0.60s
+16:43:40 I cube_task.events: [ 156.883] skill_step label="pear" zone="zone_green" stage="recover_open" ok=true error="" duration=0.6 command=0.0841 width=0.0841
+16:43:41 I cube_task.task.skills: step recover_retreat ok=True  3.02s
+16:43:41 I cube_task.events: [ 159.900] skill_step label="pear" zone="zone_green" stage="recover_retreat" ok=true error="" duration=3.017 target=[0.3099,-0.092,0.1517] linear=true pos_err=2.5232525156464434e-09
+16:43:41 I cube_task.events: [ 159.900] pick_result ok=false stage="grasp_miss" error="grasp_miss" label="pear" zone="zone_green" duration=10.727 grasp_width=0.0 fault=false holding=false
+16:43:41 I cube_task.events: [ 159.900] decision action="blacklist" label="pear" xy=[0.3055,-0.0875] reason="max_attempts (grasp_miss)" attempts=3
+16:43:41 I cube_task.events: [ 162.794] observe_move ok=true error="" duration=2.894 view=0
+16:43:42 I cube_task.events: [ 163.294] observation ok=true n=10 stamp=1163.2936212387824 detections=[{"label":"bell_pepper","score":0.99,"score_kind":"knn","bbox":[101,294,244,436],"center_base":[0.1726,-0.0211,0.0761... warnings=[]
+16:43:42 I cube_task.events: [ 163.294] decision action="view_scanned" view=0 n=4 labels=["bell_pepper","bell_pepper","pear","pear"]
+16:43:42 I cube_task.events: [ 164.477] observe_move ok=true error="" duration=1.183 view=1
+16:43:43 I cube_task.events: [ 164.977] observation ok=true n=11 stamp=1164.976954572115 detections=[{"label":"pear","score":0.998,"score_kind":"knn","bbox":[425,27,519,139],"center_base":[0.3146,-0.0908,0.1148],"top_... warnings=[]
+16:43:43 I cube_task.events: [ 164.977] decision action="view_scanned" view=1 n=3 labels=["pear","pear","bell_pepper"]
+16:43:43 I cube_task.events: [ 166.160] observe_move ok=true error="" duration=1.183 view=2
+16:43:44 I cube_task.events: [ 166.660] observation ok=true n=12 stamp=1166.6602879054474 detections=[{"label":"bell_pepper","score":0.987,"score_kind":"knn","bbox":[456,319,595,395],"center_base":[0.1967,-0.0061,0.079... warnings=[]
+16:43:44 I cube_task.events: [ 166.660] decision action="view_scanned" view=2 n=2 labels=["bell_pepper","bell_pepper"]
+16:43:44 I cube_task.events: [ 166.660] decision action="nothing_to_pick" empty=1 views=3
+16:43:46 I cube_task.events: [ 167.227] observation ok=true n=13 stamp=1167.226954572114 detections=[{"label":"bell_pepper","score":0.987,"score_kind":"knn","bbox":[455,319,593,398],"center_base":[0.1968,-0.0055,0.079... warnings=[]
+16:43:46 I cube_task.events: [ 167.227] decision action="view_scanned" view=2 n=2 labels=["bell_pepper","bell_pepper"]
+16:43:46 I cube_task.events: [ 168.410] observe_move ok=true error="" duration=1.183 view=1
+16:43:47 I cube_task.events: [ 168.910] observation ok=true n=14 stamp=1168.9102879054465 detections=[{"label":"pear","score":0.997,"score_kind":"knn","bbox":[425,27,519,139],"center_base":[0.3157,-0.0903,0.1149],"top_... warnings=[]
+16:43:47 I cube_task.events: [ 168.910] decision action="view_scanned" view=1 n=3 labels=["pear","pear","bell_pepper"]
+16:43:47 I cube_task.events: [ 170.094] observe_move ok=true error="" duration=1.183 view=0
+16:43:48 I cube_task.events: [ 170.594] observation ok=true n=15 stamp=1170.593621238779 detections=[{"label":"bell_pepper","score":0.999,"score_kind":"knn","bbox":[98,292,244,436],"center_base":[0.1806,-0.0172,0.079]... warnings=[]
+16:43:48 I cube_task.events: [ 170.594] decision action="view_scanned" view=0 n=3 labels=["bell_pepper","pear","pear"]
+16:43:48 I cube_task.events: [ 170.594] decision action="nothing_to_pick" empty=2 views=3
+16:43:49 I cube_task.events: [ 171.160] observation ok=true n=16 stamp=1171.1602879054456 detections=[{"label":"bell_pepper","score":0.991,"score_kind":"knn","bbox":[105,292,244,436],"center_base":[0.1777,-0.0212,0.076... warnings=[]
+16:43:49 I cube_task.events: [ 171.160] decision action="view_scanned" view=0 n=3 labels=["bell_pepper","bell_pepper","pear"]
+16:43:49 I cube_task.events: [ 172.344] observe_move ok=true error="" duration=1.183 view=1
+16:43:50 I cube_task.events: [ 172.844] observation ok=true n=17 stamp=1172.843621238778 detections=[{"label":"pear","score":0.996,"score_kind":"knn","bbox":[393,27,519,183],"center_base":[0.3178,-0.0905,0.1134],"top_... warnings=[]
+16:43:50 I cube_task.events: [ 172.844] decision action="view_scanned" view=1 n=3 labels=["pear","pear","bell_pepper"]
+16:43:50 I cube_task.events: [ 174.027] observe_move ok=true error="" duration=1.183 view=2
+16:43:51 I cube_task.events: [ 174.527] observation ok=true n=18 stamp=1174.5269545721105 detections=[{"label":"bell_pepper","score":0.988,"score_kind":"knn","bbox":[455,319,595,398],"center_base":[0.1968,-0.0062,0.079... warnings=[]
+16:43:51 I cube_task.events: [ 174.527] decision action="view_scanned" view=2 n=2 labels=["bell_pepper","bell_pepper"]
+16:43:51 I cube_task.events: [ 174.527] decision action="nothing_to_pick" empty=3 views=3
+16:43:52 I cube_task.events: [ 175.094] observation ok=true n=19 stamp=1175.0936212387771 detections=[{"label":"bell_pepper","score":0.998,"score_kind":"knn","bbox":[445,319,608,473],"center_base":[0.1816,-0.0118,0.079... warnings=[]
+16:43:52 I cube_task.events: [ 175.094] decision action="view_scanned" view=2 n=1 labels=["bell_pepper"]
+16:43:52 I cube_task.events: [ 176.277] observe_move ok=true error="" duration=1.183 view=1
+16:43:54 I cube_task.events: [ 176.777] observation ok=true n=20 stamp=1176.7769545721096 detections=[{"label":"pear","score":0.998,"score_kind":"knn","bbox":[424,27,519,139],"center_base":[0.3158,-0.0899,0.1148],"top_... warnings=[]
+16:43:54 I cube_task.events: [ 176.777] decision action="view_scanned" view=1 n=5 labels=["pear","pear","pear","bell_pepper","bell_pepper"]
+16:43:54 I cube_task.events: [ 177.960] observe_move ok=true error="" duration=1.183 view=0
+16:43:55 I cube_task.events: [ 178.460] observation ok=true n=21 stamp=1178.460287905442 detections=[{"label":"bell_pepper","score":0.991,"score_kind":"knn","bbox":[106,292,244,436],"center_base":[0.1777,-0.0213,0.076... warnings=[]
+16:43:55 I cube_task.events: [ 178.460] decision action="view_scanned" view=0 n=5 labels=["bell_pepper","bell_pepper","pear","pear","pear"]
+16:43:55 I cube_task.events: [ 178.460] decision action="nothing_to_pick" empty=4 views=3
+16:43:55 W cube_task.task.runner: TCP z 0.121 m is below the transit height 0.150 m but the straight lift is not possible (tool tilt 57.2 deg from straight down exceeds 30.0 deg)
+16:43:55 I cube_task.events: [ 178.460] start_lift ok=false error="rejected" reason="tool tilt 57.2 deg from straight down exceeds 30.0 deg"
+16:43:55 I cube_task.events: [ 180.757] home ok=true error="" joints=[0.0,0.0,0.0,0.0,0.0,0.0]
+16:43:55 I cube_task.events: [ 180.757] report task="L2" ok=false placed=4 required=6 attempts=10 elapsed=175.564 time_limit=300.0 stop_reason="no_targets" fault_detail="" dry_run=false picks=[{"ok":false,"stage":"grasp_miss","error":"grasp_miss","label":"bell_pepper","zone":"zone_red","duration":9.094,"gras...
+16:43:55 I cube_task.task.runner: L2 finished: no_targets, placed 4/6 in 175.6 s
+
+==============================================================================
+L2 INCOMPLETE: placed 4/6, 175.6 s of 300 s, attempts 10, stop reason: no_targets
+==============================================================================
+#   label          zone         ok   stage          error                   time_s
+1   bell_pepper    zone_red     no   grasp_miss     grasp_miss                 9.1
+2   bell_pepper    zone_red     no   grasp_miss     grasp_miss                 8.9
+3   bell_pepper    zone_red     no   grasp_miss     grasp_miss                 8.9
+4   persimmon      zone_red     yes  done                                     18.6
+5   potato         zone_yellow  yes  done                                     18.6
+6   banana         zone_yellow  yes  done                                     20.6
+7   cucumber       zone_green   yes  done                                     19.0
+8   pear           zone_green   no   grasp_miss     grasp_miss                10.7
+9   pear           zone_green   no   grasp_miss     grasp_miss                10.5
+10  pear           zone_green   no   grasp_miss     grasp_miss                10.7
+ground truth (sim): correct 3, wrong 0, remaining 3
+log: D:\大四上\智能车项目\local_validation\L2_seed3\20261114_164245_L2
+exit code 1 (finished incomplete)
+16:43:55 I cube_task.events: [ 180.757] close elapsed_s=180.757

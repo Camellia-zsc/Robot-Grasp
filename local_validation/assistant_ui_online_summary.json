@@ -1,0 +1,216 @@
+{
+  "red": {
+    "instruction": "抓取红色方块",
+    "status": "complete",
+    "reply": {
+      "scene_version": 2,
+      "action": "pick",
+      "object_id": "v2-object-3",
+      "zone_name": "zone_red",
+      "message": "抓取红色方块并放入zone_red区域。"
+    },
+    "stream_lengths_seen": [
+      0,
+      98,
+      117
+    ],
+    "usage": {
+      "input_tokens": 4865,
+      "output_tokens": 45,
+      "total_tokens": 4910
+    },
+    "result": {
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "red",
+      "zone": "zone_red",
+      "duration": 18.983,
+      "grasp_width": 0.0504717474790643,
+      "fault": false,
+      "recovery": "",
+      "object_id": "v2-object-3",
+      "aborted": false,
+      "holding": false,
+      "scene": {
+        "scene_version": 4,
+        "objects": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1021,
+            "length": 0.0499,
+            "width": 0.0498,
+            "n_points": 9784,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v4-object-1",
+            "in_zone": false,
+            "view": 0
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.1012,
+            "length": 0.0467,
+            "width": 0.0465,
+            "n_points": 6409,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v4-object-2",
+            "in_zone": false,
+            "view": 1
+          }
+        ],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "observed_at": 1037.5920906359693,
+        "warnings": []
+      },
+      "score": {
+        "correct": 1,
+        "wrong": 0,
+        "remaining": 2
+      },
+      "controller_ok": true,
+      "truth": {
+        "success": true,
+        "object_name": "red_cube",
+        "expected_zone": "zone_red",
+        "actual_zone": "zone_red"
+      },
+      "message": "已将红色方块放到红色区域"
+    },
+    "actual_score": {
+      "correct": 1,
+      "wrong": 0,
+      "remaining": 2
+    },
+    "distinct_joint_states": 175
+  },
+  "absent": {
+    "instruction": "桌上有蓝色方块吗？",
+    "status": "ready",
+    "reply": {
+      "scene_version": 5,
+      "action": "target_not_observed",
+      "object_id": null,
+      "zone_name": null,
+      "message": "当前场景未观察到蓝色方块。"
+    },
+    "stream_lengths_seen": [
+      0,
+      20,
+      110,
+      117
+    ],
+    "usage": {
+      "input_tokens": 4816,
+      "output_tokens": 41,
+      "total_tokens": 4857
+    },
+    "result": null,
+    "actual_score": {
+      "correct": 1,
+      "wrong": 0,
+      "remaining": 2
+    }
+  }
+}

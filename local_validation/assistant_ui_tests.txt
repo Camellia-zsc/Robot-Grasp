@@ -1,0 +1,4 @@
+2026-11-16
+Command: python -m pytest test/test_assistant_llm.py test/test_assistant_server.py test/test_assistant_simulation.py -q
+Result: 92 passed in 40.18s
+All API tests used fake network streams. Two real online calls are recorded separately.

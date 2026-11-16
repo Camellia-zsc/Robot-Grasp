@@ -1,0 +1,483 @@
+site_overlays:
+- config/site/tasks.yaml
+- config/site/poses.yaml
+- config/site/colors.yaml
+- config/site/local.yaml
+moveit:
+  waypoint_step: 0.0
+  max_waypoints: 24
+robot:
+  backend: sim
+  model: piper
+  firmware: v189
+  can_interface: socketcan
+  can_channel: can0
+  effector: agx_gripper
+  speed_percent: 30
+  connect_timeout_s: 5.0
+  enable_timeout_s: 5.0
+  tcp_offset:
+  - 0.0
+  - 0.0
+  - 0.1425
+  - 0.0
+  - 0.0
+  - 0.0
+  gripper:
+    max_width: 0.1
+    open_margin: 0.02
+    close_width: 0.0
+    force: 1.5
+    settle_s: 0.6
+    timeout_s: 3.0
+    empty_width: 0.004
+    stable_s: 0.15
+    width_tolerance: 0.015
+  motion:
+    pos_tol: 0.006
+    rot_tol_deg: 4.0
+    settle_samples: 5
+    stable_eps: 0.0005
+    min_wait_s: 0.25
+    timeout_base_s: 6.0
+    timeout_per_m_s: 15.0
+    poll_hz: 50
+    feedback_max_age_s: 0.5
+    stall_s: 1.0
+    require_motion_status: true
+    linear_moves: true
+    sim_lin_speed: 0.15
+    sim_overhead_s: 0.35
+  safety:
+    table_check_joint_moves: true
+  workspace:
+    x:
+    - 0.08
+    - 0.6
+    y:
+    - -0.4
+    - 0.4
+    z:
+    - -0.05
+    - 0.5
+    r_min: 0.1
+    r_max: 0.62
+    min_table_clearance: 0.002
+    max_tilt_from_down_deg: 30
+  poses:
+    home_joints:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    observe_joints:
+    - 0.0
+    - 0.486
+    - -0.47
+    - 0.0
+    - 1.168
+    - 0.0
+    observe_views:
+    - - -0.5
+      - 0.486
+      - -0.47
+      - 0.0
+      - 1.168
+      - 0.0
+    - - 0.0
+      - 0.486
+      - -0.47
+      - 0.0
+      - 1.168
+      - 0.0
+    - - 0.5
+      - 0.486
+      - -0.47
+      - 0.0
+      - 1.168
+      - 0.0
+    observe_tcp:
+    - 0.2
+    - 0.0
+    - 0.15
+    - 1.5708
+camera:
+  backend: sim
+  mount: eye_in_hand
+  extrinsics_file: config/site/extrinsics.yaml
+  extrinsics_inline:
+    mount: eye_in_hand
+    matrix:
+    - - 0.0
+      - 1.0
+      - 0.0
+      - -0.07
+    - - -1.0
+      - 0.0
+      - 0.0
+      - 0.0
+    - - 0.0
+      - 0.0
+      - 1.0
+      - 0.03
+    - - 0.0
+      - 0.0
+      - 0.0
+      - 1.0
+  frames_to_average: 3
+  settle_s: 0.4
+  frame_timeout_s: 2.0
+  max_frame_age_s: 1.0
+  ros:
+    color_topic: /camera/color/image_raw
+    depth_topic: /camera/depth/image_raw
+    info_topic: /camera/color/camera_info
+    depth_info_topic: /camera/depth/camera_info
+    depth_registered: true
+    depth_to_color: null
+    depth_scale: 0.001
+    sync_slop_s: 0.05
+    sync_mode: header
+    ignore_distortion: false
+    intrinsics_override: null
+    qos_reliable: false
+    start_timeout_s: 5.0
+    yuv422_order: uyvy
+  file:
+    dir: ''
+    loop: true
+    repeat: 1
+perception:
+  stem:
+    min_pixels: 300
+    labels:
+      bell_pepper:
+      - - - 35
+          - 60
+          - 30
+        - - 95
+          - 255
+          - 255
+  debug_image: true
+  l1_block_size: 0.05
+  depth:
+    min_z: 0.15
+    max_z: 3.0
+  roi:
+    pick_polygon:
+    - - 0.12
+      - -0.25
+    - - 0.4
+      - -0.25
+    - - 0.4
+      - 0.25
+    - - 0.12
+      - 0.25
+    exclude_zones: true
+    zone_exclude_margin: 0.02
+  table:
+    ransac_iters: 300
+    inlier_thresh: 0.005
+    min_inlier_ratio: 0.3
+    max_tilt_deg: 20.0
+    expected_z: null
+    expected_z_tol: 0.05
+    reuse_s: 0.0
+    roi_margin: 0.05
+    ransac_points: 4000
+    min_points: 200
+    sample_points: 20000
+    seed: 0
+    min_coverage: 0.25
+  segmentation:
+    min_height: 0.008
+    max_height: 0.25
+    min_area_m2: 0.00012
+    max_area_m2: 0.04
+    min_points: 40
+    morph_open_px: 3
+    morph_close_px: 5
+    split_touching: true
+    split_min_peak_dist_m: 0.025
+    top_percentile: 90
+    edge_erode_px: 2
+    split_neck_ratio: 0.75
+    split_cell_m: 0.002
+    split_height_jump_m: 0.008
+    split_jump_noise_k: 6.0
+    despike: true
+    edge_jump_abs_m: 0.006
+    edge_jump_rel: 0.01
+    extent_trim_pct: 0.5
+    max_occlusion_ratio: 0.2
+    min_blob_px: 15
+    max_instances: 40
+    color_split: true
+    color_split_min_fraction: 0.25
+    merged_blocks: split
+  classifier:
+    backend: color
+    min_score: 0.55
+    color:
+      classes:
+        red:
+        - - - 0
+            - 90
+            - 60
+          - - 8
+            - 255
+            - 255
+        - - - 170
+            - 90
+            - 60
+          - - 180
+            - 255
+            - 255
+        orange:
+        - - - 9
+            - 110
+            - 80
+          - - 20
+            - 255
+            - 255
+        yellow:
+        - - - 21
+            - 90
+            - 80
+          - - 34
+            - 255
+            - 255
+        green:
+        - - - 35
+            - 60
+            - 40
+          - - 85
+            - 255
+            - 255
+        blue:
+        - - - 95
+            - 90
+            - 40
+          - - 130
+            - 255
+            - 255
+        purple:
+        - - - 131
+            - 50
+            - 40
+          - - 169
+            - 255
+            - 255
+      min_fraction: 0.35
+    knn:
+      model_file: models/knn_model.npz
+      k: 3
+      max_distance: 3.0
+    onnx:
+      model_file: models/detector.onnx
+      labels_file: models/detector_labels.txt
+      input_size: 640
+      conf_threshold: 0.35
+      nms_threshold: 0.45
+      backend: auto
+      label_map: {}
+      min_mask_overlap: 0.3
+  tracking:
+    match_dist_m: 0.03
+    confirm_frames: 1
+grasp:
+  approach_height: 0.08
+  transit_clearance: 0.12
+  transit_z_min: 0.15
+  transit_object_clearance: 0.06
+  min_approach_clearance: 0.04
+  lift_height: 0.1
+  grasp_depth_ratio: 0.6
+  max_grasp_depth: 0.04
+  min_grasp_depth: 0.008
+  linear_descent: true
+  block_labels_square: true
+  use_cap_center: true
+  max_object_width: null
+  fit_width:
+    pear: 0.098
+  verify_grasp: true
+  open_full_tasks:
+  - L1
+  open_full_labels:
+  - bell_pepper
+  stem_labels:
+  - bell_pepper
+  stem_max_offset_ratio: 0.5
+place:
+  release_height: 0.06
+  release_height_flat: 0.01
+  retreat_height: 0.1
+  release_lower:
+    bell_pepper: 0.005
+    pear: 0.005
+  center_labels:
+    pear: 0.03
+  open_width: null
+  spread_releases: true
+  slot_margin: 0.025
+  pair_offset:
+    zone_red:
+    - 0.035
+    - 0.025
+  nominal_footprint:
+    cucumber:
+    - 0.26
+    - 0.04
+    banana:
+    - 0.18
+    - 0.04
+    pear:
+    - 0.085
+    - 0.085
+    potato:
+    - 0.1
+    - 0.07
+    persimmon:
+    - 0.07
+    - 0.07
+    bell_pepper:
+    - 0.07
+    - 0.07
+    red:
+    - 0.05
+    - 0.05
+    green:
+    - 0.05
+    - 0.05
+    yellow:
+    - 0.05
+    - 0.05
+zones:
+  zone_green:
+    center:
+    - 0.17
+    - 0.35
+    - 0.0
+    size:
+    - 0.2
+    - 0.2
+    yaw: 0.0
+    wall_height: 0.0
+    label: green
+  zone_yellow:
+    center:
+    - 0.49
+    - 0.0
+    - 0.0
+    size:
+    - 0.2
+    - 0.2
+    yaw: 0.0
+    wall_height: 0.0
+    label: yellow
+  zone_red:
+    center:
+    - 0.17
+    - -0.35
+    - 0.0
+    size:
+    - 0.2
+    - 0.2
+    yaw: 0.0
+    wall_height: 0.0
+    label: red
+tasks:
+  L1:
+    time_limit_s: 180
+    required: 3
+    classifier: color
+    labels:
+    - red
+    - green
+    - yellow
+    class_to_zone:
+      red: zone_red
+      green: zone_green
+      yellow: zone_yellow
+    order: []
+  L2:
+    time_limit_s: 300
+    required: 6
+    classifier: knn
+    labels: []
+    class_to_zone: {}
+    order: []
+runner:
+  selection: nearest
+  max_attempts_per_object: 3
+  max_empty_observations: 4
+  max_failures_per_label: null
+  min_time_for_pick_s: 12.0
+  observe_retry_s: 0.5
+  rescan_radius_m: 0.12
+  scan_all_first: false
+  live_watch:
+    enabled: false
+    max_motion_m: 0.01
+    max_rot_deg: 2.0
+    latency_s: 0.1
+    move_m: 0.03
+    match_m: 0.15
+    held_margin_m: 0.02
+    join_s: 3.0
+  partial_length_ratio: 0.6
+  start_on_enter: true
+  zone_order:
+    zone_green:
+    - cucumber
+    - pear
+  return_home_at_end: home
+  view_merge_dist_m: 0.04
+  dry_run_hover: 0.05
+sim:
+  joint_speed: 2.0
+  noise_std: 0.0008
+  dropout: 0.002
+  seed: 0
+  arm_joint_noise_std: 0.0
+  use_site_knn: false
+  intrinsics:
+    fx: 380.0
+    fy: 380.0
+    cx: 319.5
+    cy: 239.5
+    width: 640
+    height: 480
+    dist:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+  T_flange_camera:
+  - - 0.0
+    - 1.0
+    - 0.0
+    - -0.07
+  - - -1.0
+    - 0.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 1.0
+    - 0.03
+  - - 0.0
+    - 0.0
+    - 0.0
+    - 1.0
+  extrinsics_error:
+  - 0.0
+  - 0.0
+logging:
+  dir: D:\大四上\智能车项目\local_validation\L1_seed0
+  save_images: true
+  image_every_observation: true

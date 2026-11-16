@@ -1,0 +1,6103 @@
+{
+  "status": "error",
+  "stage": "本次抓取未完成，请查看执行记录并重新观察场景",
+  "busy": false,
+  "error": "本次抓取未完成，请查看执行记录并重新观察场景",
+  "model": {
+    "configured": true,
+    "provider": "custom",
+    "model": "gpt-6.1-sol",
+    "api_style": "responses"
+  },
+  "scene": {
+    "scene_version": 15,
+    "objects": [],
+    "zones": [
+      {
+        "center": [
+          0.17,
+          0.35,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "green",
+        "name": "zone_green",
+        "color_rgb": [
+          60,
+          165,
+          70
+        ]
+      },
+      {
+        "center": [
+          0.49,
+          0.0,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "yellow",
+        "name": "zone_yellow",
+        "color_rgb": [
+          230,
+          205,
+          50
+        ]
+      },
+      {
+        "center": [
+          0.17,
+          -0.35,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "red",
+        "name": "zone_red",
+        "color_rgb": [
+          205,
+          55,
+          55
+        ]
+      }
+    ],
+    "class_to_zone": {
+      "red": "zone_red",
+      "green": "zone_green",
+      "yellow": "zone_yellow"
+    },
+    "task": "L1",
+    "mode": "sim",
+    "warnings": [
+      "observation invalidated after execution"
+    ]
+  },
+  "speed": 4.0,
+  "needs_reset": true,
+  "metrics": {
+    "requests": 5,
+    "successes": 4,
+    "model_requests": 5
+  },
+  "usage": {
+    "input_tokens": 5051,
+    "output_tokens": 45,
+    "total_tokens": 5096
+  },
+  "messages": [
+    {
+      "id": 21,
+      "role": "user",
+      "content": "把红色方块抓到黄色放置区里",
+      "status": "complete"
+    },
+    {
+      "id": 41,
+      "role": "assistant",
+      "content": "{\"scene_version\":2,\"action\":\"pick\",\"object_id\":\"v2-object-3\",\"zone_name\":\"zone_yellow\",\"message\":\"将红色方块抓取并放入黄色放置区。\"}",
+      "status": "complete",
+      "decision": {
+        "scene_version": 2,
+        "action": "pick",
+        "object_id": "v2-object-3",
+        "zone_name": "zone_yellow",
+        "message": "将红色方块抓取并放入黄色放置区。"
+      }
+    },
+    {
+      "id": 83,
+      "role": "user",
+      "content": "把红色方块抓到绿色放置区里",
+      "status": "complete"
+    },
+    {
+      "id": 103,
+      "role": "assistant",
+      "content": "{\"scene_version\":5,\"action\":\"pick\",\"object_id\":\"v5-object-2\",\"zone_name\":\"zone_green\",\"message\":\"将红色方块从黄色放置区移到绿色放置区。\"}",
+      "status": "complete",
+      "decision": {
+        "scene_version": 5,
+        "action": "pick",
+        "object_id": "v5-object-2",
+        "zone_name": "zone_green",
+        "message": "将红色方块从黄色放置区移到绿色放置区。"
+      }
+    },
+    {
+      "id": 144,
+      "role": "user",
+      "content": "抓取红色方块",
+      "status": "complete"
+    },
+    {
+      "id": 164,
+      "role": "assistant",
+      "content": "{\"scene_version\":8,\"action\":\"pick\",\"object_id\":\"v8-object-3\",\"zone_name\":\"zone_red\",\"message\":\"抓取红色方块，放入红色区域。\"}",
+      "status": "complete",
+      "decision": {
+        "scene_version": 8,
+        "action": "pick",
+        "object_id": "v8-object-3",
+        "zone_name": "zone_red",
+        "message": "抓取红色方块，放入红色区域。"
+      }
+    },
+    {
+      "id": 205,
+      "role": "user",
+      "content": "抓取绿色方块到红色放置区里",
+      "status": "complete"
+    },
+    {
+      "id": 225,
+      "role": "assistant",
+      "content": "{\"scene_version\":11,\"action\":\"pick\",\"object_id\":\"v11-object-1\",\"zone_name\":\"zone_red\",\"message\":\"将绿色方块放入红色放置区。\"}",
+      "status": "complete",
+      "decision": {
+        "scene_version": 11,
+        "action": "pick",
+        "object_id": "v11-object-1",
+        "zone_name": "zone_red",
+        "message": "将绿色方块放入红色放置区。"
+      }
+    },
+    {
+      "id": 266,
+      "role": "user",
+      "content": "抓取黄色方块到红色放置区里",
+      "status": "complete"
+    },
+    {
+      "id": 286,
+      "role": "assistant",
+      "content": "{\"scene_version\":14,\"action\":\"pick\",\"object_id\":\"v14-object-3\",\"zone_name\":\"zone_red\",\"message\":\"将黄色方块抓取到红色放置区。\"}",
+      "status": "complete",
+      "decision": {
+        "scene_version": 14,
+        "action": "pick",
+        "object_id": "v14-object-3",
+        "zone_name": "zone_red",
+        "message": "将黄色方块抓取到红色放置区。"
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": 141,
+      "kind": "scene",
+      "time": "19:59:54",
+      "scene_version": 7,
+      "objects": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            132,
+            213,
+            242,
+            315
+          ],
+          "center_base": [
+            0.2405,
+            -0.0402,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 1.1018,
+          "length": 0.0499,
+          "width": 0.0498,
+          "n_points": 9769,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v7-object-1",
+          "in_zone": false,
+          "zone": null,
+          "view": 0
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3369,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0981,
+          "length": 0.0467,
+          "width": 0.0466,
+          "n_points": 6414,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v7-object-2",
+          "in_zone": false,
+          "zone": null,
+          "view": 1
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            191,
+            358,
+            278
+          ],
+          "center_base": [
+            0.1704,
+            0.3508,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": 1.1192,
+          "length": 0.0495,
+          "width": 0.0485,
+          "n_points": 6240,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v7-object-3",
+          "in_zone": true,
+          "zone": "zone_green",
+          "view": 3
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      },
+      "task": "L1",
+      "mode": "sim",
+      "observed_at": 1102.4206627951387,
+      "warnings": []
+    },
+    {
+      "id": 142,
+      "kind": "execution_result",
+      "time": "19:59:54",
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "red",
+      "zone": "zone_green",
+      "duration": 18.491,
+      "grasp_width": 0.05047047144295147,
+      "fault": false,
+      "recovery": "",
+      "object_id": "v5-object-2",
+      "aborted": false,
+      "holding": false,
+      "scene": {
+        "scene_version": 7,
+        "objects": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1018,
+            "length": 0.0499,
+            "width": 0.0498,
+            "n_points": 9769,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v7-object-1",
+            "in_zone": false,
+            "zone": null,
+            "view": 0
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3369,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.0981,
+            "length": 0.0467,
+            "width": 0.0466,
+            "n_points": 6414,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v7-object-2",
+            "in_zone": false,
+            "zone": null,
+            "view": 1
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              282,
+              191,
+              358,
+              278
+            ],
+            "center_base": [
+              0.1704,
+              0.3508,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": 1.1192,
+            "length": 0.0495,
+            "width": 0.0485,
+            "n_points": 6240,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v7-object-3",
+            "in_zone": true,
+            "zone": "zone_green",
+            "view": 3
+          }
+        ],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "observed_at": 1102.4206627951387,
+        "warnings": []
+      },
+      "score": {
+        "correct": 0,
+        "wrong": 1,
+        "remaining": 2
+      },
+      "controller_ok": true,
+      "truth": {
+        "success": true,
+        "object_name": "red_cube",
+        "expected_zone": "zone_green",
+        "actual_zone": "zone_green"
+      },
+      "message": "已将红色方块放到绿色区域"
+    },
+    {
+      "id": 143,
+      "kind": "result",
+      "time": "19:59:54",
+      "message": "已将红色方块放到绿色区域",
+      "result": {
+        "ok": true,
+        "stage": "done",
+        "error": "",
+        "label": "red",
+        "zone": "zone_green",
+        "duration": 18.491,
+        "grasp_width": 0.05047047144295147,
+        "fault": false,
+        "recovery": "",
+        "object_id": "v5-object-2",
+        "aborted": false,
+        "holding": false,
+        "scene": {
+          "scene_version": 7,
+          "objects": [
+            {
+              "label": "green",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                132,
+                213,
+                242,
+                315
+              ],
+              "center_base": [
+                0.2405,
+                -0.0402,
+                0.051
+              ],
+              "top_z": 0.051,
+              "height": 0.051,
+              "yaw": 1.1018,
+              "length": 0.0499,
+              "width": 0.0498,
+              "n_points": 9769,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v7-object-1",
+              "in_zone": false,
+              "zone": null,
+              "view": 0
+            },
+            {
+              "label": "yellow",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                484,
+                88,
+                586,
+                188
+              ],
+              "center_base": [
+                0.3369,
+                -0.1634,
+                0.0482
+              ],
+              "top_z": 0.0482,
+              "height": 0.0482,
+              "yaw": 1.0981,
+              "length": 0.0467,
+              "width": 0.0466,
+              "n_points": 6414,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v7-object-2",
+              "in_zone": false,
+              "zone": null,
+              "view": 1
+            },
+            {
+              "label": "red",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                282,
+                191,
+                358,
+                278
+              ],
+              "center_base": [
+                0.1704,
+                0.3508,
+                0.0506
+              ],
+              "top_z": 0.0506,
+              "height": 0.0506,
+              "yaw": 1.1192,
+              "length": 0.0495,
+              "width": 0.0485,
+              "n_points": 6240,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v7-object-3",
+              "in_zone": true,
+              "zone": "zone_green",
+              "view": 3
+            }
+          ],
+          "zones": [
+            {
+              "center": [
+                0.17,
+                0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "green",
+              "name": "zone_green",
+              "color_rgb": [
+                60,
+                165,
+                70
+              ]
+            },
+            {
+              "center": [
+                0.49,
+                0.0,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "yellow",
+              "name": "zone_yellow",
+              "color_rgb": [
+                230,
+                205,
+                50
+              ]
+            },
+            {
+              "center": [
+                0.17,
+                -0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "red",
+              "name": "zone_red",
+              "color_rgb": [
+                205,
+                55,
+                55
+              ]
+            }
+          ],
+          "class_to_zone": {
+            "red": "zone_red",
+            "green": "zone_green",
+            "yellow": "zone_yellow"
+          },
+          "task": "L1",
+          "mode": "sim",
+          "observed_at": 1102.4206627951387,
+          "warnings": []
+        },
+        "score": {
+          "correct": 0,
+          "wrong": 1,
+          "remaining": 2
+        },
+        "controller_ok": true,
+        "truth": {
+          "success": true,
+          "object_name": "red_cube",
+          "expected_zone": "zone_green",
+          "actual_zone": "zone_green"
+        },
+        "message": "已将红色方块放到绿色区域"
+      }
+    },
+    {
+      "id": 145,
+      "kind": "scan_view",
+      "time": "20:03:48",
+      "view": 0,
+      "total": 6,
+      "label": "抓取区视角 1",
+      "message": "正在扫描 1/6：抓取区视角 1"
+    },
+    {
+      "id": 146,
+      "kind": "observe_move",
+      "time": "20:03:50",
+      "ok": true,
+      "error": "",
+      "duration": 1.381,
+      "view": 0
+    },
+    {
+      "id": 147,
+      "kind": "observation",
+      "time": "20:03:55",
+      "ok": true,
+      "n": 31,
+      "stamp": 1104.301718000844,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            132,
+            213,
+            242,
+            315
+          ],
+          "center_base": [
+            0.2405,
+            -0.0402,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 1.1008,
+          "length": 0.05,
+          "width": 0.0498,
+          "n_points": 9784,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            265,
+            62,
+            329,
+            144
+          ],
+          "center_base": [
+            0.3367,
+            -0.1638,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": -0.4716,
+          "length": 0.0466,
+          "width": 0.0459,
+          "n_points": 4964,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 148,
+      "kind": "scan_view",
+      "time": "20:03:55",
+      "view": 1,
+      "total": 6,
+      "label": "抓取区视角 2",
+      "message": "正在扫描 2/6：抓取区视角 2"
+    },
+    {
+      "id": 149,
+      "kind": "observe_move",
+      "time": "20:03:57",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 1
+    },
+    {
+      "id": 150,
+      "kind": "observation",
+      "time": "20:04:01",
+      "ok": true,
+      "n": 32,
+      "stamp": 1105.985051334176,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            328,
+            189,
+            440,
+            311
+          ],
+          "center_base": [
+            0.2406,
+            -0.0397,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": -0.4684,
+          "length": 0.0497,
+          "width": 0.049,
+          "n_points": 8406,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            89,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0977,
+          "length": 0.0468,
+          "width": 0.0465,
+          "n_points": 6425,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 151,
+      "kind": "scan_view",
+      "time": "20:04:01",
+      "view": 2,
+      "total": 6,
+      "label": "抓取区视角 3",
+      "message": "正在扫描 3/6：抓取区视角 3"
+    },
+    {
+      "id": 152,
+      "kind": "observe_move",
+      "time": "20:04:03",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 2
+    },
+    {
+      "id": 153,
+      "kind": "observation",
+      "time": "20:04:08",
+      "ok": true,
+      "n": 33,
+      "stamp": 1107.668384667508,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            497,
+            256,
+            640,
+            392
+          ],
+          "center_base": [
+            0.2406,
+            -0.0395,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": -0.4677,
+          "length": 0.0495,
+          "width": 0.0495,
+          "n_points": 12224,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            0,
+            102,
+            77,
+            213
+          ],
+          "center_base": [
+            0.171,
+            0.3495,
+            0.0505
+          ],
+          "top_z": 0.0505,
+          "height": 0.0505,
+          "yaw": -0.4558,
+          "length": 0.0483,
+          "width": 0.0483,
+          "n_points": 5482,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 154,
+      "kind": "scan_view",
+      "time": "20:04:08",
+      "view": 3,
+      "total": 6,
+      "label": "绿色放置区",
+      "message": "正在扫描 4/6：绿色放置区"
+    },
+    {
+      "id": 155,
+      "kind": "observe_move",
+      "time": "20:04:10",
+      "ok": true,
+      "error": "",
+      "duration": 1.381,
+      "view": 3
+    },
+    {
+      "id": 156,
+      "kind": "observation",
+      "time": "20:04:16",
+      "ok": true,
+      "n": 34,
+      "stamp": 1109.5494398732133,
+      "detections": [
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            191,
+            358,
+            278
+          ],
+          "center_base": [
+            0.1704,
+            0.3508,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": 1.119,
+          "length": 0.0495,
+          "width": 0.0484,
+          "n_points": 6226,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 157,
+      "kind": "scan_view",
+      "time": "20:04:16",
+      "view": 4,
+      "total": 6,
+      "label": "黄色放置区",
+      "message": "正在扫描 5/6：黄色放置区"
+    },
+    {
+      "id": 158,
+      "kind": "observe_move",
+      "time": "20:04:20",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 4
+    },
+    {
+      "id": 159,
+      "kind": "observation",
+      "time": "20:04:24",
+      "ok": true,
+      "n": 35,
+      "stamp": 1112.2638284122502,
+      "detections": [
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            544,
+            414,
+            640,
+            480
+          ],
+          "center_base": [
+            0.3475,
+            -0.1556,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0481,
+          "yaw": -0.4711,
+          "length": 0.0366,
+          "width": 0.024,
+          "n_points": 5414,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 160,
+      "kind": "scan_view",
+      "time": "20:04:24",
+      "view": 5,
+      "total": 6,
+      "label": "红色放置区",
+      "message": "正在扫描 6/6：红色放置区"
+    },
+    {
+      "id": 161,
+      "kind": "observe_move",
+      "time": "20:04:28",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 5
+    },
+    {
+      "id": 162,
+      "kind": "observation",
+      "time": "20:04:34",
+      "ok": true,
+      "n": 36,
+      "stamp": 1114.978216951287,
+      "detections": [
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            0,
+            324,
+            26,
+            398
+          ],
+          "center_base": [
+            0.3242,
+            -0.1833,
+            0.0255
+          ],
+          "top_z": 0.0255,
+          "height": 0.0255,
+          "yaw": -0.7744,
+          "length": 0.0479,
+          "width": 0.0141,
+          "n_points": 1106,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 163,
+      "kind": "scene",
+      "time": "20:04:34",
+      "scene_version": 8,
+      "objects": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            132,
+            213,
+            242,
+            315
+          ],
+          "center_base": [
+            0.2405,
+            -0.0402,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 1.1008,
+          "length": 0.05,
+          "width": 0.0498,
+          "n_points": 9784,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v8-object-1",
+          "in_zone": false,
+          "zone": null,
+          "view": 0
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            89,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0977,
+          "length": 0.0468,
+          "width": 0.0465,
+          "n_points": 6425,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v8-object-2",
+          "in_zone": false,
+          "zone": null,
+          "view": 1
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            191,
+            358,
+            278
+          ],
+          "center_base": [
+            0.1704,
+            0.3508,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": 1.119,
+          "length": 0.0495,
+          "width": 0.0484,
+          "n_points": 6226,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v8-object-3",
+          "in_zone": true,
+          "zone": "zone_green",
+          "view": 3
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      },
+      "task": "L1",
+      "mode": "sim",
+      "observed_at": 1114.978216951287,
+      "warnings": []
+    },
+    {
+      "id": 165,
+      "kind": "decision",
+      "time": "20:04:37",
+      "message": "抓取红色方块，放入红色区域。",
+      "decision": {
+        "scene_version": 8,
+        "action": "pick",
+        "object_id": "v8-object-3",
+        "zone_name": "zone_red",
+        "message": "抓取红色方块，放入红色区域。"
+      }
+    },
+    {
+      "id": 166,
+      "kind": "decision",
+      "time": "20:04:40",
+      "action": "tilt",
+      "label": "red",
+      "tilt_deg": {
+        "pre_grasp": 10.0,
+        "grasp": 0.0,
+        "lift": 15.0,
+        "pre_place": 15.0,
+        "release": 0.0,
+        "retreat": 10.0
+      }
+    },
+    {
+      "id": 167,
+      "kind": "decision",
+      "time": "20:04:41",
+      "action": "pick",
+      "label": "red",
+      "zone": "zone_red",
+      "target": {
+        "label": "red",
+        "score": 1.0,
+        "score_kind": "color",
+        "bbox": [
+          282,
+          191,
+          358,
+          278
+        ],
+        "center_base": [
+          0.1704,
+          0.3508,
+          0.0506
+        ],
+        "top_z": 0.0506,
+        "height": 0.0506,
+        "yaw": 1.119,
+        "length": 0.0495,
+        "width": 0.0484,
+        "n_points": 6226,
+        "valid": true,
+        "reject_reason": "",
+        "track_id": -1
+      },
+      "attempt": 1,
+      "closing_angle": 2.6898,
+      "grasp_xyz": [
+        0.1706,
+        0.3512,
+        0.0106
+      ],
+      "release_xyz": [
+        0.17,
+        -0.35,
+        0.0206
+      ],
+      "transit_z": 0.15,
+      "place": {
+        "xy": [
+          0.17,
+          -0.35
+        ],
+        "reserved_diagonal": false,
+        "axis": null,
+        "edge_margin": 0.075,
+        "clearance": null,
+        "footprint_clearance": null,
+        "finger_clearance": null,
+        "tier": "slot",
+        "open_width": 0.0673
+      },
+      "grasp": {
+        "kind": "square",
+        "mode": "profile",
+        "section_max": 0.0473,
+        "fit": 0.09,
+        "z_rel": 0.0106
+      },
+      "remaining": 3487.92
+    },
+    {
+      "id": 168,
+      "kind": "skill_step",
+      "time": "20:04:42",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "open",
+      "ok": true,
+      "error": "",
+      "duration": 0.6,
+      "command": 0.1,
+      "width": 0.1,
+      "message": "张开夹爪"
+    },
+    {
+      "id": 169,
+      "kind": "stage",
+      "time": "20:04:42",
+      "stage": "pre",
+      "message": "移动到目标上方"
+    },
+    {
+      "id": 170,
+      "kind": "skill_step",
+      "time": "20:04:49",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "pre",
+      "ok": true,
+      "error": "",
+      "duration": 4.079,
+      "target": [
+        0.1706,
+        0.3512,
+        0.1306
+      ],
+      "linear": false,
+      "pos_err": 6.122758808948558E-08,
+      "message": "移动到目标上方"
+    },
+    {
+      "id": 171,
+      "kind": "stage",
+      "time": "20:04:49",
+      "stage": "descend",
+      "message": "下降到抓取位置"
+    },
+    {
+      "id": 172,
+      "kind": "skill_step",
+      "time": "20:04:54",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "descend",
+      "ok": true,
+      "error": "",
+      "duration": 3.017,
+      "target": [
+        0.1706,
+        0.3512,
+        0.0106
+      ],
+      "linear": true,
+      "pos_err": 2.850763578288314E-09,
+      "message": "下降到抓取位置"
+    },
+    {
+      "id": 173,
+      "kind": "skill_step",
+      "time": "20:04:55",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "close",
+      "ok": true,
+      "error": "",
+      "duration": 0.6,
+      "command": 0.0,
+      "width": 0.0505,
+      "message": "闭合夹爪抓取方块"
+    },
+    {
+      "id": 174,
+      "kind": "stage",
+      "time": "20:04:55",
+      "stage": "lift",
+      "message": "提起方块"
+    },
+    {
+      "id": 175,
+      "kind": "skill_step",
+      "time": "20:05:01",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "lift",
+      "ok": true,
+      "error": "",
+      "duration": 3.448,
+      "target": [
+        0.1706,
+        0.3512,
+        0.15
+      ],
+      "linear": true,
+      "pos_err": 5.325891344645336E-09,
+      "message": "提起方块"
+    },
+    {
+      "id": 176,
+      "kind": "stage",
+      "time": "20:05:01",
+      "stage": "transit",
+      "message": "移动到放置区域上方"
+    },
+    {
+      "id": 177,
+      "kind": "skill_step",
+      "time": "20:05:08",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "transit",
+      "ok": true,
+      "error": "",
+      "duration": 4.079,
+      "target": [
+        0.17,
+        -0.35,
+        0.15
+      ],
+      "linear": false,
+      "pos_err": 3.4887468445274934E-08,
+      "message": "移动到放置区域上方"
+    },
+    {
+      "id": 178,
+      "kind": "stage",
+      "time": "20:05:08",
+      "stage": "release",
+      "message": "下降到放置位置"
+    },
+    {
+      "id": 179,
+      "kind": "skill_step",
+      "time": "20:05:14",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "release",
+      "ok": true,
+      "error": "",
+      "duration": 3.226,
+      "target": [
+        0.17,
+        -0.35,
+        0.0206
+      ],
+      "linear": true,
+      "pos_err": 4.4563507568556056E-09,
+      "message": "下降到放置位置"
+    },
+    {
+      "id": 180,
+      "kind": "skill_step",
+      "time": "20:05:15",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "open_release",
+      "ok": true,
+      "error": "",
+      "duration": 0.6,
+      "command": 0.0705,
+      "width": 0.0705,
+      "message": "张开夹爪放下方块"
+    },
+    {
+      "id": 181,
+      "kind": "stage",
+      "time": "20:05:15",
+      "stage": "retreat",
+      "message": "抬起并离开放置区域"
+    },
+    {
+      "id": 182,
+      "kind": "skill_step",
+      "time": "20:05:19",
+      "label": "red",
+      "zone": "zone_red",
+      "stage": "retreat",
+      "ok": true,
+      "error": "",
+      "duration": 2.572,
+      "target": [
+        0.17,
+        -0.35,
+        0.1206
+      ],
+      "linear": true,
+      "pos_err": 1.0644519833723942E-07,
+      "message": "抬起并离开放置区域"
+    },
+    {
+      "id": 183,
+      "kind": "pick_result",
+      "time": "20:05:19",
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "red",
+      "zone": "zone_red",
+      "duration": 22.22,
+      "grasp_width": 0.050463970631326266,
+      "fault": false,
+      "holding": false
+    },
+    {
+      "id": 184,
+      "kind": "scan_view",
+      "time": "20:05:19",
+      "view": 0,
+      "total": 6,
+      "label": "抓取区视角 1",
+      "message": "正在扫描 1/6：抓取区视角 1"
+    },
+    {
+      "id": 185,
+      "kind": "observe_move",
+      "time": "20:05:24",
+      "ok": true,
+      "error": "",
+      "duration": 2.529,
+      "view": 0
+    },
+    {
+      "id": 186,
+      "kind": "observation",
+      "time": "20:05:29",
+      "ok": true,
+      "n": 37,
+      "stamp": 1140.226725159719,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            132,
+            213,
+            242,
+            315
+          ],
+          "center_base": [
+            0.2405,
+            -0.0402,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 1.1021,
+          "length": 0.0499,
+          "width": 0.0498,
+          "n_points": 9775,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            563,
+            103,
+            640,
+            214
+          ],
+          "center_base": [
+            0.1704,
+            -0.3483,
+            0.0505
+          ],
+          "top_z": 0.0505,
+          "height": 0.0505,
+          "yaw": 0.4517,
+          "length": 0.0484,
+          "width": 0.0481,
+          "n_points": 5523,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            265,
+            62,
+            329,
+            144
+          ],
+          "center_base": [
+            0.3367,
+            -0.1638,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": -0.474,
+          "length": 0.0467,
+          "width": 0.0459,
+          "n_points": 4964,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 187,
+      "kind": "scan_view",
+      "time": "20:05:29",
+      "view": 1,
+      "total": 6,
+      "label": "抓取区视角 2",
+      "message": "正在扫描 2/6：抓取区视角 2"
+    },
+    {
+      "id": 188,
+      "kind": "observe_move",
+      "time": "20:05:31",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 1
+    },
+    {
+      "id": 189,
+      "kind": "observation",
+      "time": "20:05:35",
+      "ok": true,
+      "n": 38,
+      "stamp": 1141.910058493051,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            328,
+            189,
+            440,
+            311
+          ],
+          "center_base": [
+            0.2406,
+            -0.0397,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": -0.4698,
+          "length": 0.0497,
+          "width": 0.049,
+          "n_points": 8394,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0969,
+          "length": 0.0467,
+          "width": 0.0465,
+          "n_points": 6422,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 190,
+      "kind": "scan_view",
+      "time": "20:05:35",
+      "view": 2,
+      "total": 6,
+      "label": "抓取区视角 3",
+      "message": "正在扫描 3/6：抓取区视角 3"
+    },
+    {
+      "id": 191,
+      "kind": "observe_move",
+      "time": "20:05:37",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 2
+    },
+    {
+      "id": 192,
+      "kind": "observation",
+      "time": "20:05:42",
+      "ok": true,
+      "n": 39,
+      "stamp": 1143.5933918263831,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            497,
+            256,
+            640,
+            392
+          ],
+          "center_base": [
+            0.2406,
+            -0.0395,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": -0.4638,
+          "length": 0.0497,
+          "width": 0.0495,
+          "n_points": 12235,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 193,
+      "kind": "scan_view",
+      "time": "20:05:42",
+      "view": 3,
+      "total": 6,
+      "label": "绿色放置区",
+      "message": "正在扫描 4/6：绿色放置区"
+    },
+    {
+      "id": 194,
+      "kind": "observe_move",
+      "time": "20:05:44",
+      "ok": true,
+      "error": "",
+      "duration": 1.381,
+      "view": 3
+    },
+    {
+      "id": 195,
+      "kind": "observation",
+      "time": "20:05:50",
+      "ok": true,
+      "n": 40,
+      "stamp": 1145.4744470320884,
+      "detections": [],
+      "warnings": []
+    },
+    {
+      "id": 196,
+      "kind": "scan_view",
+      "time": "20:05:50",
+      "view": 4,
+      "total": 6,
+      "label": "黄色放置区",
+      "message": "正在扫描 5/6：黄色放置区"
+    },
+    {
+      "id": 197,
+      "kind": "observe_move",
+      "time": "20:05:54",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 4
+    },
+    {
+      "id": 198,
+      "kind": "observation",
+      "time": "20:05:58",
+      "ok": true,
+      "n": 41,
+      "stamp": 1148.1888355711253,
+      "detections": [
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            544,
+            414,
+            640,
+            480
+          ],
+          "center_base": [
+            0.3475,
+            -0.1556,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0481,
+          "yaw": -0.4724,
+          "length": 0.0366,
+          "width": 0.024,
+          "n_points": 5425,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 199,
+      "kind": "scan_view",
+      "time": "20:05:58",
+      "view": 5,
+      "total": 6,
+      "label": "红色放置区",
+      "message": "正在扫描 6/6：红色放置区"
+    },
+    {
+      "id": 200,
+      "kind": "observe_move",
+      "time": "20:06:02",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 5
+    },
+    {
+      "id": 201,
+      "kind": "observation",
+      "time": "20:06:07",
+      "ok": true,
+      "n": 42,
+      "stamp": 1150.9032241101622,
+      "detections": [
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            193,
+            358,
+            280
+          ],
+          "center_base": [
+            0.1697,
+            -0.3494,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.1171,
+          "length": 0.0491,
+          "width": 0.0485,
+          "n_points": 6183,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            0,
+            324,
+            26,
+            398
+          ],
+          "center_base": [
+            0.3242,
+            -0.1834,
+            0.0255
+          ],
+          "top_z": 0.0255,
+          "height": 0.0255,
+          "yaw": -0.7794,
+          "length": 0.0478,
+          "width": 0.0142,
+          "n_points": 1101,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 202,
+      "kind": "scene",
+      "time": "20:06:07",
+      "scene_version": 10,
+      "objects": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            132,
+            213,
+            242,
+            315
+          ],
+          "center_base": [
+            0.2405,
+            -0.0402,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 1.1021,
+          "length": 0.0499,
+          "width": 0.0498,
+          "n_points": 9775,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v10-object-1",
+          "in_zone": false,
+          "zone": null,
+          "view": 0
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            193,
+            358,
+            280
+          ],
+          "center_base": [
+            0.1697,
+            -0.3494,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.1171,
+          "length": 0.0491,
+          "width": 0.0485,
+          "n_points": 6183,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v10-object-2",
+          "in_zone": true,
+          "zone": "zone_red",
+          "view": 5
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0969,
+          "length": 0.0467,
+          "width": 0.0465,
+          "n_points": 6422,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v10-object-3",
+          "in_zone": false,
+          "zone": null,
+          "view": 1
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      },
+      "task": "L1",
+      "mode": "sim",
+      "observed_at": 1150.9032241101622,
+      "warnings": []
+    },
+    {
+      "id": 203,
+      "kind": "execution_result",
+      "time": "20:06:07",
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "red",
+      "zone": "zone_red",
+      "duration": 22.22,
+      "grasp_width": 0.050463970631326266,
+      "fault": false,
+      "recovery": "",
+      "object_id": "v8-object-3",
+      "aborted": false,
+      "holding": false,
+      "scene": {
+        "scene_version": 10,
+        "objects": [
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              132,
+              213,
+              242,
+              315
+            ],
+            "center_base": [
+              0.2405,
+              -0.0402,
+              0.051
+            ],
+            "top_z": 0.051,
+            "height": 0.051,
+            "yaw": 1.1021,
+            "length": 0.0499,
+            "width": 0.0498,
+            "n_points": 9775,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v10-object-1",
+            "in_zone": false,
+            "zone": null,
+            "view": 0
+          },
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              282,
+              193,
+              358,
+              280
+            ],
+            "center_base": [
+              0.1697,
+              -0.3494,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": -1.1171,
+            "length": 0.0491,
+            "width": 0.0485,
+            "n_points": 6183,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v10-object-2",
+            "in_zone": true,
+            "zone": "zone_red",
+            "view": 5
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.0969,
+            "length": 0.0467,
+            "width": 0.0465,
+            "n_points": 6422,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v10-object-3",
+            "in_zone": false,
+            "zone": null,
+            "view": 1
+          }
+        ],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "observed_at": 1150.9032241101622,
+        "warnings": []
+      },
+      "score": {
+        "correct": 1,
+        "wrong": 0,
+        "remaining": 2
+      },
+      "controller_ok": true,
+      "truth": {
+        "success": true,
+        "object_name": "red_cube",
+        "expected_zone": "zone_red",
+        "actual_zone": "zone_red"
+      },
+      "message": "已将红色方块放到红色区域"
+    },
+    {
+      "id": 204,
+      "kind": "result",
+      "time": "20:06:07",
+      "message": "已将红色方块放到红色区域",
+      "result": {
+        "ok": true,
+        "stage": "done",
+        "error": "",
+        "label": "red",
+        "zone": "zone_red",
+        "duration": 22.22,
+        "grasp_width": 0.050463970631326266,
+        "fault": false,
+        "recovery": "",
+        "object_id": "v8-object-3",
+        "aborted": false,
+        "holding": false,
+        "scene": {
+          "scene_version": 10,
+          "objects": [
+            {
+              "label": "green",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                132,
+                213,
+                242,
+                315
+              ],
+              "center_base": [
+                0.2405,
+                -0.0402,
+                0.051
+              ],
+              "top_z": 0.051,
+              "height": 0.051,
+              "yaw": 1.1021,
+              "length": 0.0499,
+              "width": 0.0498,
+              "n_points": 9775,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v10-object-1",
+              "in_zone": false,
+              "zone": null,
+              "view": 0
+            },
+            {
+              "label": "red",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                282,
+                193,
+                358,
+                280
+              ],
+              "center_base": [
+                0.1697,
+                -0.3494,
+                0.0506
+              ],
+              "top_z": 0.0506,
+              "height": 0.0506,
+              "yaw": -1.1171,
+              "length": 0.0491,
+              "width": 0.0485,
+              "n_points": 6183,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v10-object-2",
+              "in_zone": true,
+              "zone": "zone_red",
+              "view": 5
+            },
+            {
+              "label": "yellow",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                484,
+                88,
+                586,
+                188
+              ],
+              "center_base": [
+                0.3368,
+                -0.1634,
+                0.0482
+              ],
+              "top_z": 0.0482,
+              "height": 0.0482,
+              "yaw": 1.0969,
+              "length": 0.0467,
+              "width": 0.0465,
+              "n_points": 6422,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v10-object-3",
+              "in_zone": false,
+              "zone": null,
+              "view": 1
+            }
+          ],
+          "zones": [
+            {
+              "center": [
+                0.17,
+                0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "green",
+              "name": "zone_green",
+              "color_rgb": [
+                60,
+                165,
+                70
+              ]
+            },
+            {
+              "center": [
+                0.49,
+                0.0,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "yellow",
+              "name": "zone_yellow",
+              "color_rgb": [
+                230,
+                205,
+                50
+              ]
+            },
+            {
+              "center": [
+                0.17,
+                -0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "red",
+              "name": "zone_red",
+              "color_rgb": [
+                205,
+                55,
+                55
+              ]
+            }
+          ],
+          "class_to_zone": {
+            "red": "zone_red",
+            "green": "zone_green",
+            "yellow": "zone_yellow"
+          },
+          "task": "L1",
+          "mode": "sim",
+          "observed_at": 1150.9032241101622,
+          "warnings": []
+        },
+        "score": {
+          "correct": 1,
+          "wrong": 0,
+          "remaining": 2
+        },
+        "controller_ok": true,
+        "truth": {
+          "success": true,
+          "object_name": "red_cube",
+          "expected_zone": "zone_red",
+          "actual_zone": "zone_red"
+        },
+        "message": "已将红色方块放到红色区域"
+      }
+    },
+    {
+      "id": 206,
+      "kind": "scan_view",
+      "time": "21:50:37",
+      "view": 0,
+      "total": 6,
+      "label": "抓取区视角 1",
+      "message": "正在扫描 1/6：抓取区视角 1"
+    },
+    {
+      "id": 207,
+      "kind": "observe_move",
+      "time": "21:50:40",
+      "ok": true,
+      "error": "",
+      "duration": 1.381,
+      "view": 0
+    },
+    {
+      "id": 208,
+      "kind": "observation",
+      "time": "21:50:44",
+      "ok": true,
+      "n": 43,
+      "stamp": 1152.7842793158675,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            132,
+            213,
+            242,
+            315
+          ],
+          "center_base": [
+            0.2405,
+            -0.0402,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 1.1024,
+          "length": 0.05,
+          "width": 0.0498,
+          "n_points": 9769,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            563,
+            103,
+            640,
+            214
+          ],
+          "center_base": [
+            0.1704,
+            -0.3483,
+            0.0505
+          ],
+          "top_z": 0.0505,
+          "height": 0.0505,
+          "yaw": -1.1183,
+          "length": 0.0484,
+          "width": 0.0483,
+          "n_points": 5530,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            265,
+            62,
+            329,
+            144
+          ],
+          "center_base": [
+            0.3367,
+            -0.1638,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": -0.4717,
+          "length": 0.0468,
+          "width": 0.0459,
+          "n_points": 4955,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 209,
+      "kind": "scan_view",
+      "time": "21:50:44",
+      "view": 1,
+      "total": 6,
+      "label": "抓取区视角 2",
+      "message": "正在扫描 2/6：抓取区视角 2"
+    },
+    {
+      "id": 210,
+      "kind": "observe_move",
+      "time": "21:50:47",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 1
+    },
+    {
+      "id": 211,
+      "kind": "observation",
+      "time": "21:50:51",
+      "ok": true,
+      "n": 44,
+      "stamp": 1154.4676126491995,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            328,
+            189,
+            440,
+            311
+          ],
+          "center_base": [
+            0.2406,
+            -0.0397,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": -0.4692,
+          "length": 0.0497,
+          "width": 0.0489,
+          "n_points": 8394,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0975,
+          "length": 0.0468,
+          "width": 0.0465,
+          "n_points": 6432,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 212,
+      "kind": "scan_view",
+      "time": "21:50:51",
+      "view": 2,
+      "total": 6,
+      "label": "抓取区视角 3",
+      "message": "正在扫描 3/6：抓取区视角 3"
+    },
+    {
+      "id": 213,
+      "kind": "observe_move",
+      "time": "21:50:53",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 2
+    },
+    {
+      "id": 214,
+      "kind": "observation",
+      "time": "21:50:57",
+      "ok": true,
+      "n": 45,
+      "stamp": 1156.1509459825315,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            497,
+            256,
+            640,
+            392
+          ],
+          "center_base": [
+            0.2406,
+            -0.0396,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": -0.4717,
+          "length": 0.0496,
+          "width": 0.0495,
+          "n_points": 12249,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 215,
+      "kind": "scan_view",
+      "time": "21:50:57",
+      "view": 3,
+      "total": 6,
+      "label": "绿色放置区",
+      "message": "正在扫描 4/6：绿色放置区"
+    },
+    {
+      "id": 216,
+      "kind": "observe_move",
+      "time": "21:51:00",
+      "ok": true,
+      "error": "",
+      "duration": 1.381,
+      "view": 3
+    },
+    {
+      "id": 217,
+      "kind": "observation",
+      "time": "21:51:06",
+      "ok": true,
+      "n": 46,
+      "stamp": 1158.0320011882368,
+      "detections": [],
+      "warnings": []
+    },
+    {
+      "id": 218,
+      "kind": "scan_view",
+      "time": "21:51:06",
+      "view": 4,
+      "total": 6,
+      "label": "黄色放置区",
+      "message": "正在扫描 5/6：黄色放置区"
+    },
+    {
+      "id": 219,
+      "kind": "observe_move",
+      "time": "21:51:10",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 4
+    },
+    {
+      "id": 220,
+      "kind": "observation",
+      "time": "21:51:14",
+      "ok": true,
+      "n": 47,
+      "stamp": 1160.7463897272737,
+      "detections": [
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            544,
+            414,
+            640,
+            480
+          ],
+          "center_base": [
+            0.3475,
+            -0.1556,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0481,
+          "yaw": -0.4712,
+          "length": 0.0366,
+          "width": 0.024,
+          "n_points": 5424,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 221,
+      "kind": "scan_view",
+      "time": "21:51:14",
+      "view": 5,
+      "total": 6,
+      "label": "红色放置区",
+      "message": "正在扫描 6/6：红色放置区"
+    },
+    {
+      "id": 222,
+      "kind": "observe_move",
+      "time": "21:51:18",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 5
+    },
+    {
+      "id": 223,
+      "kind": "observation",
+      "time": "21:51:23",
+      "ok": true,
+      "n": 48,
+      "stamp": 1163.4607782663106,
+      "detections": [
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            193,
+            358,
+            280
+          ],
+          "center_base": [
+            0.1697,
+            -0.3494,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.1195,
+          "length": 0.0491,
+          "width": 0.0485,
+          "n_points": 6179,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            0,
+            324,
+            26,
+            398
+          ],
+          "center_base": [
+            0.3288,
+            -0.1785,
+            0.0255
+          ],
+          "top_z": 0.0255,
+          "height": 0.0255,
+          "yaw": -0.4717,
+          "length": 0.0457,
+          "width": 0.0151,
+          "n_points": 1108,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 224,
+      "kind": "scene",
+      "time": "21:51:23",
+      "scene_version": 11,
+      "objects": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            132,
+            213,
+            242,
+            315
+          ],
+          "center_base": [
+            0.2405,
+            -0.0402,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 1.1024,
+          "length": 0.05,
+          "width": 0.0498,
+          "n_points": 9769,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v11-object-1",
+          "in_zone": false,
+          "zone": null,
+          "view": 0
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            193,
+            358,
+            280
+          ],
+          "center_base": [
+            0.1697,
+            -0.3494,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.1195,
+          "length": 0.0491,
+          "width": 0.0485,
+          "n_points": 6179,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v11-object-2",
+          "in_zone": true,
+          "zone": "zone_red",
+          "view": 5
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0975,
+          "length": 0.0468,
+          "width": 0.0465,
+          "n_points": 6432,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v11-object-3",
+          "in_zone": false,
+          "zone": null,
+          "view": 1
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      },
+      "task": "L1",
+      "mode": "sim",
+      "observed_at": 1163.4607782663106,
+      "warnings": []
+    },
+    {
+      "id": 226,
+      "kind": "decision",
+      "time": "21:51:27",
+      "message": "将绿色方块放入红色放置区。",
+      "decision": {
+        "scene_version": 11,
+        "action": "pick",
+        "object_id": "v11-object-1",
+        "zone_name": "zone_red",
+        "message": "将绿色方块放入红色放置区。"
+      }
+    },
+    {
+      "id": 227,
+      "kind": "decision",
+      "time": "21:51:31",
+      "action": "tilt",
+      "label": "green",
+      "tilt_deg": {
+        "pre_grasp": 5.0,
+        "grasp": 0.0,
+        "lift": 10.0,
+        "pre_place": 10.0,
+        "release": 0.0,
+        "retreat": 5.0
+      }
+    },
+    {
+      "id": 228,
+      "kind": "decision",
+      "time": "21:51:31",
+      "action": "pick",
+      "label": "green",
+      "zone": "zone_red",
+      "target": {
+        "label": "green",
+        "score": 1.0,
+        "score_kind": "color",
+        "bbox": [
+          132,
+          213,
+          242,
+          315
+        ],
+        "center_base": [
+          0.2405,
+          -0.0402,
+          0.051
+        ],
+        "top_z": 0.051,
+        "height": 0.051,
+        "yaw": 1.1024,
+        "length": 0.05,
+        "width": 0.0498,
+        "n_points": 9769,
+        "valid": true,
+        "reject_reason": "",
+        "track_id": -1
+      },
+      "attempt": 1,
+      "closing_angle": 1.1024,
+      "grasp_xyz": [
+        0.241,
+        -0.0401,
+        0.011
+      ],
+      "release_xyz": [
+        0.12,
+        -0.3,
+        0.021
+      ],
+      "transit_z": 0.15,
+      "place": {
+        "xy": [
+          0.12,
+          -0.3
+        ],
+        "reserved_diagonal": false,
+        "axis": null,
+        "edge_margin": 0.025,
+        "clearance": 0.0205,
+        "footprint_clearance": 0.0205,
+        "finger_clearance": 0.0248,
+        "tier": "grid",
+        "open_width": 0.0706
+      },
+      "grasp": {
+        "kind": "square",
+        "mode": "profile",
+        "section_max": 0.0506,
+        "fit": 0.09,
+        "z_rel": 0.011
+      },
+      "remaining": 3439.44
+    },
+    {
+      "id": 229,
+      "kind": "skill_step",
+      "time": "21:51:32",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "open",
+      "ok": true,
+      "error": "",
+      "duration": 0.6,
+      "command": 0.1,
+      "width": 0.1,
+      "message": "张开夹爪"
+    },
+    {
+      "id": 230,
+      "kind": "stage",
+      "time": "21:51:32",
+      "stage": "pre",
+      "message": "移动到目标上方"
+    },
+    {
+      "id": 231,
+      "kind": "skill_step",
+      "time": "21:51:35",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "pre",
+      "ok": true,
+      "error": "",
+      "duration": 1.94,
+      "target": [
+        0.241,
+        -0.0401,
+        0.131
+      ],
+      "linear": false,
+      "pos_err": 0.00014779854354374672,
+      "message": "移动到目标上方"
+    },
+    {
+      "id": 232,
+      "kind": "stage",
+      "time": "21:51:36",
+      "stage": "descend",
+      "message": "下降到抓取位置"
+    },
+    {
+      "id": 233,
+      "kind": "skill_step",
+      "time": "21:51:41",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "descend",
+      "ok": true,
+      "error": "",
+      "duration": 3.016,
+      "target": [
+        0.241,
+        -0.0401,
+        0.011
+      ],
+      "linear": true,
+      "pos_err": 1.2381815045472624E-07,
+      "message": "下降到抓取位置"
+    },
+    {
+      "id": 234,
+      "kind": "skill_step",
+      "time": "21:51:42",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "close",
+      "ok": true,
+      "error": "",
+      "duration": 0.6,
+      "command": 0.0,
+      "width": 0.0509,
+      "message": "闭合夹爪抓取方块"
+    },
+    {
+      "id": 235,
+      "kind": "stage",
+      "time": "21:51:42",
+      "stage": "lift",
+      "message": "提起方块"
+    },
+    {
+      "id": 236,
+      "kind": "skill_step",
+      "time": "21:51:48",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "lift",
+      "ok": true,
+      "error": "",
+      "duration": 3.438,
+      "target": [
+        0.241,
+        -0.0401,
+        0.15
+      ],
+      "linear": true,
+      "pos_err": 2.992727294572314E-09,
+      "message": "提起方块"
+    },
+    {
+      "id": 237,
+      "kind": "stage",
+      "time": "21:51:48",
+      "stage": "transit",
+      "message": "移动到放置区域上方"
+    },
+    {
+      "id": 238,
+      "kind": "skill_step",
+      "time": "21:51:52",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "transit",
+      "ok": true,
+      "error": "",
+      "duration": 2.059,
+      "target": [
+        0.12,
+        -0.3,
+        0.15
+      ],
+      "linear": false,
+      "pos_err": 2.4550402841678E-08,
+      "message": "移动到放置区域上方"
+    },
+    {
+      "id": 239,
+      "kind": "stage",
+      "time": "21:51:52",
+      "stage": "release",
+      "message": "下降到放置位置"
+    },
+    {
+      "id": 240,
+      "kind": "skill_step",
+      "time": "21:51:57",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "release",
+      "ok": true,
+      "error": "",
+      "duration": 3.216,
+      "target": [
+        0.12,
+        -0.3,
+        0.021
+      ],
+      "linear": true,
+      "pos_err": 8.548170010881764E-08,
+      "message": "下降到放置位置"
+    },
+    {
+      "id": 241,
+      "kind": "skill_step",
+      "time": "21:51:58",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "open_release",
+      "ok": true,
+      "error": "",
+      "duration": 0.6,
+      "command": 0.0709,
+      "width": 0.0709,
+      "message": "张开夹爪放下方块"
+    },
+    {
+      "id": 242,
+      "kind": "stage",
+      "time": "21:51:58",
+      "stage": "retreat",
+      "message": "抬起并离开放置区域"
+    },
+    {
+      "id": 243,
+      "kind": "skill_step",
+      "time": "21:52:02",
+      "label": "green",
+      "zone": "zone_red",
+      "stage": "retreat",
+      "ok": true,
+      "error": "",
+      "duration": 2.572,
+      "target": [
+        0.12,
+        -0.3,
+        0.121
+      ],
+      "linear": true,
+      "pos_err": 9.32667102129498E-08,
+      "message": "抬起并离开放置区域"
+    },
+    {
+      "id": 244,
+      "kind": "pick_result",
+      "time": "21:52:02",
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "green",
+      "zone": "zone_red",
+      "duration": 18.041,
+      "grasp_width": 0.05093559049996654,
+      "fault": false,
+      "holding": false
+    },
+    {
+      "id": 245,
+      "kind": "scan_view",
+      "time": "21:52:02",
+      "view": 0,
+      "total": 6,
+      "label": "抓取区视角 1",
+      "message": "正在扫描 1/6：抓取区视角 1"
+    },
+    {
+      "id": 246,
+      "kind": "observe_move",
+      "time": "21:52:06",
+      "ok": true,
+      "error": "",
+      "duration": 2.26,
+      "view": 0
+    },
+    {
+      "id": 247,
+      "kind": "observation",
+      "time": "21:52:11",
+      "ok": true,
+      "n": 49,
+      "stamp": 1184.2625685002229,
+      "detections": [
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            563,
+            103,
+            640,
+            201
+          ],
+          "center_base": [
+            0.1778,
+            -0.3447,
+            0.0505
+          ],
+          "top_z": 0.0505,
+          "height": 0.0505,
+          "yaw": -1.1155,
+          "length": 0.0482,
+          "width": 0.032,
+          "n_points": 4643,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        },
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            560,
+            177,
+            640,
+            302
+          ],
+          "center_base": [
+            0.1207,
+            -0.298,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 0.3811,
+          "length": 0.0482,
+          "width": 0.0478,
+          "n_points": 6076,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            265,
+            62,
+            329,
+            144
+          ],
+          "center_base": [
+            0.3367,
+            -0.1638,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": -0.473,
+          "length": 0.0466,
+          "width": 0.0459,
+          "n_points": 4957,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 248,
+      "kind": "scan_view",
+      "time": "21:52:11",
+      "view": 1,
+      "total": 6,
+      "label": "抓取区视角 2",
+      "message": "正在扫描 2/6：抓取区视角 2"
+    },
+    {
+      "id": 249,
+      "kind": "observe_move",
+      "time": "21:52:13",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 1
+    },
+    {
+      "id": 250,
+      "kind": "observation",
+      "time": "21:52:17",
+      "ok": true,
+      "n": 50,
+      "stamp": 1185.945901833555,
+      "detections": [
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0969,
+          "length": 0.0468,
+          "width": 0.0466,
+          "n_points": 6418,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 251,
+      "kind": "scan_view",
+      "time": "21:52:17",
+      "view": 2,
+      "total": 6,
+      "label": "抓取区视角 3",
+      "message": "正在扫描 3/6：抓取区视角 3"
+    },
+    {
+      "id": 252,
+      "kind": "observe_move",
+      "time": "21:52:19",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 2
+    },
+    {
+      "id": 253,
+      "kind": "observation",
+      "time": "21:52:23",
+      "ok": true,
+      "n": 51,
+      "stamp": 1187.629235166887,
+      "detections": [],
+      "warnings": []
+    },
+    {
+      "id": 254,
+      "kind": "scan_view",
+      "time": "21:52:23",
+      "view": 3,
+      "total": 6,
+      "label": "绿色放置区",
+      "message": "正在扫描 4/6：绿色放置区"
+    },
+    {
+      "id": 255,
+      "kind": "observe_move",
+      "time": "21:52:26",
+      "ok": true,
+      "error": "",
+      "duration": 1.381,
+      "view": 3
+    },
+    {
+      "id": 256,
+      "kind": "observation",
+      "time": "21:52:32",
+      "ok": true,
+      "n": 52,
+      "stamp": 1189.5102903725922,
+      "detections": [],
+      "warnings": []
+    },
+    {
+      "id": 257,
+      "kind": "scan_view",
+      "time": "21:52:32",
+      "view": 4,
+      "total": 6,
+      "label": "黄色放置区",
+      "message": "正在扫描 5/6：黄色放置区"
+    },
+    {
+      "id": 258,
+      "kind": "observe_move",
+      "time": "21:52:36",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 4
+    },
+    {
+      "id": 259,
+      "kind": "observation",
+      "time": "21:52:40",
+      "ok": true,
+      "n": 53,
+      "stamp": 1192.224678911629,
+      "detections": [
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            544,
+            414,
+            640,
+            480
+          ],
+          "center_base": [
+            0.3475,
+            -0.1556,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0481,
+          "yaw": -0.4749,
+          "length": 0.0366,
+          "width": 0.024,
+          "n_points": 5425,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 260,
+      "kind": "scan_view",
+      "time": "21:52:40",
+      "view": 5,
+      "total": 6,
+      "label": "红色放置区",
+      "message": "正在扫描 6/6：红色放置区"
+    },
+    {
+      "id": 261,
+      "kind": "observe_move",
+      "time": "21:52:44",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 5
+    },
+    {
+      "id": 262,
+      "kind": "observation",
+      "time": "21:52:49",
+      "ok": true,
+      "n": 54,
+      "stamp": 1194.939067450666,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            313,
+            276,
+            400,
+            374
+          ],
+          "center_base": [
+            0.1199,
+            -0.2997,
+            0.0511
+          ],
+          "top_z": 0.0511,
+          "height": 0.0511,
+          "yaw": -1.1928,
+          "length": 0.05,
+          "width": 0.0491,
+          "n_points": 7674,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            193,
+            358,
+            280
+          ],
+          "center_base": [
+            0.1697,
+            -0.3494,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.1204,
+          "length": 0.0491,
+          "width": 0.0485,
+          "n_points": 6108,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            0,
+            324,
+            26,
+            398
+          ],
+          "center_base": [
+            0.3241,
+            -0.1833,
+            0.0255
+          ],
+          "top_z": 0.0255,
+          "height": 0.0255,
+          "yaw": -0.792,
+          "length": 0.048,
+          "width": 0.0146,
+          "n_points": 1102,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 263,
+      "kind": "scene",
+      "time": "21:52:49",
+      "scene_version": 13,
+      "objects": [
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            193,
+            358,
+            280
+          ],
+          "center_base": [
+            0.1697,
+            -0.3494,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.1204,
+          "length": 0.0491,
+          "width": 0.0485,
+          "n_points": 6108,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v13-object-1",
+          "in_zone": true,
+          "zone": "zone_red",
+          "view": 5
+        },
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            313,
+            276,
+            400,
+            374
+          ],
+          "center_base": [
+            0.1199,
+            -0.2997,
+            0.0511
+          ],
+          "top_z": 0.0511,
+          "height": 0.0511,
+          "yaw": -1.1928,
+          "length": 0.05,
+          "width": 0.0491,
+          "n_points": 7674,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v13-object-2",
+          "in_zone": true,
+          "zone": "zone_red",
+          "view": 5
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0969,
+          "length": 0.0468,
+          "width": 0.0466,
+          "n_points": 6418,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v13-object-3",
+          "in_zone": false,
+          "zone": null,
+          "view": 1
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      },
+      "task": "L1",
+      "mode": "sim",
+      "observed_at": 1194.939067450666,
+      "warnings": []
+    },
+    {
+      "id": 264,
+      "kind": "execution_result",
+      "time": "21:52:49",
+      "ok": true,
+      "stage": "done",
+      "error": "",
+      "label": "green",
+      "zone": "zone_red",
+      "duration": 18.041,
+      "grasp_width": 0.05093559049996654,
+      "fault": false,
+      "recovery": "",
+      "object_id": "v11-object-1",
+      "aborted": false,
+      "holding": false,
+      "scene": {
+        "scene_version": 13,
+        "objects": [
+          {
+            "label": "red",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              282,
+              193,
+              358,
+              280
+            ],
+            "center_base": [
+              0.1697,
+              -0.3494,
+              0.0506
+            ],
+            "top_z": 0.0506,
+            "height": 0.0506,
+            "yaw": -1.1204,
+            "length": 0.0491,
+            "width": 0.0485,
+            "n_points": 6108,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v13-object-1",
+            "in_zone": true,
+            "zone": "zone_red",
+            "view": 5
+          },
+          {
+            "label": "green",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              313,
+              276,
+              400,
+              374
+            ],
+            "center_base": [
+              0.1199,
+              -0.2997,
+              0.0511
+            ],
+            "top_z": 0.0511,
+            "height": 0.0511,
+            "yaw": -1.1928,
+            "length": 0.05,
+            "width": 0.0491,
+            "n_points": 7674,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v13-object-2",
+            "in_zone": true,
+            "zone": "zone_red",
+            "view": 5
+          },
+          {
+            "label": "yellow",
+            "score": 1.0,
+            "score_kind": "color",
+            "bbox": [
+              484,
+              88,
+              586,
+              188
+            ],
+            "center_base": [
+              0.3368,
+              -0.1634,
+              0.0482
+            ],
+            "top_z": 0.0482,
+            "height": 0.0482,
+            "yaw": 1.0969,
+            "length": 0.0468,
+            "width": 0.0466,
+            "n_points": 6418,
+            "valid": true,
+            "reject_reason": "",
+            "track_id": -1,
+            "object_id": "v13-object-3",
+            "in_zone": false,
+            "zone": null,
+            "view": 1
+          }
+        ],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "observed_at": 1194.939067450666,
+        "warnings": []
+      },
+      "score": {
+        "correct": 1,
+        "wrong": 1,
+        "remaining": 1
+      },
+      "controller_ok": true,
+      "truth": {
+        "success": true,
+        "object_name": "green_cube",
+        "expected_zone": "zone_red",
+        "actual_zone": "zone_red"
+      },
+      "message": "已将绿色方块放到红色区域"
+    },
+    {
+      "id": 265,
+      "kind": "result",
+      "time": "21:52:49",
+      "message": "已将绿色方块放到红色区域",
+      "result": {
+        "ok": true,
+        "stage": "done",
+        "error": "",
+        "label": "green",
+        "zone": "zone_red",
+        "duration": 18.041,
+        "grasp_width": 0.05093559049996654,
+        "fault": false,
+        "recovery": "",
+        "object_id": "v11-object-1",
+        "aborted": false,
+        "holding": false,
+        "scene": {
+          "scene_version": 13,
+          "objects": [
+            {
+              "label": "red",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                282,
+                193,
+                358,
+                280
+              ],
+              "center_base": [
+                0.1697,
+                -0.3494,
+                0.0506
+              ],
+              "top_z": 0.0506,
+              "height": 0.0506,
+              "yaw": -1.1204,
+              "length": 0.0491,
+              "width": 0.0485,
+              "n_points": 6108,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v13-object-1",
+              "in_zone": true,
+              "zone": "zone_red",
+              "view": 5
+            },
+            {
+              "label": "green",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                313,
+                276,
+                400,
+                374
+              ],
+              "center_base": [
+                0.1199,
+                -0.2997,
+                0.0511
+              ],
+              "top_z": 0.0511,
+              "height": 0.0511,
+              "yaw": -1.1928,
+              "length": 0.05,
+              "width": 0.0491,
+              "n_points": 7674,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v13-object-2",
+              "in_zone": true,
+              "zone": "zone_red",
+              "view": 5
+            },
+            {
+              "label": "yellow",
+              "score": 1.0,
+              "score_kind": "color",
+              "bbox": [
+                484,
+                88,
+                586,
+                188
+              ],
+              "center_base": [
+                0.3368,
+                -0.1634,
+                0.0482
+              ],
+              "top_z": 0.0482,
+              "height": 0.0482,
+              "yaw": 1.0969,
+              "length": 0.0468,
+              "width": 0.0466,
+              "n_points": 6418,
+              "valid": true,
+              "reject_reason": "",
+              "track_id": -1,
+              "object_id": "v13-object-3",
+              "in_zone": false,
+              "zone": null,
+              "view": 1
+            }
+          ],
+          "zones": [
+            {
+              "center": [
+                0.17,
+                0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "green",
+              "name": "zone_green",
+              "color_rgb": [
+                60,
+                165,
+                70
+              ]
+            },
+            {
+              "center": [
+                0.49,
+                0.0,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "yellow",
+              "name": "zone_yellow",
+              "color_rgb": [
+                230,
+                205,
+                50
+              ]
+            },
+            {
+              "center": [
+                0.17,
+                -0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "red",
+              "name": "zone_red",
+              "color_rgb": [
+                205,
+                55,
+                55
+              ]
+            }
+          ],
+          "class_to_zone": {
+            "red": "zone_red",
+            "green": "zone_green",
+            "yellow": "zone_yellow"
+          },
+          "task": "L1",
+          "mode": "sim",
+          "observed_at": 1194.939067450666,
+          "warnings": []
+        },
+        "score": {
+          "correct": 1,
+          "wrong": 1,
+          "remaining": 1
+        },
+        "controller_ok": true,
+        "truth": {
+          "success": true,
+          "object_name": "green_cube",
+          "expected_zone": "zone_red",
+          "actual_zone": "zone_red"
+        },
+        "message": "已将绿色方块放到红色区域"
+      }
+    },
+    {
+      "id": 267,
+      "kind": "scan_view",
+      "time": "21:52:59",
+      "view": 0,
+      "total": 6,
+      "label": "抓取区视角 1",
+      "message": "正在扫描 1/6：抓取区视角 1"
+    },
+    {
+      "id": 268,
+      "kind": "observe_move",
+      "time": "21:53:01",
+      "ok": true,
+      "error": "",
+      "duration": 1.381,
+      "view": 0
+    },
+    {
+      "id": 269,
+      "kind": "observation",
+      "time": "21:53:06",
+      "ok": true,
+      "n": 55,
+      "stamp": 1196.8201226563713,
+      "detections": [
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            563,
+            103,
+            640,
+            201
+          ],
+          "center_base": [
+            0.1778,
+            -0.3448,
+            0.0505
+          ],
+          "top_z": 0.0505,
+          "height": 0.0505,
+          "yaw": -1.1169,
+          "length": 0.0484,
+          "width": 0.032,
+          "n_points": 4640,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        },
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            560,
+            177,
+            640,
+            302
+          ],
+          "center_base": [
+            0.1207,
+            -0.298,
+            0.051
+          ],
+          "top_z": 0.051,
+          "height": 0.051,
+          "yaw": 0.3804,
+          "length": 0.0483,
+          "width": 0.0478,
+          "n_points": 6073,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            265,
+            62,
+            329,
+            144
+          ],
+          "center_base": [
+            0.3367,
+            -0.1638,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": -0.4699,
+          "length": 0.0466,
+          "width": 0.0459,
+          "n_points": 4961,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 270,
+      "kind": "scan_view",
+      "time": "21:53:06",
+      "view": 1,
+      "total": 6,
+      "label": "抓取区视角 2",
+      "message": "正在扫描 2/6：抓取区视角 2"
+    },
+    {
+      "id": 271,
+      "kind": "observe_move",
+      "time": "21:53:08",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 1
+    },
+    {
+      "id": 272,
+      "kind": "observation",
+      "time": "21:53:11",
+      "ok": true,
+      "n": 56,
+      "stamp": 1198.5034559897033,
+      "detections": [
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0983,
+          "length": 0.0467,
+          "width": 0.0466,
+          "n_points": 6415,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 273,
+      "kind": "scan_view",
+      "time": "21:53:11",
+      "view": 2,
+      "total": 6,
+      "label": "抓取区视角 3",
+      "message": "正在扫描 3/6：抓取区视角 3"
+    },
+    {
+      "id": 274,
+      "kind": "observe_move",
+      "time": "21:53:14",
+      "ok": true,
+      "error": "",
+      "duration": 1.183,
+      "view": 2
+    },
+    {
+      "id": 275,
+      "kind": "observation",
+      "time": "21:53:18",
+      "ok": true,
+      "n": 57,
+      "stamp": 1200.1867893230353,
+      "detections": [],
+      "warnings": []
+    },
+    {
+      "id": 276,
+      "kind": "scan_view",
+      "time": "21:53:18",
+      "view": 3,
+      "total": 6,
+      "label": "绿色放置区",
+      "message": "正在扫描 4/6：绿色放置区"
+    },
+    {
+      "id": 277,
+      "kind": "observe_move",
+      "time": "21:53:20",
+      "ok": true,
+      "error": "",
+      "duration": 1.381,
+      "view": 3
+    },
+    {
+      "id": 278,
+      "kind": "observation",
+      "time": "21:53:26",
+      "ok": true,
+      "n": 58,
+      "stamp": 1202.0678445287406,
+      "detections": [],
+      "warnings": []
+    },
+    {
+      "id": 279,
+      "kind": "scan_view",
+      "time": "21:53:26",
+      "view": 4,
+      "total": 6,
+      "label": "黄色放置区",
+      "message": "正在扫描 5/6：黄色放置区"
+    },
+    {
+      "id": 280,
+      "kind": "observe_move",
+      "time": "21:53:30",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 4
+    },
+    {
+      "id": 281,
+      "kind": "observation",
+      "time": "21:53:34",
+      "ok": true,
+      "n": 59,
+      "stamp": 1204.7822330677775,
+      "detections": [
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            544,
+            414,
+            640,
+            480
+          ],
+          "center_base": [
+            0.3475,
+            -0.1556,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0481,
+          "yaw": -0.4705,
+          "length": 0.0366,
+          "width": 0.024,
+          "n_points": 5427,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 282,
+      "kind": "scan_view",
+      "time": "21:53:34",
+      "view": 5,
+      "total": 6,
+      "label": "红色放置区",
+      "message": "正在扫描 6/6：红色放置区"
+    },
+    {
+      "id": 283,
+      "kind": "observe_move",
+      "time": "21:53:38",
+      "ok": true,
+      "error": "",
+      "duration": 2.214,
+      "view": 5
+    },
+    {
+      "id": 284,
+      "kind": "observation",
+      "time": "21:53:42",
+      "ok": true,
+      "n": 60,
+      "stamp": 1207.4966216068144,
+      "detections": [
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            313,
+            276,
+            400,
+            374
+          ],
+          "center_base": [
+            0.1199,
+            -0.2997,
+            0.0511
+          ],
+          "top_z": 0.0511,
+          "height": 0.0511,
+          "yaw": -1.1918,
+          "length": 0.0499,
+          "width": 0.0491,
+          "n_points": 7678,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            193,
+            358,
+            280
+          ],
+          "center_base": [
+            0.1697,
+            -0.3494,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.1198,
+          "length": 0.0491,
+          "width": 0.0485,
+          "n_points": 6121,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            0,
+            324,
+            26,
+            398
+          ],
+          "center_base": [
+            0.3241,
+            -0.1834,
+            0.0255
+          ],
+          "top_z": 0.0255,
+          "height": 0.0255,
+          "yaw": -0.7756,
+          "length": 0.0479,
+          "width": 0.014,
+          "n_points": 1099,
+          "valid": false,
+          "reject_reason": "touches_image_border",
+          "track_id": -1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": 285,
+      "kind": "scene",
+      "time": "21:53:42",
+      "scene_version": 14,
+      "objects": [
+        {
+          "label": "red",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            282,
+            193,
+            358,
+            280
+          ],
+          "center_base": [
+            0.1697,
+            -0.3494,
+            0.0506
+          ],
+          "top_z": 0.0506,
+          "height": 0.0506,
+          "yaw": -1.1198,
+          "length": 0.0491,
+          "width": 0.0485,
+          "n_points": 6121,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v14-object-1",
+          "in_zone": true,
+          "zone": "zone_red",
+          "view": 5
+        },
+        {
+          "label": "green",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            313,
+            276,
+            400,
+            374
+          ],
+          "center_base": [
+            0.1199,
+            -0.2997,
+            0.0511
+          ],
+          "top_z": 0.0511,
+          "height": 0.0511,
+          "yaw": -1.1918,
+          "length": 0.0499,
+          "width": 0.0491,
+          "n_points": 7678,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v14-object-2",
+          "in_zone": true,
+          "zone": "zone_red",
+          "view": 5
+        },
+        {
+          "label": "yellow",
+          "score": 1.0,
+          "score_kind": "color",
+          "bbox": [
+            484,
+            88,
+            586,
+            188
+          ],
+          "center_base": [
+            0.3368,
+            -0.1634,
+            0.0482
+          ],
+          "top_z": 0.0482,
+          "height": 0.0482,
+          "yaw": 1.0983,
+          "length": 0.0467,
+          "width": 0.0466,
+          "n_points": 6415,
+          "valid": true,
+          "reject_reason": "",
+          "track_id": -1,
+          "object_id": "v14-object-3",
+          "in_zone": false,
+          "zone": null,
+          "view": 1
+        }
+      ],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      },
+      "task": "L1",
+      "mode": "sim",
+      "observed_at": 1207.4966216068144,
+      "warnings": []
+    },
+    {
+      "id": 287,
+      "kind": "decision",
+      "time": "21:53:48",
+      "message": "将黄色方块抓取到红色放置区。",
+      "decision": {
+        "scene_version": 14,
+        "action": "pick",
+        "object_id": "v14-object-3",
+        "zone_name": "zone_red",
+        "message": "将黄色方块抓取到红色放置区。"
+      }
+    },
+    {
+      "id": 288,
+      "kind": "decision",
+      "time": "21:53:53",
+      "action": "tilt",
+      "label": "yellow",
+      "tilt_deg": {
+        "pre_grasp": 10.0,
+        "grasp": 0.0,
+        "lift": 15.0,
+        "pre_place": 20.0,
+        "release": 5.0,
+        "retreat": 15.0
+      }
+    },
+    {
+      "id": 289,
+      "kind": "decision",
+      "time": "21:53:53",
+      "action": "pick",
+      "label": "yellow",
+      "zone": "zone_red",
+      "target": {
+        "label": "yellow",
+        "score": 1.0,
+        "score_kind": "color",
+        "bbox": [
+          484,
+          88,
+          586,
+          188
+        ],
+        "center_base": [
+          0.3368,
+          -0.1634,
+          0.0482
+        ],
+        "top_z": 0.0482,
+        "height": 0.0482,
+        "yaw": 1.0983,
+        "length": 0.0467,
+        "width": 0.0466,
+        "n_points": 6415,
+        "valid": true,
+        "reject_reason": "",
+        "track_id": -1
+      },
+      "attempt": 1,
+      "closing_angle": 1.0983,
+      "grasp_xyz": [
+        0.3375,
+        -0.1639,
+        0.0082
+      ],
+      "release_xyz": [
+        0.215,
+        -0.4,
+        0.0182
+      ],
+      "transit_z": 0.15,
+      "place": {
+        "xy": [
+          0.215,
+          -0.4
+        ],
+        "reserved_diagonal": false,
+        "axis": null,
+        "edge_margin": 0.025,
+        "clearance": 0.0183,
+        "footprint_clearance": 0.0183,
+        "finger_clearance": 0.0264,
+        "tier": "grid",
+        "open_width": 0.0657
+      },
+      "grasp": {
+        "kind": "square",
+        "mode": "profile",
+        "section_max": 0.0457,
+        "fit": 0.09,
+        "z_rel": 0.0082
+      },
+      "remaining": 3395.4
+    },
+    {
+      "id": 290,
+      "kind": "skill_step",
+      "time": "21:53:54",
+      "label": "yellow",
+      "zone": "zone_red",
+      "stage": "open",
+      "ok": true,
+      "error": "",
+      "duration": 0.6,
+      "command": 0.1,
+      "width": 0.1,
+      "message": "张开夹爪"
+    },
+    {
+      "id": 291,
+      "kind": "stage",
+      "time": "21:53:54",
+      "stage": "pre",
+      "message": "移动到目标上方"
+    },
+    {
+      "id": 292,
+      "kind": "skill_step",
+      "time": "21:53:55",
+      "label": "yellow",
+      "zone": "zone_red",
+      "stage": "pre",
+      "ok": true,
+      "error": "",
+      "duration": 1.506,
+      "target": [
+        0.3375,
+        -0.1639,
+        0.1282
+      ],
+      "linear": false,
+      "pos_err": 4.0904833302888054E-08,
+      "message": "移动到目标上方"
+    },
+    {
+      "id": 293,
+      "kind": "stage",
+      "time": "21:53:55",
+      "stage": "descend",
+      "message": "下降到抓取位置"
+    },
+    {
+      "id": 294,
+      "kind": "skill_step",
+      "time": "21:53:59",
+      "label": "yellow",
+      "zone": "zone_red",
+      "stage": "descend",
+      "ok": true,
+      "error": "",
+      "duration": 3.017,
+      "target": [
+        0.3375,
+        -0.1639,
+        0.0082
+      ],
+      "linear": true,
+      "pos_err": 1.0264070481096595E-07,
+      "message": "下降到抓取位置"
+    },
+    {
+      "id": 295,
+      "kind": "skill_step",
+      "time": "21:53:59",
+      "label": "yellow",
+      "zone": "zone_red",
+      "stage": "close",
+      "ok": true,
+      "error": "",
+      "duration": 0.6,
+      "command": 0.0,
+      "width": 0.0481,
+      "message": "闭合夹爪抓取方块"
+    },
+    {
+      "id": 296,
+      "kind": "stage",
+      "time": "21:53:59",
+      "stage": "lift",
+      "message": "提起方块"
+    },
+    {
+      "id": 297,
+      "kind": "skill_step",
+      "time": "21:54:02",
+      "label": "yellow",
+      "zone": "zone_red",
+      "stage": "lift",
+      "ok": true,
+      "error": "",
+      "duration": 3.501,
+      "target": [
+        0.3375,
+        -0.1639,
+        0.15
+      ],
+      "linear": true,
+      "pos_err": 5.0778924293807155E-09,
+      "message": "提起方块"
+    },
+    {
+      "id": 298,
+      "kind": "stage",
+      "time": "21:54:02",
+      "stage": "transit",
+      "message": "移动到放置区域上方"
+    },
+    {
+      "id": 299,
+      "kind": "skill_step",
+      "time": "21:54:04",
+      "label": "yellow",
+      "zone": "zone_red",
+      "stage": "transit",
+      "ok": true,
+      "error": "",
+      "duration": 1.392,
+      "target": [
+        0.215,
+        -0.4,
+        0.15
+      ],
+      "linear": false,
+      "pos_err": 3.378170309512689E-09,
+      "message": "移动到放置区域上方"
+    },
+    {
+      "id": 300,
+      "kind": "stage",
+      "time": "21:54:04",
+      "stage": "release",
+      "message": "下降到放置位置"
+    },
+    {
+      "id": 301,
+      "kind": "skill_step",
+      "time": "21:54:04",
+      "label": "yellow",
+      "zone": "zone_red",
+      "stage": "release",
+      "ok": false,
+      "error": "rejected",
+      "duration": 0.0,
+      "target": [
+        0.215,
+        -0.4,
+        0.0182
+      ],
+      "linear": true,
+      "pos_err": null,
+      "message": "下降到放置位置"
+    },
+    {
+      "id": 302,
+      "kind": "stage",
+      "time": "21:54:04",
+      "stage": "recover_up",
+      "message": "放置未完成，先向上抬起"
+    },
+    {
+      "id": 303,
+      "kind": "skill_step",
+      "time": "21:54:04",
+      "label": "yellow",
+      "zone": "zone_red",
+      "stage": "recover_up",
+      "ok": false,
+      "error": "rejected",
+      "duration": 0.0,
+      "target": [
+        0.215,
+        -0.4,
+        0.15
+      ],
+      "linear": true,
+      "pos_err": null,
+      "message": "放置未完成，先向上抬起"
+    },
+    {
+      "id": 304,
+      "kind": "pick_result",
+      "time": "21:54:04",
+      "ok": false,
+      "stage": "release",
+      "error": "holding_object",
+      "label": "yellow",
+      "zone": "zone_red",
+      "duration": 10.617,
+      "grasp_width": 0.04808849652435833,
+      "fault": true,
+      "holding": true
+    },
+    {
+      "id": 305,
+      "kind": "execution_result",
+      "time": "21:54:04",
+      "ok": false,
+      "stage": "release",
+      "error": "holding_object",
+      "label": "yellow",
+      "zone": "zone_red",
+      "duration": 10.617,
+      "grasp_width": 0.04808849652435833,
+      "fault": true,
+      "recovery": "failed: rejected",
+      "object_id": "v14-object-3",
+      "aborted": false,
+      "holding": true,
+      "scene": {
+        "scene_version": 15,
+        "objects": [],
+        "zones": [
+          {
+            "center": [
+              0.17,
+              0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "green",
+            "name": "zone_green",
+            "color_rgb": [
+              60,
+              165,
+              70
+            ]
+          },
+          {
+            "center": [
+              0.49,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "yellow",
+            "name": "zone_yellow",
+            "color_rgb": [
+              230,
+              205,
+              50
+            ]
+          },
+          {
+            "center": [
+              0.17,
+              -0.35,
+              0.0
+            ],
+            "size": [
+              0.2,
+              0.2
+            ],
+            "yaw": 0.0,
+            "wall_height": 0.0,
+            "label": "red",
+            "name": "zone_red",
+            "color_rgb": [
+              205,
+              55,
+              55
+            ]
+          }
+        ],
+        "class_to_zone": {
+          "red": "zone_red",
+          "green": "zone_green",
+          "yellow": "zone_yellow"
+        },
+        "task": "L1",
+        "mode": "sim",
+        "warnings": [
+          "observation invalidated after execution"
+        ]
+      },
+      "score": {
+        "correct": 1,
+        "wrong": 1,
+        "remaining": 1
+      },
+      "controller_ok": false,
+      "truth": {
+        "success": false,
+        "object_name": "yellow_cube",
+        "expected_zone": "zone_red",
+        "actual_zone": null
+      },
+      "message": "本次抓取未完成，请查看执行记录并重新观察场景"
+    },
+    {
+      "id": 306,
+      "kind": "result",
+      "time": "21:54:04",
+      "message": "本次抓取未完成，请查看执行记录并重新观察场景",
+      "result": {
+        "ok": false,
+        "stage": "release",
+        "error": "holding_object",
+        "label": "yellow",
+        "zone": "zone_red",
+        "duration": 10.617,
+        "grasp_width": 0.04808849652435833,
+        "fault": true,
+        "recovery": "failed: rejected",
+        "object_id": "v14-object-3",
+        "aborted": false,
+        "holding": true,
+        "scene": {
+          "scene_version": 15,
+          "objects": [],
+          "zones": [
+            {
+              "center": [
+                0.17,
+                0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "green",
+              "name": "zone_green",
+              "color_rgb": [
+                60,
+                165,
+                70
+              ]
+            },
+            {
+              "center": [
+                0.49,
+                0.0,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "yellow",
+              "name": "zone_yellow",
+              "color_rgb": [
+                230,
+                205,
+                50
+              ]
+            },
+            {
+              "center": [
+                0.17,
+                -0.35,
+                0.0
+              ],
+              "size": [
+                0.2,
+                0.2
+              ],
+              "yaw": 0.0,
+              "wall_height": 0.0,
+              "label": "red",
+              "name": "zone_red",
+              "color_rgb": [
+                205,
+                55,
+                55
+              ]
+            }
+          ],
+          "class_to_zone": {
+            "red": "zone_red",
+            "green": "zone_green",
+            "yellow": "zone_yellow"
+          },
+          "task": "L1",
+          "mode": "sim",
+          "warnings": [
+            "observation invalidated after execution"
+          ]
+        },
+        "score": {
+          "correct": 1,
+          "wrong": 1,
+          "remaining": 1
+        },
+        "controller_ok": false,
+        "truth": {
+          "success": false,
+          "object_name": "yellow_cube",
+          "expected_zone": "zone_red",
+          "actual_zone": null
+        },
+        "message": "本次抓取未完成，请查看执行记录并重新观察场景"
+      }
+    }
+  ],
+  "last_result": {
+    "ok": false,
+    "stage": "release",
+    "error": "holding_object",
+    "label": "yellow",
+    "zone": "zone_red",
+    "duration": 10.617,
+    "grasp_width": 0.04808849652435833,
+    "fault": true,
+    "recovery": "failed: rejected",
+    "object_id": "v14-object-3",
+    "aborted": false,
+    "holding": true,
+    "scene": {
+      "scene_version": 15,
+      "objects": [],
+      "zones": [
+        {
+          "center": [
+            0.17,
+            0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "green",
+          "name": "zone_green",
+          "color_rgb": [
+            60,
+            165,
+            70
+          ]
+        },
+        {
+          "center": [
+            0.49,
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "yellow",
+          "name": "zone_yellow",
+          "color_rgb": [
+            230,
+            205,
+            50
+          ]
+        },
+        {
+          "center": [
+            0.17,
+            -0.35,
+            0.0
+          ],
+          "size": [
+            0.2,
+            0.2
+          ],
+          "yaw": 0.0,
+          "wall_height": 0.0,
+          "label": "red",
+          "name": "zone_red",
+          "color_rgb": [
+            205,
+            55,
+            55
+          ]
+        }
+      ],
+      "class_to_zone": {
+        "red": "zone_red",
+        "green": "zone_green",
+        "yellow": "zone_yellow"
+      },
+      "task": "L1",
+      "mode": "sim",
+      "warnings": [
+        "observation invalidated after execution"
+      ]
+    },
+    "score": {
+      "correct": 1,
+      "wrong": 1,
+      "remaining": 1
+    },
+    "controller_ok": false,
+    "truth": {
+      "success": false,
+      "object_name": "yellow_cube",
+      "expected_zone": "zone_red",
+      "actual_zone": null
+    },
+    "message": "本次抓取未完成，请查看执行记录并重新观察场景"
+  },
+  "simulation": {
+    "mode": "sim",
+    "simulation_kind": "kinematic",
+    "seed": 0,
+    "status": "error",
+    "stage": "recover_up",
+    "scene_version": 15,
+    "sim_time": 218.11348129150997,
+    "camera_available": true,
+    "speed": 4.0,
+    "joints": [
+      -1.0776006693439053,
+      1.8803429250401162,
+      -1.6626757765674487,
+      -2.2404055400888922E-09,
+      1.0913297557897463,
+      2.4600942508976775E-09
+    ],
+    "tcp_xyz": [
+      0.21500000139129918,
+      -0.4000000030429141,
+      0.150000000465827
+    ],
+    "tcp_transform": [
+      [
+        -0.44489099359303236,
+        0.880824397712615,
+        0.16192709536706135,
+        0.21500000139129918
+      ],
+      [
+        0.8277041760515264,
+        0.4734431120992352,
+        -0.3012597161132815,
+        -0.4000000030429141
+      ],
+      [
+        -0.34202017596432566,
+        -1.3799822219192453E-09,
+        -0.9396926089064082,
+        0.150000000465827
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "gripper_width": 0.04808849652435833,
+    "link_points": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.123
+      ],
+      [
+        0.0,
+        0.0,
+        0.123
+      ],
+      [
+        0.05812893322904354,
+        -0.10814685237696108,
+        0.38023022050802885
+      ],
+      [
+        0.17719002462309036,
+        -0.3296558593304629,
+        0.3694182246454733
+      ],
+      [
+        0.17719002462309036,
+        -0.3296558593304629,
+        0.3694182246454733
+      ],
+      [
+        0.19192539030149294,
+        -0.3570704934967715,
+        0.28390619723499017
+      ],
+      [
+        0.21500000139129918,
+        -0.4000000030429141,
+        0.150000000465827
+      ]
+    ],
+    "link_frames": [
+      [
+        [
+          0.4734431138788609,
+          0.8808243967560663,
+          0.0,
+          0.0
+        ],
+        [
+          -0.8808243967560663,
+          0.4734431138788609,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.123
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          0.2039397018876734,
+          0.42726687219263665,
+          0.8808243967560663,
+          0.0
+        ],
+        [
+          -0.37942270068751044,
+          -0.7949151100109269,
+          0.4734431138788609,
+          0.0
+        ],
+        [
+          0.9024671806758198,
+          -0.4307586189538606,
+          6.123233995736766E-17,
+          0.123
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          -0.061562488457061526,
+          -0.4694235210279585,
+          0.8808243967560663,
+          0.05812893322904354
+        ],
+        [
+          0.11453486209510735,
+          0.8733460844851499,
+          0.4734431138788609,
+          -0.10814685237696108
+        ],
+        [
+          -0.9915098715493602,
+          0.13003143704570486,
+          6.123233995736766E-17,
+          0.38023022050802885
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          -0.06156249043046538,
+          0.8808243966181413,
+          0.46942352102795853,
+          0.17719002462309036
+        ],
+        [
+          0.11453486103440277,
+          0.47344311413546547,
+          -0.8733460844851499,
+          -0.3296558593304629
+        ],
+        [
+          -0.9915098715493602,
+          -2.221384140077543E-09,
+          -0.13003143704570486,
+          0.3694182246454733
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          -0.4448909957599434,
+          -0.1619270953670613,
+          0.8808243966181413,
+          0.17719002462309036
+        ],
+        [
+          0.8277041748868117,
+          0.30125971611328156,
+          0.4734431141354654,
+          -0.3296558593304629
+        ],
+        [
+          -0.34202017596432566,
+          0.9396926089064082,
+          -2.2213841480396722E-09,
+          0.3694182246454733
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          -0.44489099359303236,
+          0.880824397712615,
+          0.16192709536706135,
+          0.19192539030149294
+        ],
+        [
+          0.8277041760515264,
+          0.4734431120992352,
+          -0.3012597161132815,
+          -0.3570704934967715
+        ],
+        [
+          -0.34202017596432566,
+          -1.3799822219192453E-09,
+          -0.9396926089064082,
+          0.28390619723499017
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    ],
+    "objects": [
+      {
+        "id": "yellow_cube",
+        "label": "yellow",
+        "shape": "box",
+        "center": [
+          0.21256569216286178,
+          -0.39547105577848324,
+          0.16499601377242173
+        ],
+        "size": [
+          0.04807402640763093,
+          0.04807402640763093,
+          0.04807402640763093
+        ],
+        "yaw": -2.647689264012465,
+        "transform": [
+          [
+            -0.8804890760694617,
+            0.4455544250882272,
+            -0.16192665378696924,
+            0.21645792527798882
+          ],
+          [
+            -0.47406636724897444,
+            -0.8273476495372803,
+            0.30125893554963307,
+            -0.40271242079005715
+          ],
+          [
+            0.00025761542342215155,
+            0.3420191823413367,
+            0.939692935242602,
+            0.1424086022804632
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "color_rgb": [
+          224,
+          198,
+          34
+        ],
+        "held": true,
+        "placed": false,
+        "zone": null
+      },
+      {
+        "id": "green_cube",
+        "label": "green",
+        "shape": "box",
+        "center": [
+          0.12008267849698384,
+          -0.30020669159319413,
+          0.02546323280782978
+        ],
+        "size": [
+          0.05092646561565956,
+          0.05092646561565956,
+          0.05092646561565956
+        ],
+        "yaw": 1.9507653888688492,
+        "transform": [
+          [
+            -0.3708917382776547,
+            -0.9286761106421225,
+            0.0,
+            0.12008267849698384
+          ],
+          [
+            0.9286761106421225,
+            -0.3708917382776547,
+            0.0,
+            -0.30020669159319413
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "color_rgb": [
+          60,
+          164,
+          54
+        ],
+        "held": false,
+        "placed": true,
+        "zone": "zone_red"
+      },
+      {
+        "id": "red_cube",
+        "label": "red",
+        "shape": "box",
+        "center": [
+          0.1700596746531776,
+          -0.3501228595799354,
+          0.025230841929938738
+        ],
+        "size": [
+          0.050461683859877475,
+          0.050461683859877475,
+          0.050461683859877475
+        ],
+        "yaw": -1.1187784431823706,
+        "transform": [
+          [
+            0.436781644772089,
+            0.8995675598809623,
+            0.0,
+            0.1700596746531776
+          ],
+          [
+            -0.8995675598809623,
+            0.436781644772089,
+            0.0,
+            -0.3501228595799354
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "color_rgb": [
+          200,
+          40,
+          46
+        ],
+        "held": false,
+        "placed": true,
+        "zone": "zone_red"
+      }
+    ],
+    "zones": [
+      {
+        "center": [
+          0.17,
+          0.35,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "green",
+        "name": "zone_green",
+        "color_rgb": [
+          60,
+          165,
+          70
+        ]
+      },
+      {
+        "center": [
+          0.49,
+          0.0,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "yellow",
+        "name": "zone_yellow",
+        "color_rgb": [
+          230,
+          205,
+          50
+        ]
+      },
+      {
+        "center": [
+          0.17,
+          -0.35,
+          0.0
+        ],
+        "size": [
+          0.2,
+          0.2
+        ],
+        "yaw": 0.0,
+        "wall_height": 0.0,
+        "label": "red",
+        "name": "zone_red",
+        "color_rgb": [
+          205,
+          55,
+          55
+        ]
+      }
+    ],
+    "table_z": 0.0,
+    "pick_polygon": [
+      [
+        0.12,
+        -0.25
+      ],
+      [
+        0.4,
+        -0.25
+      ],
+      [
+        0.4,
+        0.25
+      ],
+      [
+        0.12,
+        0.25
+      ]
+    ],
+    "held_object": "yellow_cube",
+    "score": {
+      "correct": 1,
+      "wrong": 1,
+      "remaining": 1
+    },
+    "class_to_zone": {
+      "red": "zone_red",
+      "green": "zone_green",
+      "yellow": "zone_yellow"
+    }
+  },
+  "camera": {
+    "available": true,
+    "sim_time": 218.11348129150997,
+    "width": 320,
+    "height": 240,
+    "updated_at": 1794837244.5610363,
+    "fps": 3.0,
+    "mode": "live"
+  },
+  "camera_available": true,
+  "observation_views": [
+    {
+      "id": 0,
+      "view_id": 0,
+      "label": "抓取区视角 1",
+      "detected_labels": [
+        "yellow"
+      ],
+      "stamp": 1196.8201226563713,
+      "sim_time": 196.82012265637127,
+      "width": 640,
+      "height": 480
+    },
+    {
+      "id": 1,
+      "view_id": 1,
+      "label": "抓取区视角 2",
+      "detected_labels": [
+        "yellow"
+      ],
+      "stamp": 1198.5034559897033,
+      "sim_time": 198.5034559897033,
+      "width": 640,
+      "height": 480
+    },
+    {
+      "id": 2,
+      "view_id": 2,
+      "label": "抓取区视角 3",
+      "detected_labels": [],
+      "stamp": 1200.1867893230353,
+      "sim_time": 200.18678932303533,
+      "width": 640,
+      "height": 480
+    },
+    {
+      "id": 3,
+      "view_id": 3,
+      "label": "绿色放置区",
+      "detected_labels": [],
+      "stamp": 1202.0678445287406,
+      "sim_time": 202.06784452874058,
+      "width": 640,
+      "height": 480
+    },
+    {
+      "id": 4,
+      "view_id": 4,
+      "label": "黄色放置区",
+      "detected_labels": [],
+      "stamp": 1204.7822330677775,
+      "sim_time": 204.7822330677775,
+      "width": 640,
+      "height": 480
+    },
+    {
+      "id": 5,
+      "view_id": 5,
+      "label": "红色放置区",
+      "detected_labels": [
+        "green",
+        "red"
+      ],
+      "stamp": 1207.4966216068144,
+      "sim_time": 207.49662160681441,
+      "width": 640,
+      "height": 480
+    }
+  ]
+}

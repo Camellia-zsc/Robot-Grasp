@@ -931,6 +931,8 @@ class TaskRunner:
         self._event('decision', action='pick', label=det.label, zone=zone_name,
                     target=det.summary(), attempt=track['attempts'],
                     closing_angle=round(gp.closing_angle, 4),
+                    expected_width=float(gp.expected_width), open_width=float(gp.open_width),
+                    close_width=float(gp.close_width),
                     grasp_xyz=[round(float(v), 4) for v in gp.T_grasp[:3, 3]],
                     release_xyz=[round(float(v), 4) for v in pp.T_release[:3, 3]],
                     transit_z=round(float(pp.T_pre[2, 3]), 4), place=place_info,

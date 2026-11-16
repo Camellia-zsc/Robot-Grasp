@@ -1,4 +1,4 @@
-"""Launch the local natural-language L1 simulation dashboard."""
+"""Launch the editable tabletop and natural-language simulation dashboard."""
 from __future__ import annotations
 
 import argparse
@@ -34,7 +34,7 @@ def main(argv=None):
             webbrowser.open('http://127.0.0.1:%s' % args.port)
         return 2
     url = 'http://127.0.0.1:%s' % args.port
-    print('L1 simulation dashboard: %s' % url, flush=True)
+    print('Tabletop grasp simulation dashboard: %s' % url, flush=True)
     print('Keep this window running. Press Ctrl+C to close.', flush=True)
     if args.open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()

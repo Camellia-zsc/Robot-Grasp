@@ -63,7 +63,7 @@ class DashboardController:
             self._client = client or ModelClient(settings)
         except (ValueError, OSError) as exc:
             self._error = '模型配置尚未就绪：%s' % exc
-        self._launch(self._reset_impl, 'preparing', '正在准备 L1 仿真')
+        self._launch(self._reset_impl, 'preparing', '正在准备桌面抓取仿真')
 
     def _event(self, kind, payload=None):
         with self._lock:
@@ -169,10 +169,50 @@ class DashboardController:
             self._last_result = None
             self._needs_reset = False
             self._status, self._stage = 'ready', '场景已就绪，输入一句中文开始抓取'
-        self._event('ready', {'message': 'L1 场景已就绪', 'scene_version': scene.get('scene_version')})
+        self._event('ready', {'message': '可编辑场景已就绪', 'scene_version': scene.get('scene_version')})
 
     def reset(self):
         self._launch(self._reset_impl, 'preparing', '正在重置仿真场景')
+
+    def edit_scene(self, request):
+        if not isinstance(request, dict):
+            raise ValueError('布局操作需要为 JSON 对象')
+        request = copy.deepcopy(request)
+
+        def editable_session():
+            if self._needs_reset:
+                raise ValueError('任务已停止，请先重置场景再调整布局')
+            session = self._session
+            if session is None or not self._scene:
+                raise ValueError('仿真尚未准备好，请先重置场景')
+            sim = session.snapshot()
+            if sim.get('held_object'):
+                raise ValueError('机械臂仍夹持物品，请先完成放置或重置场景')
+            if sim.get('status') == 'stopped':
+                raise ValueError('任务已停止，请先重置场景再调整布局')
+            return session
+
+        def run():
+            with self._lock:
+                session = editable_session()
+            scene = session.edit_scene(request)
+            with self._lock:
+                if self._cancel.is_set():
+                    raise RuntimeError('布局调整已停止')
+                self._scene = scene
+                self._last_result = None
+                self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
+                                  'reason': '', 'message': '', 'history': []}
+                self._error = ''
+                self._status, self._stage = 'ready', '布局已变更，下次指令将重新扫描桌面'
+            self._event('scene_edited', {'message': self._stage,
+                                      'scene_version': scene.get('scene_version')})
+
+        with self._lock:
+            if self._busy:
+                raise BusyError('上一项任务还在进行，请等待完成或先停止')
+            editable_session()
+            self._launch(run, 'editing', '正在调整桌面布局')
 
     def submit(self, instruction):
         if not isinstance(instruction, str) or not instruction.strip():
@@ -425,7 +465,13 @@ class DashboardController:
                      'messages': copy.deepcopy(self._messages),
                      'events': copy.deepcopy(list(self._events)),
                      'last_result': copy.deepcopy(self._last_result)}
-        state['simulation'] = session.snapshot() if session is not None else {}
+            state['simulation'] = session.snapshot() if session is not None else {}
+            editor = state['simulation'].setdefault('editor', {})
+            editor['editable'] = bool(
+                editor.get('editable', True) and session is not None and self._scene
+                and not self._closed and not self._busy and not self._needs_reset
+                and not state['simulation'].get('held_object')
+                and state['simulation'].get('status') != 'stopped')
         state['camera'] = (preview.info() if preview is not None else
                            {'available': bool(state['simulation'].get('camera_available')),
                             'mode': 'observation'})
@@ -548,6 +594,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             files = {'/': ('index.html', 'text/html; charset=utf-8'),
                      '/static/app.js': ('app.js', 'text/javascript; charset=utf-8'),
+                     '/static/editor.js': ('editor.js', 'text/javascript; charset=utf-8'),
                      '/static/style.css': ('style.css', 'text/css; charset=utf-8')}
             entry = files.get(path)
             if entry is None or not (STATIC / entry[0]).is_file():
@@ -576,6 +623,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             ctl = self.server.controller
             if path == '/api/command':
                 ctl.submit(data.get('instruction'))
+            elif path == '/api/scene-edit':
+                ctl.edit_scene(data)
             elif path == '/api/reset':
                 ctl.reset()
             elif path == '/api/stop':

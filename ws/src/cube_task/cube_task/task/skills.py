@@ -360,6 +360,9 @@ class PickPlaceSkill:
         if not self.verify:
             return
         w = self._read_width()
+        self._event('grasp_feedback', stage=stage,
+                    ok=w is not None and w >= self.empty_width,
+                    measured_width=w, empty_threshold=self.empty_width)
         if w is None:
             raise _StepFailed('verify_' + stage, 'no_gripper_feedback', 'while holding',
                               fault=True)

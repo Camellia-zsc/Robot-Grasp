@@ -41,6 +41,16 @@ _MIN_GEOMETRY = {
     'banana': (0.095, 0.023, 0.026),
     'pear': (0.055, 0.032, 0.095),
 }
+# Large merged instances must not become an executable class merely because
+# their color resembles it. Bounds include room for RGB-D noise and stems.
+_MAX_GEOMETRY = {
+    'red': (0.075, 0.075, 0.065),
+    'green': (0.075, 0.075, 0.065),
+    'yellow': (0.075, 0.075, 0.065),
+    'apple': (0.085, 0.085, 0.080),
+    'banana': (0.215, 0.100, 0.060),
+    'pear': (0.110, 0.110, 0.145),
+}
 
 
 def configure_sandbox(cfg) -> None:
@@ -62,11 +72,12 @@ def configure_sandbox(cfg) -> None:
     # keeps the pads around the neck, above the steep shoulder of this type.
     depths['pear'] = 0.025
     cfg.set('grasp.max_grasp_depth_by_label', depths)
-    # The editor guarantees separated objects. The competition watershed's
-    # 8 mm internal height barriers otherwise cut one pear's neck and bulb
-    # into separate instances. Preserve all border/occlusion checks instead
-    # of accepting these incomplete fragments or consulting world labels.
-    cfg.set('perception.segmentation.split_touching', False)
+    # Even separated objects can touch in the camera projection. Keep the
+    # base-XY watershed so it separates these instances, but avoid 8 mm
+    # height barriers which cut one pear's neck away from its own bulb.
+    # Border, occlusion and completeness checks still apply to every part.
+    cfg.set('perception.segmentation.split_touching', True)
+    cfg.set('perception.segmentation.split_height_jump_m', 0.080)
     # Preserve the established geometry planners. These are library type
     # dimensions used to reject incomplete measurements, not live truth.
     nominal = dict(cfg.get('place.nominal_footprint', {}) or {})
@@ -88,7 +99,8 @@ def completeness(det) -> bool:
         measured = np.asarray([det.length, det.width, det.height], dtype=float)
     except (TypeError, ValueError):
         return False
-    return bool(np.all(np.isfinite(measured)) and np.all(measured >= minimum))
+    return bool(np.all(np.isfinite(measured)) and np.all(measured >= minimum)
+                and np.all(measured <= _MAX_GEOMETRY[det.label]))
 
 
 def _cache_path() -> Path:

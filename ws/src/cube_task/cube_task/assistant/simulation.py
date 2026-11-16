@@ -1,4 +1,4 @@
-"""L1 camera-to-motion adapter for the local instruction assistant.
+"""Camera-to-motion adapter and editable tabletop for the local assistant.
 
 Only the existing kinematic simulator can be constructed here. Perception
 observations are separate from the ground truth published to the viewer; model
@@ -22,19 +22,20 @@ from ..core.extrinsics import extrinsics_from_cfg
 from ..core.logger import RunLogger, to_jsonable
 from ..core.transforms import inv_T
 from ..core.zones import parse_zones
-from ..perception.factory import make_perception
 from ..robot.factory import make_arm
 from ..task.operator import Operator
 from ..task.runner import TaskRunner, pick_summary
 from ..task.views import merge_view_detections, tag_view
 from ..tools.common import load_cfg_for
+from .catalog import CatalogEditor
+from .catalog_perception import configure_sandbox, make_sandbox_perception
 
 _LOG = logging.getLogger(__name__)
 _STAGE_MESSAGES = {
     'start': '开始抓放', 'open': '张开夹爪', 'pre': '移动到目标上方',
-    'descend': '下降到抓取位置', 'close': '闭合夹爪抓取方块',
-    'lift': '提起方块', 'transit': '移动到放置区域上方',
-    'release': '下降到放置位置', 'open_release': '张开夹爪放下方块',
+    'descend': '下降到抓取位置', 'close': '闭合夹爪抓取物品',
+    'lift': '提起物品', 'transit': '移动到放置区域上方',
+    'release': '下降到放置位置', 'open_release': '张开夹爪放下物品',
     'retreat': '抬起并离开放置区域', 'recover_open': '重新张开夹爪',
     'recover_retreat': '抓取未完成，抬起机械臂', 'recover_up': '放置未完成，先向上抬起',
     'putback_lift': '抬起方块并返回原处', 'putback_down': '将方块降回原处',
@@ -103,6 +104,7 @@ class _EventLogger:
         self.inner.event(kind, **fields)
         if kind == 'skill_step' and fields.get('stage') in _STAGE_MESSAGES:
             fields = dict(fields, message=_STAGE_MESSAGES[fields['stage']])
+        self.session._record_feedback(kind, fields)
         self.session._emit(kind, fields)
 
     def save_json(self, name, value):
@@ -144,6 +146,7 @@ class SimulationSession:
         self._closed = False
         self._status = 'initializing'
         self._stage = ''
+        self._feedback = {'grasp_plan': {}, 'checks': []}
         self._recovery_target = None
         self._recovery_neighbors = []
         self._recovery_goal = None
@@ -154,6 +157,8 @@ class SimulationSession:
                                site=False, config=[], set=[], extrinsics_error=(0.0, 0.0),
                                log_dir=None if log_dir is None else str(log_dir))
         self.cfg, self.world, self.info = load_cfg_for(args, 'L1')
+        configure_sandbox(self.cfg)
+        self.editor = CatalogEditor(self.world, self.info['pick_polygon'])
         # Fail closed even if a future scenario overlay changes its backend.
         if self.cfg.get('robot.backend') != 'sim' or self.cfg.get('camera.backend') != 'sim':
             raise ValueError('the assistant only supports the kinematic simulation')
@@ -176,8 +181,8 @@ class SimulationSession:
         self.arm.set_abort_event(self.cancel_event)
         self.camera = make_camera(self.cfg, self.clock, sim_world=self.world, arm=self.arm)
         self.logger = _EventLogger(self, log_dir)
-        self.runner = TaskRunner(self.cfg, 'L1', self.arm, self.camera,
-                                 make_perception(self.cfg, 'L1'), self.clock, self.logger,
+        self.runner = TaskRunner(self.cfg, 'Sandbox', self.arm, self.camera,
+                                 make_sandbox_perception(self.cfg), self.clock, self.logger,
                                  operator=self.operator, mode='sim')
         self._configure_observation_views()
         self.runner.skill.on_stage = self._on_stage
@@ -204,6 +209,76 @@ class SimulationSession:
         self._publish_snapshot()
         self._emit('stage', {'stage': stage,
                              'message': _STAGE_MESSAGES.get(stage, '正在执行机械臂动作')})
+
+    def _record_feedback(self, kind: str, fields: dict) -> None:
+        """Expose existing measured checks; viewer feedback never commands motion."""
+        if kind == 'decision' and fields.get('action') == 'pick':
+            target = fields.get('target') or {}
+            self._feedback['grasp_plan'] = {
+                'label': fields.get('label'),
+                **{key: target.get(key) for key in ('length', 'width', 'height')},
+                **{key: fields.get(key) for key in
+                   ('expected_width', 'open_width', 'close_width')},
+                'closing_angle_deg': math.degrees(fields.get('closing_angle', 0.0)),
+                'kind': (fields.get('grasp') or {}).get('kind'),
+                'mode': (fields.get('grasp') or {}).get('mode'),
+            }
+        elif kind == 'skill_step' and fields.get('stage') == 'close':
+            width = fields.get('width')
+            ok = bool(fields.get('ok') and width is not None
+                      and width >= self.runner.skill.empty_width)
+            self._append_check('close', ok, '闭合后检测到夹持' if ok else '闭合后未确认夹持',
+                               measured_width=width,
+                               expected_width=self._feedback['grasp_plan'].get('expected_width'))
+        elif kind == 'grasp_feedback':
+            names = {'dropped': '抬升后夹持检查', 'dropped_in_transit': '搬运后夹持检查',
+                     'dropped_before_retry': '恢复前夹持检查'}
+            self._append_check(fields['stage'], bool(fields.get('ok')),
+                               names.get(fields['stage'], '夹持反馈检查'),
+                               measured_width=fields.get('measured_width'))
+        else:
+            return
+        self._publish_snapshot()
+
+    def _append_check(self, stage, ok, message, **extra):
+        self._feedback['checks'].append(dict(stage=stage, ok=bool(ok), message=message, **extra))
+        self._feedback['checks'] = self._feedback['checks'][-20:]
+
+    def edit_scene(self, request: dict) -> dict:
+        """Commit one validated layout edit and expire all camera/planning state."""
+        with self._operation_lock:
+            self._check_open()
+            if not isinstance(request, dict):
+                raise ValueError('摆场请求必须是 JSON 对象')
+            if (type(request.get('scene_version')) is not int
+                    or request['scene_version'] != self._scene_version):
+                raise ValueError('布局版本已变化，请等待界面刷新后重试')
+            if (not self._prepared or self.cancel_event.is_set()
+                    or self._status not in ('ready', 'error')):
+                raise ValueError('当前不能编辑场景，请先完成任务或重置')
+            if self.world.held is not None:
+                raise ValueError('夹爪仍夹着物品，不能编辑场景')
+            change = self.editor.apply(request)
+            self.runner._placed.clear()
+            self.runner._placed_labels.clear()
+            self.runner._tracks.clear()
+            self.runner._held_recovery_context = None
+            self.runner._live_dets = []
+            self.runner._live_mark += 1
+            self._recovery_target = self._recovery_goal = self._recovery_evaluation = None
+            self._recovery_context = None
+            self._recovery_neighbors = []
+            self._recovery_retry = None
+            self._feedback = {'grasp_plan': {}, 'checks': []}
+            self._invalidate_scene('布局已改变，执行下一条指令时将重新扫描')
+            with self._cache_lock:
+                self._observation_views.clear()
+                self._observation_jpegs.clear()
+                self._jpeg = None
+            self._status, self._stage = 'ready', ''
+            self._publish_snapshot()
+            self._emit('scene_edit', {'message': '布局已更新，旧观测已清除', 'change': change})
+            return self.scene
 
     def _check_open(self) -> None:
         if self._closed:
@@ -314,7 +389,7 @@ class SimulationSession:
             self._scene = {'scene_version': self._scene_version, 'objects': objects,
                            'zones': self._zones(),
                            'class_to_zone': dict(self.runner.class_to_zone),
-                           'task': 'L1', 'mode': 'sim',
+                           'task': 'Sandbox', 'mode': 'sim',
                            'observed_at': float(result.frame_stamp),
                            'warnings': warnings}
             self._status = 'ready'
@@ -354,7 +429,7 @@ class SimulationSession:
         self._detections = MappingProxyType({})
         self._scene = {'scene_version': self._scene_version, 'objects': [],
                        'zones': self._zones(), 'class_to_zone': dict(self.runner.class_to_zone),
-                       'task': 'L1', 'mode': 'sim', 'warnings': [reason]}
+                       'task': 'Sandbox', 'mode': 'sim', 'warnings': [reason]}
 
     def execute(self, decision, cancel_event: Optional[threading.Event] = None) -> dict:
         """Resolve a current object ID and use TaskRunner.pick_detection unchanged."""
@@ -380,7 +455,7 @@ class SimulationSession:
                     return self._refusal('invalid_target', 'target has no valid measured geometry',
                                          object_id, zone_name)
                 if det.label not in self.runner.class_to_zone:
-                    return self._refusal('invalid_target', 'target is not an L1 target class',
+                    return self._refusal('invalid_target', 'target is not a configured catalog class',
                                          object_id, zone_name)
                 zone_name = zone_name or self.runner.class_to_zone[det.label]
                 if zone_name not in self.runner.zones:
@@ -400,6 +475,7 @@ class SimulationSession:
                 self._recovery_goal = {'label': det.label, 'zone_name': zone_name}
                 self._recovery_evaluation = evaluation_object
                 self._recovery_context = None
+                self._feedback = {'grasp_plan': {}, 'checks': []}
                 self._refresh_placement_occupancy(det)
                 self._status = 'executing'
                 self._publish_snapshot()
@@ -457,14 +533,18 @@ class SimulationSession:
                                   if summary['holding'] else '任务已停止，机械臂保持当前位置')
         elif summary['ok']:
             zone_label = self.runner.zones[zone_name].label
-            summary['message'] = '已将%s方块放到%s区域' % (
-                colors.get(det.label, det.label), colors.get(zone_label, zone_label or zone_name))
+            names = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块',
+                     'apple': '苹果', 'banana': '香蕉', 'pear': '梨子'}
+            summary['message'] = '已将%s放到%s区域' % (
+                names.get(det.label, det.label), colors.get(zone_label, zone_label or zone_name))
         elif summary['controller_ok']:
-            summary['message'] = ('抓放动作已结束，但无法唯一核对目标方块'
+            summary['message'] = ('抓放动作已结束，但无法唯一核对目标物品'
                                   if evaluation_object is None else
-                                  '抓放动作已结束，但目标方块没有位于指定区域')
+                                  '抓放动作已结束，但目标物品没有位于指定区域')
         else:
             summary['message'] = '本次抓取未完成，请查看执行记录并重新观察场景'
+        self._append_check('placement', truth_success,
+                           '已独立核验物品落入指定区域' if truth_success else '落位核验未通过')
         self.logger.save_json('last_result.json', summary)
         self._publish_snapshot()
         self._emit('execution_result', summary)
@@ -699,10 +779,14 @@ class SimulationSession:
             zone = self.world.zone_of(obj)
             objects.append({'id': obj.name, 'label': obj.label, 'shape': obj.shape,
                             'center': ((lo + hi) / 2).tolist(), 'size': list(obj.size),
+                            'dimensions': (hi - lo).tolist(),
                             'yaw': obj.yaw(), 'transform': pose.tolist(),
                             'color_rgb': list(reversed(obj.color_bgr)),
                             'held': obj is self.world.held, 'placed': zone is not None,
                             'zone': None if zone is None else zone.name})
+        editor = dict(self.editor.metadata(), scene_version=self._scene_version,
+                      editable=(self._prepared and not self.cancel_event.is_set()
+                                and self.world.held is None and self._status in ('ready', 'error')))
         snap = {'mode': 'sim', 'simulation_kind': 'kinematic', 'seed': self.seed,
                 'status': 'stopped' if self.cancel_event.is_set() else self._status,
                 'stage': self._stage, 'scene_version': self._scene_version,
@@ -717,6 +801,7 @@ class SimulationSession:
                 'zones': self._zones(), 'table_z': self.world.table_z,
                 'pick_polygon': to_jsonable(self.info['pick_polygon']),
                 'held_object': None if self.world.held is None else self.world.held.name,
+                'editor': editor, 'feedback': copy.deepcopy(self._feedback),
                 'score': self.world.score(self.runner.class_to_zone),
                 'class_to_zone': dict(self.runner.class_to_zone)}
         with self._cache_lock:

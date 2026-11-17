@@ -1,0 +1,365 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-18",
+  "scope": "L1 kinematic simulation: safe held-camera paths, confirmed staging and same-region obstacle rearrangement, regrasp, explicit resume",
+  "evidence_root": "main checkout .git/held-placement-20261118 (private raw logs; not copied into this JSON)",
+  "root_causes": [
+    {
+      "kind": "unreachable_intermediate_observation_lift",
+      "recorded_tcp_xyz": [
+        0.480000005,
+        0.010000013,
+        0.150000001
+      ],
+      "old_lift_z_m": 0.19,
+      "ik_residual_mm": 2.2,
+      "ik_rotation_residual_deg": 3.46,
+      "fix": "Precheck complete camera route, carried swept geometry and native IK; use checked inward retraction or hold."
+    },
+    {
+      "kind": "measured_destination_occupancy",
+      "retaining_yellow": "no_clear_supported_release",
+      "diagnostic_omitting_only_yellow": "reachable release near [0.49, 0]",
+      "physical_capacity_claim": false
+    },
+    {
+      "kind": "insufficient_staged_regrasp_view",
+      "rejected_taper_deg": 32,
+      "unchanged_max_taper_deg": 20,
+      "fix": "Acquire a fresh grasp-supporting local view before capacity/rearrangement decisions; do not relax pad checks."
+    }
+  ],
+  "safety_contract": {
+    "original_goal_preserved": true,
+    "protected_completed_goals_reverified": true,
+    "explicit_button_approval_required": true,
+    "approval_bound_to_request_and_scene": true,
+    "no_default_or_chat_text_approval": true,
+    "stale_or_duplicate_approval_rejected": true,
+    "staging_does_not_complete_original_task": true,
+    "same_region_rearrangement_is_original_pose_restoration": false,
+    "fresh_unique_camera_target_required_for_every_pick": true,
+    "world_truth_use": "Initial simulation setup and independent final evaluation only; never object/trajectory selection.",
+    "unchanged_thresholds": {
+      "pad_taper_limit_deg": 20,
+      "default_finger_clearance_m": 0.005,
+      "default_min_grasp_height_m": 0.008,
+      "workspace_horizontal_margin_m": 0.002,
+      "point_center_tolerance_m": 0.015
+    }
+  },
+  "source_manifest": {
+    "file_count": 117,
+    "sha256": "2423f4f05b4cea40ce790110ce09adf57100ef8a6671104ac8662455cd421cc5",
+    "canonicalization": "Relative paths normalized to /; keys sorted; compact JSON encoded UTF-8; SHA-256.",
+    "unit_before_equals_after": true,
+    "legacy_before_equals_after": true,
+    "unit_equals_legacy": true,
+    "first_failed_run_same_source": true,
+    "current_workspace_matches": true,
+    "key_files": {
+      "ws/src/cube_task/cube_task/assistant/held_recovery.py": "ae7b48907413afffb7f586417f4e5f7b1d84f796b7dc7800a1715ee716ff891a",
+      "ws/src/cube_task/cube_task/assistant/placement_observation.py": "6ca0ff510872280fd5aa0c0c7aa195d8cc6cdbe779f2fb36d0623c9f8187f666",
+      "ws/src/cube_task/cube_task/assistant/server.py": "69245087b3144c90b467c0f1ea65f865857e833c177f3169e9be81b5453225c0",
+      "ws/src/cube_task/cube_task/assistant/simulation.py": "174af0bdc0215509870fa671c6bd19287efdca8f0e4389eeee55f3c1128461ed",
+      "ws/src/cube_task/cube_task/task/runner.py": "51a3d4b109359006b7535fa6bce0735f0e3ccf1357945b161a3a3ef966cba7ce",
+      "ws/src/cube_task/cube_task/assistant/static/app.js": "243229948e00aca59d9a660a85ec4e896f6e966d0609b3af19e32881c469f3ff",
+      "ws/src/cube_task/cube_task/assistant/static/index.html": "ae7f8981427064edd641c8148f720a3bf9ef4370cb1d474c6aa460e9fb9993e0",
+      "ws/src/cube_task/cube_task/assistant/static/style.css": "e661d8ef3a8ceee98d1bf47bc090528a9167fab6cfe1ff3d4d0f489adc86ec70"
+    }
+  },
+  "unit_and_protocol": {
+    "status": "passed",
+    "passed": 527,
+    "failed": 0,
+    "exit_code": 0,
+    "pytest_elapsed_seconds": 33.93,
+    "wrapper_elapsed_seconds": 36.547,
+    "source_frozen": true,
+    "report": {
+      "file": "unit-final/report.json",
+      "sha256": "e121d574805282d6cb8ec5cc45115c64aa046289a5fd771fab3af8a65e1f038d"
+    },
+    "log": {
+      "file": "unit-final/pytest.txt",
+      "sha256": "df2733c691efc641a6ad7e7fd2a10266d2eefd7b14e70994f1db3bf99d08032e"
+    },
+    "actual_command_recorded_in": "unit-final/report.json:command",
+    "prior_run": {
+      "passed": 526,
+      "failed": 1,
+      "pytest_elapsed_seconds": 33.26,
+      "failure": "test_assistant_server.py::test_http_rejects_cross_origin_and_no_key_in_state: WinError 10053 while reading local HTTP 403 response",
+      "counted_as_pass": false,
+      "report": {
+        "file": "unit-final/report-first-run.json",
+        "sha256": "60f5c3439ac53d5c356e17c30c36da6ba7a0e2f6fe773f8125619296795868e9"
+      },
+      "log": {
+        "file": "unit-final/pytest-first-run.txt",
+        "sha256": "57e9e31cc7629e9b2426a4a919a351409537d17ce1c3b5466a830aaaa6aaf52f"
+      }
+    }
+  },
+  "exact_held_controller_execution": {
+    "status": "passed",
+    "passed": 1,
+    "pytest_elapsed_seconds": 76.67,
+    "test": "test_assistant_held_execution.py::test_recorded_held_banana_stages_rearranges_and_finishes_only_after_confirmation",
+    "test_source_sha256": "20531b45df75ac4d049fe623e7fef67686f407d6c97653ea87e8b5a176598af6",
+    "report": {
+      "file": "controller-real-final/test_recorded_held_banana_stag0/held_rearrangement.json",
+      "sha256": "a6fbc36686d2de698066b9b4387abd5c1b4d3974d6d5531bd52fae0eb73a2509"
+    },
+    "fixture": {
+      "file": "ws/src/cube_task/test/fixtures/assistant_held_banana_scene.json",
+      "sha256": "9c3548d363a793d1169d8b328b9835b9f3a22abaa0d2472d40bd0871af174b1d"
+    },
+    "network": "socket.connect and socket.create_connection forbidden by the test",
+    "online_api_calls": 0,
+    "intent_client": "Fixed offline option selection; this run validates execution and approval, not online model reasoning.",
+    "before_approval_assertions": {
+      "joints_unchanged": true,
+      "all_object_transforms_unchanged": true,
+      "absolute_tolerance": 1e-10,
+      "basis": "Assertions in the passing exact controller test, before approve_recovery."
+    },
+    "steps": [
+      {
+        "step": "安全暂放原目标",
+        "label": "banana",
+        "ok": true,
+        "controller_ok": true,
+        "camera_verified": true,
+        "truth_success": true,
+        "placement_center": [
+          0.2648,
+          0.0303
+        ]
+      },
+      {
+        "step": "调整目的区域障碍",
+        "label": "yellow",
+        "ok": true,
+        "controller_ok": true,
+        "camera_verified": true,
+        "truth_success": true,
+        "placement_center": [
+          0.5430656376768501,
+          0.05420830085247781
+        ]
+      },
+      {
+        "step": "重新抓取并完成原目标",
+        "label": "banana",
+        "ok": true,
+        "controller_ok": true,
+        "camera_verified": true,
+        "truth_success": true
+      }
+    ],
+    "original_goal": {
+      "label": "banana",
+      "zone_name": "zone_yellow"
+    },
+    "batch": {
+      "completed": 5,
+      "total": 5,
+      "status": "complete"
+    },
+    "geometry_score": {
+      "correct": 6,
+      "wrong": 0,
+      "remaining": 0
+    },
+    "final_camera_goals": [
+      {
+        "label": "banana",
+        "ok": true,
+        "verified_revision": 2,
+        "goal": {
+          "label": "banana",
+          "zone_name": "zone_yellow"
+        }
+      },
+      {
+        "label": "yellow",
+        "ok": true,
+        "verified_revision": 2,
+        "goal": {
+          "label": "yellow",
+          "zone_name": "zone_yellow"
+        }
+      },
+      {
+        "label": "apple",
+        "ok": true,
+        "verified_revision": 2,
+        "goal": {
+          "label": "apple",
+          "zone_name": "zone_red"
+        }
+      },
+      {
+        "label": "red",
+        "ok": true,
+        "verified_revision": 2,
+        "goal": {
+          "label": "red",
+          "zone_name": "zone_red"
+        }
+      },
+      {
+        "label": "green",
+        "ok": true,
+        "verified_revision": 2,
+        "goal": {
+          "label": "green",
+          "zone_name": "zone_green"
+        }
+      },
+      {
+        "label": "pear",
+        "ok": true,
+        "verified_revision": 2,
+        "goal": {
+          "label": "pear",
+          "zone_name": "zone_green"
+        }
+      }
+    ],
+    "yellow_adjustment": {
+      "preserved_zone": "zone_yellow",
+      "actual_displacement_m": 0.05555114000502783,
+      "approved_destination": {
+        "type": "point",
+        "xy": [
+          0.5430656376768501,
+          0.05420830085247781
+        ]
+      },
+      "restored_original_pose": false
+    },
+    "other_four_full_transforms_exactly_unchanged": [
+      "green",
+      "red",
+      "apple",
+      "pear"
+    ],
+    "held_object": null,
+    "pending_restore": null,
+    "separate_run_before_after_manifest_recorded": false,
+    "fixture_limit": "Exact objects, joints and held transform; initial camera summaries rounded, original raw cloud cache unavailable; full nominal geometry prior retained."
+  },
+  "legacy_real_execution": {
+    "status": "passed",
+    "passed": 9,
+    "failed": 0,
+    "exit_code": 0,
+    "pytest_elapsed_seconds": 205.1,
+    "wrapper_elapsed_seconds": 207.703,
+    "source_frozen": true,
+    "report": {
+      "file": "legacy-final/report.json",
+      "sha256": "cf6a102f0d1e0deb96edeb3b68ab3e4d2a3d48527a448e7758dd146787eef537"
+    },
+    "log": {
+      "file": "legacy-final/pytest.txt",
+      "sha256": "f7ea901e149acd5235a20ea2d2b167eaf9d2190b406db46e8a72604f033d0492"
+    },
+    "actual_command_recorded_in": "legacy-final/report.json:command",
+    "cases": [
+      {
+        "file": "cases\\test_exact_banana_neighbor_sce0\\exact_banana.json",
+        "scans": {
+          "frames": 9,
+          "full_scans": 1,
+          "local_scans": 2
+        },
+        "ok": true
+      },
+      {
+        "file": "cases\\test_neighbor_moved_into_plann0\\occupied_slot_replan.json",
+        "scans": {
+          "frames": 10,
+          "full_scans": 1,
+          "local_scans": 2
+        },
+        "ok": true
+      },
+      {
+        "file": "cases\\test_target_moved_during_pre_a0\\moved_target_recovery.json",
+        "scans": {
+          "frames": 12,
+          "full_scans": 1,
+          "local_scans": 4
+        },
+        "ok": true
+      },
+      {
+        "file": "cases\\test_two_real_sequential_tasks0\\two_object_queue.json",
+        "scans": {
+          "frames": 13,
+          "full_scans": 1,
+          "local_scans": 4
+        },
+        "ok": true
+      }
+    ]
+  },
+  "ui": {
+    "method": "Small DOM executing real UI event listeners; no real-browser appearance/click acceptance.",
+    "total_assertions": 254,
+    "assertions_by_script": {
+      "test_assistant_recovery_approval_ui.cjs": 128,
+      "test_assistant_batch_ui.cjs": 50,
+      "test_assistant_placement_ui.cjs": 42,
+      "test_assistant_intervention_ui.cjs": 34
+    },
+    "javascript_syntax_check": "passed"
+  },
+  "excluded_from_pass_claims": [
+    {
+      "case": "Earlier legacy workspace_margin exploratory run",
+      "reason": "StopIteration during initialization; unrelated old-chain probe; not represented as passing. Existing real held continuation is covered by legacy_real_execution."
+    }
+  ],
+  "limits": [
+    "L1 kinematic/geometry model; no contact friction, force, stiffness, Gazebo or MoveIt2 physical closed-loop claim.",
+    "Online model decision quality not evaluated by the forbidden-network replay.",
+    "Success is for the recorded scene; arbitrary crowded layouts may remain infeasible."
+  ],
+  "deployment": {
+    "status": "passed",
+    "url": "http://127.0.0.1:8767",
+    "held_scene_joints_history_preservation": "passed at 1e-10 pose tolerance; messages, queue, usage and metrics unchanged",
+    "live_service_check": "HTTP state, exact static resources, valid camera JPEG; no browser click acceptance",
+    "held_object": "catalog-banana-1",
+    "batch_completed": 4,
+    "batch_total": 5,
+    "can_resume_recovery": true,
+    "approval_status": "none",
+    "online_api_called": false,
+    "user_approval_submitted": false,
+    "bootstrap_scope": "Validated recorded banana scene only; rounded measured grasp log reconstructs planner context; world/joints/held transform retained.",
+    "report": {
+      "file": "held_recovery_deployment_check.json",
+      "sha256": "506059f690150cd8ad019030e088b7dd5ccf523974f1ffd339e3721decdd5098"
+    }
+  },
+  "git_publication": {
+    "status": "published",
+    "remote": "https://github.com/Camellia-zsc/Robot-Grasp",
+    "branch": "main",
+    "commits": [
+      {
+        "id": "cfc72b2",
+        "change": "Measured held transfer, safe observation, staged rearrangement, confirmation/resume API and regression tests"
+      },
+      {
+        "id": "c872103",
+        "change": "Approval question and steps, explicit resume UI, UI tests and usage guide"
+      }
+    ]
+  }
+}

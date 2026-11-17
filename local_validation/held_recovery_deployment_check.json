@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "url": "http://127.0.0.1:8767",
+  "code_commit": "c872103b4d7a3d99a3186425886fbc8792f3b25e",
+  "status": "error",
+  "busy": false,
+  "can_resume_recovery": true,
+  "approval_status": "none",
+  "held_object": "catalog-banana-1",
+  "objects": 6,
+  "pose_tolerance": 1e-10,
+  "geometry_and_gripper_preserved": true,
+  "scene_and_clock_preserved": true,
+  "history_and_metrics_preserved": true,
+  "messages": 14,
+  "metrics": {
+    "requests": 4,
+    "successes": 2,
+    "model_requests": 10
+  },
+  "batch_progress": [
+    4,
+    5
+  ],
+  "speed": 4.0,
+  "camera_jpeg_valid": true,
+  "observation_images_preserved": true,
+  "static_assets_match": true,
+  "asset_sha256": {
+    "index.html": "ae7f8981427064edd641c8148f720a3bf9ef4370cb1d474c6aa460e9fb9993e0",
+    "app.js": "243229948e00aca59d9a660a85ec4e896f6e966d0609b3af19e32881c469f3ff",
+    "style.css": "e661d8ef3a8ceee98d1bf47bc090528a9167fab6cfe1ff3d4d0f489adc86ec70",
+    "editor.js": "fe66a285c81ab0f3c4b9dd63da67f0a36303e0d27cdec169ea437665cd5afec5"
+  },
+  "production_content_matches_tested_source": true,
+  "source_files_checked": 117,
+  "line_endings_normalized_for_source_comparison": true,
+  "normal_reset_factory_restored": true,
+  "online_api_called": false,
+  "user_approval_submitted": false,
+  "interaction_check": "HTTP state and exact assets; browser interaction not performed"
+}

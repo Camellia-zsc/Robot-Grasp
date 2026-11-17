@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "status": "ready",
+  "batch": "idle",
+  "model_configured": true,
+  "objects": 6,
+  "messages": 12,
+  "metrics": {
+    "requests": 5,
+    "successes": 2,
+    "model_requests": 7
+  },
+  "confirmed": 6,
+  "pending": 1,
+  "layout_and_history_preserved": true,
+  "assets_match": true
+}

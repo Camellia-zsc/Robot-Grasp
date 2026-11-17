@@ -1,0 +1,28 @@
+{
+  "check": "live_online_batch_plan_only",
+  "ok": true,
+  "moved_simulation": false,
+  "instruction": "先把苹果放到绿色区域，再把梨子放到红色区域，一件一件抓取。",
+  "decision": {
+    "message": "先将苹果放到绿色区域，再将梨子放到红色区域，逐件抓取。",
+    "scene_version": 32,
+    "action": "pick_batch",
+    "items": [
+      {
+        "object_id": "v32-object-4",
+        "zone_name": "zone_green"
+      },
+      {
+        "object_id": "v32-object-1",
+        "zone_name": "zone_red"
+      }
+    ]
+  },
+  "elapsed_seconds": 6.31,
+  "stream_chunks": 70,
+  "usage": {
+    "input_tokens": 5639,
+    "output_tokens": 74,
+    "total_tokens": 5713
+  }
+}

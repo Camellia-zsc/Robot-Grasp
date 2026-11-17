@@ -50,8 +50,9 @@ function updateControls(){
 }
 async function submitInstruction(instruction){
   const text=String(instruction||"").trim();if(!text||ui.pending||ui.state?.busy||ui.state?.needs_reset)return;
+  const selection=window.SceneEditor?.selection?.();
   ui.pending=true;showError("");updateControls();
-  try{await api("/api/command",{instruction:text});$("instruction").value="";}
+  try{await api("/api/command",{instruction:text,...(selection||{})});$("instruction").value="";}
   catch(error){showError(error.message);}
   finally{ui.pending=false;updateControls();}
 }
@@ -60,7 +61,7 @@ $("instruction").addEventListener("keydown",event=>{if(event.key==="Enter"&&!eve
 document.querySelectorAll("[data-instruction]").forEach(button=>button.addEventListener("click",()=>submitInstruction(button.dataset.instruction)));
 $("reset-button").addEventListener("click",async()=>{
   ui.pending=true;updateControls();showError("");
-  try{await api("/api/reset",{});ui.trail=[];ui.lastTime=null;ui.lastCameraVersion=null;ui.cameraKey=null;}
+  try{await api("/api/reset",{});window.SceneEditor?.clearDestination?.();ui.trail=[];ui.lastTime=null;ui.lastCameraVersion=null;ui.cameraKey=null;}
   catch(error){showError(error.message);}finally{ui.pending=false;updateControls();}
 });
 $("stop-button").addEventListener("click",async()=>{try{await api("/api/stop",{});}catch(error){showError(error.message);}});
@@ -250,6 +251,7 @@ function renderBatch(state){
   const labels={pending:"等待",observing:"重新观测",executing:"抓放中",recovering:"恢复中",succeeded:"已完成",skipped:"已在目标区",failed:"失败",cancelled:"已取消"};
   const batchLabels={running:"执行中",complete:"全部完成",failed:"已中止",stopped:"已停止"};
   const zoneLabel=zone=>({zone_red:"红色区域",zone_green:"绿色区域",zone_yellow:"黄色区域",zone_blue:"蓝色区域"})[zone]||String(zone||"默认区域");
+  const destinationLabel=item=>item.destination?.type==="region"?"抓取区":item.destination?.type==="point"?`桌面点 (${item.destination.xy.map(value=>number(value).toFixed(3)).join(", ")})`:zoneLabel(item.zone_name);
   panel.dataset.status=status;
   setText("batch-state",batchLabels[status]||"任务清单");
   setText("batch-progress",`${completed} / ${total} 件完成`);
@@ -262,9 +264,9 @@ function renderBatch(state){
     li.classList.toggle("current",active);if(active)li.setAttribute("aria-current","step");
     const order=document.createElement("span");order.className="batch-order";order.textContent=String(item.index??index+1);
     const copy=document.createElement("div");copy.className="batch-item-copy";
-    const name=document.createElement("strong");name.textContent=`${displayLabel(item.label)} → ${zoneLabel(item.zone_name)}`;copy.append(name);
+    const name=document.createElement("strong");name.textContent=`${displayLabel(item.label)} → ${destinationLabel(item)}`;copy.append(name);
     if(item.message){const message=document.createElement("small");message.textContent=String(item.message);copy.append(message);}
-    const badge=document.createElement("span");badge.className="batch-item-status";badge.textContent=labels[item.status]||"等待";
+    const badge=document.createElement("span");badge.className="batch-item-status";badge.textContent=item.status==="skipped"&&item.destination?"已在目标位置":labels[item.status]||"等待";
     li.append(order,copy,badge);return li;
   });
   $("batch-items").replaceChildren(...rows);

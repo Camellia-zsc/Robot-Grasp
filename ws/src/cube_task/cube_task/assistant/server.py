@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from .batch import bind_item, build_items, idle_batch, whole_footprint_in_zone
+from .batch import (bind_item, build_items, completed_position, idle_batch,
+                    whole_footprint_at_goal)
 
 _LOG = logging.getLogger(__name__)
 STATIC = Path(__file__).with_name('static')
@@ -220,7 +221,7 @@ class DashboardController:
             editable_session()
             self._launch(run, 'editing', '正在调整桌面布局')
 
-    def submit(self, instruction):
+    def submit(self, instruction, destination=None, scene_version=None):
         if not isinstance(instruction, str) or not instruction.strip():
             raise ValueError('请输入抓取指令')
         instruction = instruction.strip()
@@ -232,6 +233,18 @@ class DashboardController:
             raise ValueError('任务已停止，请先重置场景再执行新指令')
         if self._session is None or not self._scene:
             raise ValueError('仿真尚未准备好，请先重置场景')
+        selected_destination = None
+        with self._lock:
+            if destination is not None:
+                from .destinations import validate_destination
+                if (type(scene_version) is not int
+                        or scene_version != self._scene.get('scene_version')):
+                    raise ValueError('选定位置的场景已变化，请重新选择放置点')
+                selected_destination = validate_destination(destination, self._scene)
+                if selected_destination['type'] != 'point':
+                    raise ValueError('界面选择的放置目标必须是桌面点')
+            elif scene_version is not None:
+                raise ValueError('提交场景版本时必须同时选择放置点')
 
         def run():
             with self._lock:
@@ -246,6 +259,10 @@ class DashboardController:
                 self._metrics['requests'] += 1
             self._set_status('observing', '正在观察桌面并生成物体列表')
             scene = self._session.observe()
+            if selected_destination is not None:
+                from .destinations import validate_destination
+                scene = copy.deepcopy(scene)
+                scene['selected_destination'] = validate_destination(selected_destination, scene)
             if self._cancel.is_set():
                 raise RuntimeError('任务已停止')
             with self._lock:
@@ -296,10 +313,11 @@ class DashboardController:
             with self._lock:
                 self._last_result = result
                 self._scene = self._session.scene
-            if not result.get('ok') and not result.get('aborted'):
+            if (not result.get('ok') and not result.get('aborted')
+                    and result.get('stage') != 'validation'):
                 selected = next(obj for obj in scene['objects']
                                 if obj['object_id'] == decision['object_id'])
-                goal = {'label': selected['label'], 'zone_name': decision['zone_name']}
+                goal = self._goal(selected['label'], decision)
                 result = self._recover_task(instruction, goal, result)
             with self._lock:
                 if self._cancel.is_set():
@@ -317,7 +335,18 @@ class DashboardController:
                     self._error = self._stage
             self._event('result', {'message': self._stage, 'result': result})
 
-        self._launch(run, 'observing', '正在开始任务')
+        with self._lock:
+            if (selected_destination is not None
+                    and scene_version != self._scene.get('scene_version')):
+                raise ValueError('选定位置的场景已变化，请重新选择放置点')
+            self._launch(run, 'observing', '正在开始任务')
+
+    @staticmethod
+    def _goal(label, decision):
+        goal = {'label': label, 'zone_name': decision['zone_name']}
+        if decision.get('destination') is not None:
+            goal['destination'] = copy.deepcopy(decision['destination'])
+        return goal
 
     def _end_batch_on_error(self, cancelled, message):
         """Called under the controller lock, including unexpected worker failures."""
@@ -370,13 +399,23 @@ class DashboardController:
                     self._scene = scene
                 completed_zones = tuple(dict.fromkeys(
                     done['zone_name'] for done in items[:item['index'] - 1]
-                    if done['label'] == item['label'] and done['status'] in ('succeeded', 'skipped')))
-                single, target = bind_item(item, scene, completed_zones)
+                    if (done['label'] == item['label'] and done['status'] in ('succeeded', 'skipped')
+                        and done.get('destination') is None)))
+                prior_extended = [done for done in items[:item['index'] - 1]
+                                  if (done['label'] == item['label']
+                                      and done['status'] in ('succeeded', 'skipped')
+                                      and done.get('destination') is not None)]
+                if any(done.get('completion_xy') is None for done in prior_extended):
+                    raise ValueError('已完成同类物品的落位尚未可靠观察，无法确认下一件身份，已停止后续任务')
+                completed_positions = tuple(done['completion_xy'] for done in prior_extended)
+                single, target = bind_item(item, scene, completed_zones, completed_positions)
                 with self._lock:
                     item['object_id'] = single['object_id']
-                if whole_footprint_in_zone(target, scene, item['zone_name']):
+                if whole_footprint_at_goal(target, scene, item):
                     last_result = {'ok': True, 'skipped': True, 'observed_in_zone': True,
-                                   'message': '实测完整足迹已在指定区域，无需搬运'}
+                                   'message': '实测完整足迹已满足指定目标，无需搬运'}
+                    if item.get('destination') is not None:
+                        last_result['destination'] = copy.deepcopy(item['destination'])
                     need_scan = False
                     final_status = 'skipped'
                 else:
@@ -396,13 +435,15 @@ class DashboardController:
                         self._last_result = last_result
                         self._scene = self._session.scene
                     if (not last_result.get('ok') and not last_result.get('aborted')
+                            and last_result.get('stage') != 'validation'
                             and not (last_result.get('truth') or {}).get('success')):
                         with self._lock:
                             item.update(status='recovering', message='正在恢复本件任务')
-                        goal = {'label': item['label'], 'zone_name': item['zone_name']}
+                        goal = self._goal(item['label'], item)
                         last_result = self._recover_task(instruction, goal, last_result,
                                                          reference_xy=item['reference_xy'],
-                                                         completed_zones=completed_zones)
+                                                         completed_zones=completed_zones,
+                                                         completed_positions=completed_positions)
                     elif not last_result.get('ok') and (last_result.get('truth') or {}).get('success'):
                         last_result = dict(last_result, fault=True,
                                            message='本件已落位，但机械臂后续动作异常，已停止后续任务')
@@ -416,6 +457,9 @@ class DashboardController:
             if self._cancel.is_set():
                 raise RuntimeError('任务已停止')
             with self._lock:
+                if last_result.get('ok') and item.get('destination') is not None:
+                    item['completion_xy'] = completed_position(
+                        target, self._session.scene, item, last_result)
                 item.update(status=final_status, message=last_result.get('message', ''),
                             result=copy.deepcopy(last_result))
                 self._scene = self._session.scene
@@ -445,7 +489,8 @@ class DashboardController:
                 self._error = self._stage
         self._event('result', {'message': self._stage, 'result': self._last_result})
 
-    def _recover_task(self, instruction, goal, initial_result, reference_xy=None, completed_zones=()):
+    def _recover_task(self, instruction, goal, initial_result, reference_xy=None,
+                      completed_zones=(), completed_positions=()):
         """Ask the real model to select bounded local repairs, checking every result."""
         from .recovery import MAX_RECOVERY_ATTEMPTS, validate_recovery_decision
 
@@ -476,6 +521,8 @@ class DashboardController:
                     identity = {'reference_xy': reference_xy}
                     if completed_zones:
                         identity['completed_zones'] = completed_zones
+                    if completed_positions:
+                        identity['completed_positions'] = completed_positions
                     context = self._session.prepare_recovery(result, goal, attempt, history,
                                                               **identity)
                 if self._cancel.is_set():
@@ -763,14 +810,35 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if size < 1 or size > 8192:
             self._send(413, {'error': '请求内容为空或过长'})
             return
+
+        def unique_fields(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError('请求包含重复字段')
+                result[key] = value
+            return result
+
+        def reject_constant(_value):
+            raise ValueError('请求包含非有限数值')
+
         try:
-            data = json.loads(self.rfile.read(size))
+            data = json.loads(self.rfile.read(size), object_pairs_hook=unique_fields,
+                              parse_constant=reject_constant)
             if not isinstance(data, dict):
                 raise ValueError('请求需要为 JSON 对象')
             path = urlsplit(self.path).path
             ctl = self.server.controller
             if path == '/api/command':
-                ctl.submit(data.get('instruction'))
+                if set(data) == {'instruction'}:
+                    ctl.submit(data['instruction'])
+                elif set(data) == {'instruction', 'destination', 'scene_version'}:
+                    if data['destination'] is None:
+                        raise ValueError('请选择有效的桌面放置点')
+                    ctl.submit(data['instruction'], destination=data['destination'],
+                               scene_version=data['scene_version'])
+                else:
+                    raise ValueError('指令字段不符合约定；选择位置时需同时提交目标与场景版本')
             elif path == '/api/scene-edit':
                 ctl.edit_scene(data)
             elif path == '/api/reset':

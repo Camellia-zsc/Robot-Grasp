@@ -13,6 +13,7 @@ _DECISION_KEYS = {'scene_version', 'action', 'option_id', 'message'}
 
 RECOVERY_PROMPT = '''你是机械臂仿真任务的异常恢复助手。
 原始 instruction 与 goal 是不可改变的用户目标；不能换物体、换放置区或谎报成功。
+goal.destination 表示抓取区或指定桌面点，必须完整保持；指定点不能改到另一位置，抓取区可由本地程序选择其中的空位。
 请结合 failure、相机实测 observations、已有 history，从本地提供的 options 中选择一个恢复方案。
 options 由本地程序检查，模型只能选择其中已有的 id；不能输出新坐标、轨迹、关节角、代码或机器人命令。
 holding=true 表示夹爪仍拿着目标，不得要求重新抓取或擅自张开夹爪；只能选择提供的持物恢复方案。
@@ -73,9 +74,17 @@ def model_recovery_context(context: dict) -> dict:
     goal = context.get('goal')
     if not isinstance(goal, dict):
         raise ValueError('恢复目标无效。')
+    visible_goal = {'label': _text(goal.get('label'), '目标类别', 100)}
+    if goal.get('destination') is not None:
+        from .destinations import validate_destination
+        if goal.get('zone_name') is not None:
+            raise ValueError('恢复目标不能同时指定区域与桌面目标。')
+        visible_goal.update(zone_name=None,
+                            destination=validate_destination(goal['destination'], context))
+    else:
+        visible_goal['zone_name'] = _text(goal.get('zone_name'), '目标区域', 100)
     visible = {'scene_version': version, 'attempt': attempt, 'max_attempts': maximum,
-               'goal': {'label': _text(goal.get('label'), '目标类别', 100),
-                        'zone_name': _text(goal.get('zone_name'), '目标区域', 100)}}
+               'goal': visible_goal}
     observation_mode = context.get('observation_mode')
     if observation_mode is not None:
         if observation_mode not in ('stationary_with_last_scan', 'full_scan', 'unavailable'):

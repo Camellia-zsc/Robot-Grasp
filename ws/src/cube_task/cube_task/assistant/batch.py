@@ -1,6 +1,7 @@
 """Measured identities and destinations for a finite sequential grasp queue."""
 from __future__ import annotations
 
+import copy
 import math
 
 import numpy as np
@@ -20,10 +21,15 @@ def build_items(decision, scene):
     if decision['action'] != 'pick_batch':
         raise ValueError('需要多物品抓取计划')
     observed = {o['object_id']: o for o in scene['objects']}
-    return [dict(index=index, label=observed[item['object_id']]['label'],
-                 reference_xy=list(observed[item['object_id']]['center_base'][:2]),
-                 zone_name=item['zone_name'], object_id=None, status='pending', message='等待执行')
-            for index, item in enumerate(decision['items'], 1)]
+    items = []
+    for index, item in enumerate(decision['items'], 1):
+        queued = dict(index=index, label=observed[item['object_id']]['label'],
+                      reference_xy=list(observed[item['object_id']]['center_base'][:2]),
+                      zone_name=item['zone_name'], object_id=None, status='pending', message='等待执行')
+        if 'destination' in item:
+            queued['destination'] = copy.deepcopy(item['destination'])
+        items.append(queued)
+    return items
 
 
 def _in_completed_zone(center, scene, completed_zones):
@@ -46,11 +52,20 @@ def _in_completed_zone(center, scene, completed_zones):
     return False
 
 
-def matching_objects(scene, label, reference_xy, completed_zones=()):
+def matching_objects(scene, label, reference_xy, completed_zones=(), completed_positions=()):
     """A label alone cannot substitute a different object after a new scan."""
     reference = np.asarray(reference_xy, dtype=float)
     if reference.shape != (2,) or not np.all(np.isfinite(reference)):
         raise ValueError('队列目标的原始观测位置无效')
+    completed = []
+    for position in completed_positions:
+        try:
+            point = np.asarray(position, dtype=float)
+            if point.shape != (2,) or not np.all(np.isfinite(point)):
+                raise ValueError
+        except (ValueError, TypeError, OverflowError):
+            raise ValueError('已完成物品的观测位置无效，无法确认下一件身份') from None
+        completed.append(point)
     matches = []
     for obj in scene.get('objects', []):
         if obj.get('valid') is not True or obj.get('label') != label:
@@ -63,25 +78,53 @@ def matching_objects(scene, label, reference_xy, completed_zones=()):
                 and np.linalg.norm(center[:2] - reference) <= MAX_TARGET_DRIFT):
             # A completed object can appear near a later item's original pose.
             # With no persistent visual identity, do not claim it as a new item.
-            if not _in_completed_zone(center, scene, completed_zones):
+            if (not _in_completed_zone(center, scene, completed_zones)
+                    and not any(np.linalg.norm(center[:2] - p) <= MAX_TARGET_DRIFT for p in completed)):
                 matches.append(obj)
     return matches
 
 
-def bind_item(item, scene, completed_zones=()):
+def bind_item(item, scene, completed_zones=(), completed_positions=()):
     from .llm import validate_decision
 
-    matches = matching_objects(scene, item['label'], item['reference_xy'], completed_zones)
+    matches = matching_objects(scene, item['label'], item['reference_xy'],
+                               completed_zones, completed_positions)
     if not matches:
         raise ValueError('下一件物品未被可靠观察到、位置变化过大或无法与已完成同类区分，已停止后续任务')
     if len(matches) != 1:
         raise ValueError('下一件物品无法唯一确认，已停止后续任务')
     target = matches[0]
-    decision = validate_decision(
-        {'scene_version': scene['scene_version'], 'action': 'pick',
-         'object_id': target['object_id'], 'zone_name': item['zone_name'],
-         'message': '执行第 %d 件物品' % item['index']}, scene)
+    proposed = {'scene_version': scene['scene_version'], 'action': 'pick',
+                'object_id': target['object_id'], 'zone_name': item['zone_name'],
+                'message': '执行第 %d 件物品' % item['index']}
+    if 'destination' in item:
+        proposed['destination'] = copy.deepcopy(item['destination'])
+    decision = validate_decision(proposed, scene)
     return decision, target
+
+
+def whole_footprint_at_goal(target, scene, item):
+    if item.get('destination') is not None:
+        from .destinations import whole_footprint_at_destination
+        return whole_footprint_at_destination(target, scene, item['destination'])
+    return whole_footprint_in_zone(target, scene, item['zone_name'])
+
+
+def completed_position(target, scene, item, result):
+    """Locate a completed extended goal using observations and its planned release."""
+    if result.get('skipped'):
+        return list(target['center_base'][:2])
+    try:
+        release = np.asarray(result.get('placement_center'), dtype=float)
+        if release.shape not in ((2,), (3,)) or not np.all(np.isfinite(release)):
+            return None
+        matches = [obj for obj in matching_objects(scene, item['label'], release[:2])
+                   if whole_footprint_at_goal(obj, scene, item)]
+        if len(matches) == 1:
+            return list(matches[0]['center_base'][:2])
+    except (ValueError, TypeError, OverflowError):
+        pass
+    return None
 
 
 def whole_footprint_in_zone(target, scene, zone_name):

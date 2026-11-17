@@ -19,6 +19,7 @@ from .catalog import catalog_entries, make_catalog_object
 from ..core.config import load_config
 from ..core.types import Frame
 from ..perception.classify_knn import KnnClassifier
+from ..perception.classify_color import ColorClassifier
 from ..perception.features import feature_vector
 from ..perception.pipeline import Perception
 from ..perception.visualize import draw_result
@@ -136,6 +137,14 @@ def _training_samples():
         count_before = len(labels)
         for index, (x, y, yaw) in enumerate(placements):
             obj = make_catalog_object(label, 'teach-%s-%d' % (label, index), [x, y], yaw)
+            # Small, deterministic illumination/color variation includes both
+            # sides of the circular red hue boundary (0 and 179 in OpenCV).
+            # The L1 blocks already vary by a few BGR levels; teaching only one
+            # exact swatch made a red block nearer to apple samples after voting.
+            color_offsets = ((0, 0, 0), (7, 0, 0), (0, 7, 0),
+                             (-7, 0, 0), (0, -7, 0), (4, -4, 3))
+            obj.color_bgr = tuple(int(v) for v in np.clip(
+                np.asarray(obj.color_bgr, dtype=int) + color_offsets[index], 0, 255))
             world = SimWorld(objects=[obj], seed=index)
             for view, pose in enumerate(poses):
                 color, depth = render_rgbd(world, intr, pose, gripper=False,
@@ -189,8 +198,34 @@ def _classifier() -> KnnClassifier:
         return model
 
 
+class _ColorSeededKnn(ColorClassifier):
+    """Expose conservative red/green split seeds, then classify shape with KNN.
+
+    A color seed is only an instance boundary cue. It never becomes the final
+    label: an apple remains eligible for apple, and a pear for pear.
+    Brown stems and yellow banana bodies do not provide a second seed color.
+    """
+
+    def __init__(self, cfg, model):
+        super().__init__(cfg.get('perception.classifier.color.classes'),
+                         allowed_labels=['red', 'green'])
+        self.model = model
+
+    def classify(self, frame, detections):
+        self.model.classify(frame, detections)
+
+
 class SandboxPerception(Perception):
     """The existing image pipeline plus a conservative completeness gate."""
+
+    def __init__(self, cfg, classifier=None, detector=None):
+        seeded = _ColorSeededKnn(cfg, classifier) if classifier is not None else None
+        super().__init__(cfg, classifier=seeded, detector=detector)
+
+    def _merged_blocks(self, frame, seg, dets, clf, res):
+        # Only use the shared color-boundary splitter. The fixed library also
+        # includes round fruit and stems, so block-size cuts are inappropriate.
+        return dets
 
     def process(self, frame, T_base_camera, zones=None):
         result = super().process(frame, T_base_camera, zones)

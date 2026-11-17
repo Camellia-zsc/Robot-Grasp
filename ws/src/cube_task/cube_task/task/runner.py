@@ -137,6 +137,7 @@ def held_shape(det: Detection, gp, nominal: Optional[Sequence[float]] = None
     tz = detection_table_z(det)
     kind = (det.extra.get('grasp') or {}).get('kind', '') if det.extra else ''
     return {'length': dims[0], 'width': dims[1], 'elongated': kind == 'elongated',
+            'axis_offset': float(det.yaw or 0.) - float(gp.closing_angle),
             'grip_width': float(gp.expected_width),
             'grip_z': 0.0 if tz is None else max(0.0, float(gp.T_grasp[2, 3]) - tz)}
 
@@ -840,6 +841,8 @@ class TaskRunner:
             return None, None
         track['xy'] = _xy(det)
         self._neighbors = list(neighbors)
+        from ..perception.grasp import annotate_grasp_neighbors
+        annotate_grasp_neighbors(det, neighbors)
         gp = self.planner.plan(det)
         if not gp.feasible:
             if gp.reason.startswith(REMEASURE_REASONS):
@@ -874,6 +877,9 @@ class TaskRunner:
                 return None, None
             shape['center_offset'] = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
             shape['grasp_closing'] = gp.closing_angle
+            desired_yaw = (det.extra or {}).get('_restore_yaw')
+            if desired_yaw is not None:
+                shape['_required_closing'] = gp.closing_angle + float(desired_yaw) - float(det.yaw or 0)
             place_options = dict(strict=True, fixed_xy=exact_xy,
                                  avoid_poses=avoided_poses,
                                  candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
@@ -1019,7 +1025,7 @@ class TaskRunner:
     def _save_held_recovery(self, det, gp, pp, result) -> None:
         """Remember only recoverable motion failures of a verified held grasp."""
         errors = [s.get('error') for s in result.detail.get('steps', ()) if s.get('error')]
-        allowed = ('rejected', 'unreachable', 'timeout', 'stalled')
+        allowed = ('rejected', 'unreachable', 'timeout', 'stalled', 'scene_changed', 'placement_changed')
         width = result.grasp_width
         if (not result.detail.get('holding') or result.error not in allowed + ('holding_object',)
                 or any(error not in allowed for error in errors)
@@ -1154,6 +1160,113 @@ class TaskRunner:
                  shape['length'] if shape else None, shape['width'] if shape else None,
                  self.placer.last_info.get('axis') if shape else None))
         return result, ''
+
+    def replan_release(self, det, gp, pp, width, neighbors, placement_zone=None,
+                       placement_polygon=None, exact_xy=False, observation_filter=None):
+        """Plan the held object's release from fresh measured surroundings.
+
+        This is the stationary ``before_release`` seam, not another grasp or
+        recovery action. It sends no arm/gripper commands. The original held
+        grasp transform remains fixed; only the same destination's release
+        center/orientation may change. A fixed point permits orientation retries
+        but never silently moves to another center.
+        """
+        from .reach import adjust_plan_poses, release_workspace_reason
+
+        if self._aborted() or not self._healthy():
+            return None, 'arm stopped or unhealthy before release'
+        try:
+            width = float(width)
+        except (TypeError, ValueError):
+            return None, 'held grasp width is unavailable'
+        if (not math.isfinite(width) or width < self.skill.empty_width
+                or width > self.max_width):
+            return None, 'held grasp width is invalid'
+        zone = placement_zone if placement_zone is not None else self.zones.get(pp.zone)
+        if zone is None or zone.name != pp.zone:
+            return None, 'release destination changed'
+        polygon = np.asarray(zone.corners_xy() if placement_polygon is None
+                             else placement_polygon, float)
+        if (polygon.ndim != 2 or polygon.shape[1:] != (2,) or len(polygon) < 3
+                or not np.all(np.isfinite(polygon))):
+            return None, 'release support polygon is unavailable'
+        planning_grasp = copy.deepcopy(gp)
+        planning_grasp.expected_width = max(float(gp.expected_width), width)
+        shape = held_shape(det, planning_grasp, self.nominal.get(det.label))
+        if shape is None:
+            return None, 'held footprint is unavailable'
+        shape['grip_width'] = max(shape['grip_width'], width)
+        shape['center_offset'] = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
+        shape['grasp_closing'] = gp.closing_angle
+        desired_yaw = (det.extra or {}).get('_restore_yaw')
+        if desired_yaw is not None:
+            shape['_required_closing'] = gp.closing_angle + (float(desired_yaw) - float(det.yaw or 0))
+        neighbors = list(neighbors)
+        self._neighbors = neighbors
+        held = held_offset_of(planning_grasp)
+        tops = [float(d.top_z) for d in neighbors if d is not det and d.top_z is not None
+                and math.isfinite(float(d.top_z))]
+        transit = transit_height(self.cfg, list(self.zones.values()), detection_table_z(det),
+                                 held, max(tops) if tops else None)
+        # Occupancy is rebuilt from current measurements, rather than retaining
+        # old placement reservations after the user moved a table object.
+        occupied = []
+        for other in neighbors:
+            if other is det or not _has_xy(other):
+                continue
+            dims = footprint_dims(other, self.nominal.get(other.label))
+            if dims is None or other.yaw is None:
+                return None, 'neighbor footprint is unavailable before release'
+            occupied.append((*_xy(other), dims[0], float(other.height or 0.),
+                             *dims, float(other.yaw)))
+        allowed = self._strict_place_filter(det, planning_grasp, neighbors, polygon)
+        def measured_allowed(x, y, closing):
+            return (allowed(x, y, closing) and
+                    (observation_filter is None or observation_filter(x, y, closing)))
+        avoided, avoided_poses = [], []
+        why = 'no clear reachable position in the requested destination'
+        for _ in range(RELEASE_RETRIES + 1):
+            candidate = self.placer.plan(
+                zone, held, transit, footprint=self._footprint(det), occupied=occupied,
+                held=shape, avoid=avoided, strict=True, fixed_xy=bool(exact_xy),
+                avoid_poses=avoided_poses, pose_filter=measured_allowed,
+                candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
+                center_first=self._center_first(zone.name),
+                lower=self.release_lower.get(det.label, 0.0))
+            if not candidate.feasible:
+                return None, candidate.reason or why
+            info = dict(self.placer.last_info)
+            xy = tuple(info['xy'])
+            ok, why, _tilts = adjust_plan_poses(
+                self.arm, planning_grasp, candidate,
+                self._floors(det, planning_grasp, candidate, held), self.free_tilt)
+            if ok:
+                ok, why = self._adjust_strict_release(
+                    det, planning_grasp, candidate, neighbors, polygon, xy, held)
+            if ok and observation_filter is not None:
+                closing = math.atan2(float(candidate.T_release[1, 1]),
+                                     float(candidate.T_release[0, 1]))
+                if not observation_filter(*xy, closing, gripper_pose=candidate.T_release,
+                                          opening=candidate.open_width):
+                    ok, why = False, 'final release footprint is not visible in the fresh image'
+            if ok and not np.allclose(planning_grasp.T_grasp, gp.T_grasp, atol=1e-7, rtol=0):
+                ok, why = False, 'release planning would change the held grasp transform'
+            if ok:
+                self._event('decision', action='replan_release', label=det.label, zone=zone.name,
+                            release_xyz=[round(float(v), 4) for v in candidate.T_release[:3, 3]],
+                            place=info, observed_neighbors=len(occupied),
+                            changed=not np.allclose(candidate.T_release, pp.T_release, atol=.001),
+                            avoided=[[round(float(a), 4), round(float(b), 4)] for a, b in avoided])
+                return candidate, ''
+            if exact_xy:
+                avoided_poses.append((*xy, info['closing_angle']))
+            else:
+                avoided.append(xy)
+            # Reach adjustment mutates both plans. Every new candidate must use
+            # the same physically held grasp, not a failed candidate's anchor.
+            planning_grasp = copy.deepcopy(gp)
+            planning_grasp.expected_width = max(float(gp.expected_width), width)
+        return None, why
 
     def ready_for_pick(self, go_observe: bool = False) -> Tuple[bool, str]:
         """

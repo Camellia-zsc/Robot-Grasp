@@ -370,6 +370,51 @@ def _identity_plan(det: Detection, reason: str, close_width: float) -> GraspPlan
                      closing_angle=0.0, feasible=False, reason=reason)
 
 
+def annotate_grasp_neighbors(det: Detection, neighbors: Sequence[Detection]) -> None:
+    """Attach measured neighbor clouds and identities, never simulator geometry.
+
+    A multi-view target can retain its original frame's neighbor annotation.
+    Refresh it from the current detections before planning, so moved or removed
+    neighbors do not keep blocking a later attempt.
+    """
+    records, clouds = [], []
+    for other in neighbors:
+        if other is det or other.center_base is None:
+            continue
+        if (other.label == det.label and det.center_base is not None
+                and np.linalg.norm(np.asarray(other.center_base[:2]) -
+                                   np.asarray(det.center_base[:2])) < .01):
+            continue
+        observed = []
+        for key in ('_points_xy', '_placement_points_base', '_points_base'):
+            points = (other.extra or {}).get(key)
+            if points is None:
+                continue
+            points = np.asarray(points, dtype=float)
+            if points.ndim == 2 and points.shape[1] >= 2:
+                observed.append(points[np.all(np.isfinite(points), axis=1), :2])
+        if not observed or not sum(len(p) for p in observed):
+            continue
+        points = np.vstack(observed)
+        if (det.center_base is not None and
+                np.min(np.linalg.norm(points[:, :2] - np.asarray(det.center_base[:2]),
+                                      axis=1)) > .16):
+            continue
+        # Keep the complete observed outline: an extremal point may be the
+        # only evidence of a narrow corner in the fingers' swept volume.
+        xy = points[:, :2].copy()
+        clouds.append(xy)
+        records.append({'object_id': (other.extra or {}).get('object_id'),
+                        'label': other.label,
+                        'center_base': np.asarray(other.center_base, dtype=float).tolist(),
+                        'points': xy})
+    det.extra['_grasp_neighbors'] = records
+    if clouds:
+        det.extra['_neighbor_xy'] = np.concatenate(clouds, axis=0)
+    else:
+        det.extra.pop('_neighbor_xy', None)
+
+
 class GraspPlanner:
     """
     Plan a vertical top-down grasp for one detection.
@@ -426,6 +471,7 @@ class GraspPlanner:
         self.stem_max_ratio = float(cfg.get('grasp.stem_max_offset_ratio', 0.5))
         self.block_labels = set(str(x) for x in (cfg.get('tasks.L1.labels', []) or []))
         self.use_profile = bool(cfg.get('grasp.section_profile', True))
+        self.adaptive_neighbors = bool(cfg.get('grasp.adaptive_neighbors', self.task == 'Sandbox'))
         self.finger_clearance = _float(cfg, 'grasp.finger_clearance', FINGER_CLEARANCE)
         self.pad_half = _float(cfg, 'grasp.pad_half', PAD_HALF)
         self.min_grasp_height = _float(cfg, 'grasp.min_grasp_height', MIN_GRASP_HEIGHT)
@@ -573,6 +619,18 @@ class GraspPlanner:
             open_w = self.max_width
         if not reason and z_grasp >= top:
             reason = 'too_flat: top %.4f m is not above the lowest TCP z %.4f m' % (top, z_floor)
+        # A nominal full opening is useful in free space, but it needlessly
+        # sweeps neighboring objects in a crowded scene. Re-evaluate the local
+        # measured section at nearby wrist angles before asking for relocation.
+        if self.adaptive_neighbors and not reason and det.extra.get('_neighbor_xy') is not None:
+            choice = self._adaptive_neighbor_grasp(
+                det, kind, x, y, closing, z_grasp, expected, open_w,
+                pts, table_z, top, z_floor)
+            if choice is not None:
+                x, y, closing, z_grasp, expected, open_w, adaptive = choice
+                info.update(adaptive)
+                if adaptive.get('blocked'):
+                    reason = 'blocked_by_neighbor: no measured collision-free finger sweep'
         info['z_rel'] = round(z_grasp - table_z, 4)
         det.extra['grasp'] = info
         plan = GraspPlan(
@@ -590,6 +648,108 @@ class GraspPlanner:
         _LOG.debug('grasp %s kind=%s mode=%s closing=%.3f z=%.4f feasible=%s %s', det.label,
                    kind, info['mode'], closing, z_grasp, plan.feasible, plan.reason)
         return plan
+
+    @staticmethod
+    def _sweep_mask(points, closing, x, y, expected, opening):
+        """Observed material in the open-to-contact finger sweep, with 2 mm margin."""
+        points = np.asarray(points, dtype=float).reshape(-1, 2)
+        axis = np.array([math.cos(closing), math.sin(closing)])
+        rel = points - np.array([x, y])
+        along = np.abs(rel @ axis)
+        across = np.abs(rel @ np.array([-axis[1], axis[0]]))
+        return ((across <= FINGER_HALF_BAND + NEIGHBOR_CLEARANCE)
+                & (along >= expected / 2.0 + NEIGHBOR_CLEARANCE)
+                & (along <= opening / 2.0 + FINGER_OUTER + NEIGHBOR_CLEARANCE))
+
+    def _adaptive_neighbor_grasp(self, det, kind, x, y, closing, z, expected,
+                                 opening, points, table_z, top, z_floor):
+        """Search measured local sections; object dimensions and safety checks stay fixed.
+
+        The search changes a tool pose and its opening, never the perceived
+        footprint used for placement. Every candidate retains the original
+        profile contact/taper checks and at least 5 mm clearance per finger.
+        """
+        neighbors = np.asarray(det.extra['_neighbor_xy'], dtype=float).reshape(-1, 2)
+        if not len(neighbors):
+            return None
+        initial_hits = int(np.count_nonzero(
+            self._sweep_mask(neighbors, closing, x, y, expected, opening)))
+        if not initial_hits:
+            return None
+        angles = [0.0]
+        is_block = self.task == 'L1' or det.label in self.block_labels
+        if kind == 'square' or is_block:
+            angles += [math.pi / 2.0]
+        elif kind == 'round':
+            angles += [math.pi / 4.0, -math.pi / 4.0, math.pi / 2.0]
+        elif points is not None:
+            angles += [math.radians(deg) for deg in (-15, 15, -30, 30, -45, 45)]
+        shifts = ((0., .005, -.005)
+                  if kind == 'elongated' and points is not None and not is_block else (0.,))
+        tested = 0
+        best_blocked = (initial_hits, closing, x, y, expected, opening)
+        for delta in angles:
+            a = choose_closing_angle(closing + delta, x, y, math.pi)
+            axis = np.array([math.cos(a), math.sin(a)])
+            for slide in shifts:
+                center = np.array([x, y]) + slide * np.array([-axis[1], axis[0]])
+                if points is not None and kind == 'elongated' and not is_block:
+                    # A banana's cap center can sit inside its bow. Recenter
+                    # each local section from its own observed crest, including
+                    # small corrections which are material near an obstacle.
+                    shift = section_center_shift(points, center, a,
+                                                 table_z + SHIFT_CREST * float(det.height))
+                    if shift is None or abs(shift) > .5 * float(det.width):
+                        continue
+                    center += shift * axis
+                    # Keep the pad near the measured longitudinal center, rather
+                    # than grasping an unsupported tip to get a low collision count.
+                    u = np.asarray(points)[:, :2] @ np.array([-axis[1], axis[0]])
+                    mid = float(np.mean(np.percentile(u, PROFILE_PCT)))
+                    if abs(mid - center @ np.array([-axis[1], axis[0]])) > .007:
+                        continue
+                cx, cy = map(float, center)
+                more = {}
+                if points is not None:
+                    profile = section_profile(points, center, a, table_z, with_support=True)
+                    if profile is None:
+                        continue
+                    cz, width, _, why, more = self._profile_grasp(det, profile, top, z_floor)
+                    if why or cz >= top:
+                        continue
+                    passed = section_width(profile, cz - self.pad_half, float(profile[0][-1]))
+                else:
+                    cz = z
+                    width = float(det.length) if kind == 'square' and delta else expected
+                    passed = width
+                minimal = max(width, passed) + 2.0 * self.finger_clearance
+                if minimal > self.max_width + 1e-9:
+                    continue
+                minimal = min(minimal, self.max_width)
+                tested += 1
+                hits = int(np.count_nonzero(
+                    self._sweep_mask(neighbors, a, cx, cy, width, minimal)))
+                if hits < best_blocked[0]:
+                    best_blocked = (hits, a, cx, cy, width, minimal)
+                if hits:
+                    continue
+                info = dict(more, strategy='narrow_opening' if not delta and not slide
+                            else 'local_section_and_angle',
+                            candidate_count=tested, neighbor_hits_before=initial_hits,
+                            neighbor_hits=0, open_width_min=round(minimal, 4),
+                            closing_adjustment_deg=round(math.degrees(delta), 1),
+                            local_shift_m=round(slide, 4), blockers=[])
+                info['neck'] = bool(more.get('neck'))
+                return cx, cy, a, cz, width, minimal, info
+        _, a, cx, cy, width, minimal = best_blocked
+        blockers = []
+        for item in det.extra.get('_grasp_neighbors', []):
+            if np.any(self._sweep_mask(item['points'], a, cx, cy, width, minimal)):
+                blockers.append({k: item.get(k) for k in ('object_id', 'label', 'center_base')})
+        return x, y, closing, z, expected, opening, {
+            'strategy': 'relocation_required', 'blocked': True, 'candidate_count': tested,
+            'neighbor_hits_before': initial_hits, 'neighbor_hits': best_blocked[0],
+            'blockers': blockers}
 
     def _profile_grasp(self, det: Detection, prof, top: float, z_floor: float):
         """
@@ -1057,6 +1217,7 @@ class PlacePlanner:
         W = float(held.get('width', 0.0) or 0.0)
         L, W = max(L, W), min(L, W)
         elongated = bool(held.get('elongated', False))
+        axis_offset = float(held.get('axis_offset', -math.pi / 2.0))
         grip = float(held.get('grip_width', W) or W)
         open_w = min(self.open_width, grip + RELEASE_OPEN_EXTRA)
         open_min = min(open_w, grip + RELEASE_OPEN_MIN_EXTRA)
@@ -1077,7 +1238,7 @@ class PlacePlanner:
             for k, ax in enumerate(self._axes(zone, x, y, L, W, elongated)):
                 cap = footprint_capsule(x, y, L, W, ax)
                 closing = (neutral_closing_angle(x, y) if ax is None else
-                           choose_closing_angle(ax + math.pi / 2.0, x, y, math.pi))
+                           choose_closing_angle(ax - axis_offset, x, y, math.pi))
                 e = capsule_edge_margin(zone, cap)
                 fp, fg = self._clearance(cap, closing, open_w / 2.0 + FINGER_OUTER
                                          - FINGER_HALF_BAND, finger_floor, occ)
@@ -1110,7 +1271,7 @@ class PlacePlanner:
             if center_only or skip(x, y):
                 x, y = center
             cap = footprint_capsule(x, y, L, W, ax)
-            closing = choose_closing_angle(ax + math.pi / 2.0, x, y, math.pi)
+            closing = choose_closing_angle(ax - axis_offset, x, y, math.pi)
             fp, fg = self._clearance(cap, closing, open_w / 2.0 + FINGER_OUTER - FINGER_HALF_BAND,
                                      finger_floor, occ)
             return done(x, y, ax, closing, capsule_edge_margin(zone, cap), min(fp, fg),
@@ -1275,13 +1436,19 @@ class PlacePlanner:
                     for i in range(-nx, nx + 1) for j in range(-ny, ny + 1)]
             candidates += sorted(grid, key=lambda p: math.hypot(p[0]-center[0], p[1]-center[1]))
         for x, y in candidates:
+            axis_offset = float(held.get('axis_offset', -math.pi / 2.0))
             axes = self._axes(zone, x, y, L, W, bool(held.get('elongated')))
             angles = [(axis, neutral_closing_angle(x, y) if axis is None else
-                       choose_closing_angle(axis + math.pi / 2, x, y, math.pi)) for axis in axes]
+                       choose_closing_angle(axis - axis_offset, x, y, math.pi)) for axis in axes]
             neutral = neutral_closing_angle(x, y)
             for turn in (2, 1, -1, 3):
                 closing = choose_closing_angle(neutral + turn * math.pi / 4, x, y, math.pi)
-                angles.append((closing - math.pi/2 if held.get('elongated') else None, closing))
+                angles.append((closing + axis_offset if held.get('elongated') else None, closing))
+            if '_required_closing' in held:
+                required = float(held['_required_closing'])
+                if not math.isfinite(required):
+                    return None
+                angles = [(required + axis_offset if held.get('elongated') else None, required)]
             for axis, closing in angles:
                 delta = closing - float(held.get('grasp_closing', closing))
                 c, s = math.cos(delta), math.sin(delta)

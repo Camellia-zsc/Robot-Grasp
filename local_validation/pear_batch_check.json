@@ -1,0 +1,278 @@
+{
+  "check": "offline_captured_pear_and_six_object_batch",
+  "ok": true,
+  "verified_at": "2026-11-17T11:58:24+08:00",
+  "verification_timezone": "Asia/Shanghai",
+  "elapsed_seconds": 346.17,
+  "source_head": "d4e3fb7212945144dcdea380ff29bf60c3b215a0",
+  "source_sha256": {
+    "assistant/simulation.py": "d6fd3cf5d86db1f8765e3dbbb7cbf3d113801b2ef65010f0cef0b8e17146dfe2",
+    "assistant/server.py": "64013cc042fb9481e85458070721b61a4674deeb1591e34061353b2a5c6ae8cf",
+    "assistant/observations.py": "5412a9be72310a91408e75cbcd94b918425a98416053df19f5a034cd5af888c5",
+    "assistant/batch.py": "6494115dcd46350e8057f966104a5ae0052d30a0fa31ad34a96be5ca39762b74",
+    "perception/grasp.py": "3be44374c3b9067352dc7722dcc8b9c5728a00a2edff880076b08cbaf1eaec96"
+  },
+  "source_scope": "Hashes captured at the start of this run, before subsequent observation-association and short-sidewall compatibility edits; later source changes are not covered by this run. The final source has a separate captured-pear production regression and related unit-test run.",
+  "source_report_sha256": "2cccfb95745950363d1f064835195c5de3c40e89f40558f3bf2731dd71c747e7",
+  "intent_source": "Fixed local client selecting initial camera-measured IDs once; no online model.",
+  "fixed_intent_client_calls": 1,
+  "paid_api_requested": false,
+  "production_port_8767_touched": false,
+  "recovery_model_requests": 0,
+  "batch": {
+    "status": "complete",
+    "completed": 6,
+    "total": 6
+  },
+  "items": [
+    {
+      "index": 1,
+      "label": "pear",
+      "zone_name": "zone_green",
+      "status": "succeeded",
+      "ok": true,
+      "message": "已将梨子放到绿色区域",
+      "final_zone": "zone_green",
+      "checks": [
+        {
+          "stage": "close",
+          "ok": true,
+          "message": "闭合后检测到夹持",
+          "measured_width_mm": 54.0,
+          "expected_width_mm": 52.264
+        },
+        {
+          "stage": "dropped",
+          "ok": true,
+          "message": "抬升后夹持检查",
+          "measured_width_mm": 53.985
+        },
+        {
+          "stage": "dropped_in_transit",
+          "ok": true,
+          "message": "搬运后夹持检查",
+          "measured_width_mm": 53.985
+        },
+        {
+          "stage": "placement",
+          "ok": true,
+          "message": "已独立核验物品落入指定区域"
+        }
+      ],
+      "controller_ok": true,
+      "holding": false,
+      "fault": false,
+      "aborted": false,
+      "grasp_width_mm": 53.985,
+      "placement": {
+        "success": true,
+        "expected_zone": "zone_green",
+        "actual_zone": "zone_green"
+      }
+    },
+    {
+      "index": 2,
+      "label": "green",
+      "zone_name": "zone_green",
+      "status": "succeeded",
+      "ok": true,
+      "message": "已将绿色方块放到绿色区域",
+      "final_zone": "zone_green",
+      "checks": [
+        {
+          "stage": "close",
+          "ok": true,
+          "message": "闭合后检测到夹持",
+          "measured_width_mm": 50.9,
+          "expected_width_mm": 50.709
+        },
+        {
+          "stage": "dropped",
+          "ok": true,
+          "message": "抬升后夹持检查",
+          "measured_width_mm": 50.933
+        },
+        {
+          "stage": "dropped_in_transit",
+          "ok": true,
+          "message": "搬运后夹持检查",
+          "measured_width_mm": 50.933
+        },
+        {
+          "stage": "placement",
+          "ok": true,
+          "message": "已独立核验物品落入指定区域"
+        }
+      ],
+      "controller_ok": true,
+      "holding": false,
+      "fault": false,
+      "aborted": false,
+      "grasp_width_mm": 50.933,
+      "placement": {
+        "success": true,
+        "expected_zone": "zone_green",
+        "actual_zone": "zone_green"
+      }
+    },
+    {
+      "index": 3,
+      "label": "yellow",
+      "zone_name": "zone_yellow",
+      "status": "succeeded",
+      "ok": true,
+      "message": "已将黄色方块放到黄色区域",
+      "final_zone": "zone_yellow",
+      "checks": [
+        {
+          "stage": "close",
+          "ok": true,
+          "message": "闭合后检测到夹持",
+          "measured_width_mm": 48.1,
+          "expected_width_mm": 45.483
+        },
+        {
+          "stage": "dropped",
+          "ok": true,
+          "message": "抬升后夹持检查",
+          "measured_width_mm": 48.125
+        },
+        {
+          "stage": "dropped_in_transit",
+          "ok": true,
+          "message": "搬运后夹持检查",
+          "measured_width_mm": 48.125
+        },
+        {
+          "stage": "placement",
+          "ok": true,
+          "message": "已独立核验物品落入指定区域"
+        }
+      ],
+      "controller_ok": true,
+      "holding": false,
+      "fault": false,
+      "aborted": false,
+      "grasp_width_mm": 48.125,
+      "placement": {
+        "success": true,
+        "expected_zone": "zone_yellow",
+        "actual_zone": "zone_yellow"
+      }
+    },
+    {
+      "index": 4,
+      "label": "apple",
+      "zone_name": "zone_red",
+      "status": "skipped",
+      "ok": true,
+      "message": "实测完整足迹已在指定区域，无需搬运",
+      "final_zone": "zone_red",
+      "checks": [],
+      "skipped": true,
+      "pose_unchanged": true,
+      "observed_complete_footprint_in_zone": true
+    },
+    {
+      "index": 5,
+      "label": "red",
+      "zone_name": "zone_red",
+      "status": "succeeded",
+      "ok": true,
+      "message": "已将红色方块放到红色区域",
+      "final_zone": "zone_red",
+      "checks": [
+        {
+          "stage": "close",
+          "ok": true,
+          "message": "闭合后检测到夹持",
+          "measured_width_mm": 50.5,
+          "expected_width_mm": 50.236
+        },
+        {
+          "stage": "dropped",
+          "ok": true,
+          "message": "抬升后夹持检查",
+          "measured_width_mm": 50.469
+        },
+        {
+          "stage": "dropped_in_transit",
+          "ok": true,
+          "message": "搬运后夹持检查",
+          "measured_width_mm": 50.469
+        },
+        {
+          "stage": "placement",
+          "ok": true,
+          "message": "已独立核验物品落入指定区域"
+        }
+      ],
+      "controller_ok": true,
+      "holding": false,
+      "fault": false,
+      "aborted": false,
+      "grasp_width_mm": 50.469,
+      "placement": {
+        "success": true,
+        "expected_zone": "zone_red",
+        "actual_zone": "zone_red"
+      }
+    },
+    {
+      "index": 6,
+      "label": "banana",
+      "zone_name": "zone_yellow",
+      "status": "succeeded",
+      "ok": true,
+      "message": "已将香蕉放到黄色区域",
+      "final_zone": "zone_yellow",
+      "checks": [
+        {
+          "stage": "close",
+          "ok": true,
+          "message": "闭合后检测到夹持",
+          "measured_width_mm": 41.3,
+          "expected_width_mm": 51.766
+        },
+        {
+          "stage": "dropped",
+          "ok": true,
+          "message": "抬升后夹持检查",
+          "measured_width_mm": 41.281
+        },
+        {
+          "stage": "dropped_in_transit",
+          "ok": true,
+          "message": "搬运后夹持检查",
+          "measured_width_mm": 41.281
+        },
+        {
+          "stage": "placement",
+          "ok": true,
+          "message": "已独立核验物品落入指定区域"
+        }
+      ],
+      "controller_ok": true,
+      "holding": false,
+      "fault": false,
+      "aborted": false,
+      "grasp_width_mm": 41.281,
+      "placement": {
+        "success": true,
+        "expected_zone": "zone_yellow",
+        "actual_zone": "zone_yellow"
+      }
+    }
+  ],
+  "apple_skipped": true,
+  "apple_pose_unchanged": true,
+  "final_zones": {
+    "yellow": "zone_yellow",
+    "green": "zone_green",
+    "red": "zone_red",
+    "pear": "zone_green",
+    "banana": "zone_yellow",
+    "apple": "zone_red"
+  },
+  "final_held_object": null
+}

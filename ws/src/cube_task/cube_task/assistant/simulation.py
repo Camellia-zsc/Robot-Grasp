@@ -553,7 +553,7 @@ class SimulationSession:
         self._emit('execution_result', summary)
         return summary
 
-    def prepare_recovery(self, failure, goal, attempt, history):
+    def prepare_recovery(self, failure, goal, attempt, history, reference_xy=None, completed_zones=()):
         """Offer goal-preserving local repairs, observing without moving a held cube."""
         with self._operation_lock:
             self._check_open()
@@ -593,6 +593,9 @@ class SimulationSession:
                 observations = scene['objects']
                 matches = [o for o in observations if o.get('valid') and
                            o.get('label') == goal['label']]
+                if reference_xy is not None:
+                    from .batch import matching_objects
+                    matches = matching_objects(scene, goal['label'], reference_xy, completed_zones)
                 if len(matches) == 1:
                     target = matches[0]
                     self._recovery_retry = {

@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from .batch import bind_item, build_items, idle_batch, whole_footprint_in_zone
+
 _LOG = logging.getLogger(__name__)
 STATIC = Path(__file__).with_name('static')
 
@@ -49,6 +51,7 @@ class DashboardController:
         self._events = deque(maxlen=160)
         self._next_id = 0
         self._last_result = None
+        self._batch = idle_batch()
         self._speed = 1.0
         self._needs_reset = False
         self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
@@ -116,6 +119,7 @@ class DashboardController:
                         for message in self._messages:
                             if message.get('status') == 'streaming':
                                 message['status'] = 'cancelled' if cancelled else 'error'
+                        self._end_batch_on_error(cancelled, self._stage)
                         if self._session is not None:
                             sim = self._session.snapshot()
                             if sim.get('status') == 'stopped':
@@ -141,6 +145,7 @@ class DashboardController:
             self._preview = None
             self._scene = {}
             self._needs_reset = True
+            self._batch = idle_batch()
             self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
                               'reason': '', 'message': '', 'history': []}
         if previous_preview is not None:
@@ -201,6 +206,7 @@ class DashboardController:
                     raise RuntimeError('布局调整已停止')
                 self._scene = scene
                 self._last_result = None
+                self._batch = idle_batch()
                 self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
                                   'reason': '', 'message': '', 'history': []}
                 self._error = ''
@@ -234,6 +240,7 @@ class DashboardController:
                                        'content': instruction, 'status': 'complete'})
                 self._messages = self._messages[-60:]
                 self._last_result = None
+                self._batch = idle_batch()
                 self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
                                   'reason': '', 'message': '', 'history': []}
                 self._metrics['requests'] += 1
@@ -270,6 +277,9 @@ class DashboardController:
                 reply['decision'] = decision
                 self._last_usage = copy.deepcopy(getattr(self._client, 'last_usage', {}))
             self._event('decision', {'message': decision['message'], 'decision': decision})
+            if decision['action'] == 'pick_batch':
+                self._execute_batch(instruction, decision, scene)
+                return
             if decision['action'] != 'pick':
                 with self._lock:
                     if self._cancel.is_set():
@@ -309,7 +319,133 @@ class DashboardController:
 
         self._launch(run, 'observing', '正在开始任务')
 
-    def _recover_task(self, instruction, goal, initial_result):
+    def _end_batch_on_error(self, cancelled, message):
+        """Called under the controller lock, including unexpected worker failures."""
+        if self._batch['status'] != 'running':
+            return
+        self._batch.update(status='stopped' if cancelled else 'failed', message=message)
+        for item in self._batch['items']:
+            if item['status'] not in ('succeeded', 'skipped', 'failed'):
+                active_failure = not cancelled and item['index'] == self._batch['current_index']
+                item.update(status='failed' if active_failure else 'cancelled',
+                            message=message if active_failure else '任务已停止' if cancelled else '前序任务未完成')
+        sim = self._session.snapshot() if self._session is not None else {}
+        self._last_result = self._batch_result(False, {'holding': bool(sim.get('held_object')),
+                                                      'aborted': cancelled, 'fault': not cancelled})
+        if not cancelled:
+            self._needs_reset = True
+
+    def _batch_result(self, ok, result=None):
+        return dict(result or {}, ok=bool(ok), batch=True,
+                    completed=self._batch['completed'], total=self._batch['total'],
+                    items=copy.deepcopy(self._batch['items']), message=self._batch['message'])
+
+    def _execute_batch(self, instruction, decision, initial_scene):
+        items = build_items(decision, initial_scene)
+        with self._lock:
+            self._batch = dict(status='running', total=len(items), completed=0,
+                               current_index=None, items=items, message='按顺序逐件抓放')
+        previous_version = None
+        need_scan = False
+        last_result = {}
+        for item in items:
+            if self._cancel.is_set():
+                raise RuntimeError('任务已停止')
+            with self._lock:
+                self._batch['current_index'] = item['index']
+                self._batch['message'] = '正在处理第 %d/%d 件物品' % (item['index'], len(items))
+                item.update(status='observing', message='正在根据最新观测确认目标')
+            self._set_status('observing', '正在确认第 %d/%d 件物品' % (item['index'], len(items)))
+            moving = False
+            try:
+                scene = self._session.scene
+                if need_scan and (last_result.get('observation_error')
+                                  or scene.get('scene_version') == previous_version):
+                    moving = True
+                    scene = self._session.observe()
+                    moving = False
+                if self._cancel.is_set():
+                    raise RuntimeError('任务已停止')
+                with self._lock:
+                    self._scene = scene
+                completed_zones = tuple(dict.fromkeys(
+                    done['zone_name'] for done in items[:item['index'] - 1]
+                    if done['label'] == item['label'] and done['status'] in ('succeeded', 'skipped')))
+                single, target = bind_item(item, scene, completed_zones)
+                with self._lock:
+                    item['object_id'] = single['object_id']
+                if whole_footprint_in_zone(target, scene, item['zone_name']):
+                    last_result = {'ok': True, 'skipped': True, 'observed_in_zone': True,
+                                   'message': '实测完整足迹已在指定区域，无需搬运'}
+                    need_scan = False
+                    final_status = 'skipped'
+                else:
+                    with self._lock:
+                        item.update(status='executing', message='正在抓取并放到指定区域')
+                        self._status = 'executing'
+                        self._stage = '正在执行第 %d/%d 件物品' % (item['index'], len(items))
+                        self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
+                                          'reason': '', 'message': '', 'history': []}
+                    self._event('batch_item_start', {'message': self._stage, 'index': item['index']})
+                    previous_version = single['scene_version']
+                    moving = True
+                    last_result = self._session.execute(single, cancel_event=self._cancel)
+                    if self._cancel.is_set():
+                        raise RuntimeError('任务已停止')
+                    with self._lock:
+                        self._last_result = last_result
+                        self._scene = self._session.scene
+                    if (not last_result.get('ok') and not last_result.get('aborted')
+                            and not (last_result.get('truth') or {}).get('success')):
+                        with self._lock:
+                            item.update(status='recovering', message='正在恢复本件任务')
+                        goal = {'label': item['label'], 'zone_name': item['zone_name']}
+                        last_result = self._recover_task(instruction, goal, last_result,
+                                                         reference_xy=item['reference_xy'],
+                                                         completed_zones=completed_zones)
+                    elif not last_result.get('ok') and (last_result.get('truth') or {}).get('success'):
+                        last_result = dict(last_result, fault=True,
+                                           message='本件已落位，但机械臂后续动作异常，已停止后续任务')
+                    need_scan = True
+                    final_status = 'succeeded' if last_result.get('ok') else 'failed'
+            except ValueError as exc:
+                last_result = {'ok': False, 'error': 'batch_target_unavailable', 'message': str(exc)}
+                if moving:
+                    last_result.update(fault=True, holding=bool(self._session.snapshot().get('held_object')))
+                final_status = 'failed'
+            if self._cancel.is_set():
+                raise RuntimeError('任务已停止')
+            with self._lock:
+                item.update(status=final_status, message=last_result.get('message', ''),
+                            result=copy.deepcopy(last_result))
+                self._scene = self._session.scene
+                if last_result.get('ok'):
+                    self._batch['completed'] += 1
+                else:
+                    self._batch.update(status='failed', message='已完成 %d/%d 件；%s' % (
+                        self._batch['completed'], len(items), item['message']))
+                    for pending in items[item['index']:]:
+                        pending.update(status='cancelled', message='前序任务未完成，不再执行')
+                    break
+            self._event('batch_item_result', {'index': item['index'], 'ok': last_result.get('ok'),
+                                             'message': item['message']})
+        with self._lock:
+            if self._cancel.is_set():
+                raise RuntimeError('任务已停止')
+            ok = self._batch['completed'] == len(items)
+            if ok:
+                self._batch.update(status='complete', message='已依次完成 %d/%d 件物品任务' % (len(items), len(items)))
+                self._metrics['successes'] += 1
+            if last_result.get('holding') or last_result.get('aborted') or last_result.get('fault'):
+                self._needs_reset = True
+            self._last_result = self._batch_result(ok, last_result)
+            self._status = 'complete' if ok else 'error'
+            self._stage = self._batch['message']
+            if not ok:
+                self._error = self._stage
+        self._event('result', {'message': self._stage, 'result': self._last_result})
+
+    def _recover_task(self, instruction, goal, initial_result, reference_xy=None, completed_zones=()):
         """Ask the real model to select bounded local repairs, checking every result."""
         from .recovery import MAX_RECOVERY_ATTEMPTS, validate_recovery_decision
 
@@ -334,7 +470,14 @@ class DashboardController:
                                     (attempt, MAX_RECOVERY_ATTEMPTS)})
             reply = None
             try:
-                context = self._session.prepare_recovery(result, goal, attempt, history)
+                if reference_xy is None:
+                    context = self._session.prepare_recovery(result, goal, attempt, history)
+                else:
+                    identity = {'reference_xy': reference_xy}
+                    if completed_zones:
+                        identity['completed_zones'] = completed_zones
+                    context = self._session.prepare_recovery(result, goal, attempt, history,
+                                                              **identity)
                 if self._cancel.is_set():
                     raise RuntimeError('任务已停止')
                 with self._lock:
@@ -398,6 +541,10 @@ class DashboardController:
                     with self._lock:
                         self._recovery.update(status='succeeded', message='恢复后已通过落位核验')
                     return dict(result, recovery_history=history)
+                if reference_xy is not None and (result.get('truth') or {}).get('success'):
+                    result = dict(result, fault=True)
+                    reason = '本件已落位，但机械臂后续动作异常，已停止后续任务'
+                    break
                 if result.get('aborted'):
                     raise RuntimeError('任务已停止')
                 if result.get('stage') == 'plan':
@@ -465,6 +612,7 @@ class DashboardController:
                      'messages': copy.deepcopy(self._messages),
                      'events': copy.deepcopy(list(self._events)),
                      'last_result': copy.deepcopy(self._last_result)}
+            state['batch'] = copy.deepcopy(self._batch)
             state['simulation'] = session.snapshot() if session is not None else {}
             editor = state['simulation'].setdefault('editor', {})
             editor['editable'] = bool(

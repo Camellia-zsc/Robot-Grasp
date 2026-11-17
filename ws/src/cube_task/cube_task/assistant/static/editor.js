@@ -4,7 +4,7 @@
 window.SceneEditor=(()=>{
   const byId=id=>document.getElementById(id);
   const map=byId("editor-canvas"),wrap=byId("editor-map-wrap"),ctx=map.getContext("2d");
-  const editor={state:null,mode:"edit",destination:null,destinationVersion:null,placeHover:null,selected:null,chosen:null,drag:null,ghost:null,pending:false,pendingVersion:null,accepted:false,width:420,height:280,scale:350,center:[.3,0],catalogSignature:"",library:new Map(),yawEditing:false};
+  const editor={state:null,mode:"edit",destination:null,destinationVersion:null,placeHover:null,selected:null,chosen:null,drag:null,ghost:null,pending:false,pendingVersion:null,accepted:false,interventionPending:false,interventionVersion:null,interventionRequestId:null,width:420,height:280,scale:350,center:[.3,0],catalogSignature:"",library:new Map(),yawEditing:false};
   const icons={red:"■",green:"■",yellow:"■",apple:"🍎",banana:"🍌",pear:"🍐"};
   const safeNumber=(v,fallback=0)=>Number.isFinite(Number(v))?Number(v):fallback;
   const objects=()=>Array.isArray(editor.state?.simulation?.objects)?editor.state.simulation.objects:[];
@@ -21,7 +21,10 @@ window.SceneEditor=(()=>{
     const radius=bounds.r_max??Infinity;
     return {...bounds,x:[Math.max(bounds.x[0],table?.x?.[0]??-Infinity,-radius),Math.min(bounds.x[1],table?.x?.[1]??Infinity,radius)],y:[Math.max(bounds.y[0],table?.y?.[0]??-Infinity,-radius),Math.min(bounds.y[1],table?.y?.[1]??Infinity,radius)]};
   }
-  const canEdit=()=>Boolean(editor.state&&config().editable&&!editor.state.busy&&!editor.state.needs_reset&&!editor.pending&&!ui.pending&&ui.connected&&!editor.state.simulation?.held_object);
+  const canEdit=()=>Boolean(editor.state&&config().editable&&!editor.state.busy&&!editor.state.needs_reset&&!editor.pending&&!editor.interventionPending&&!ui.pending&&ui.connected&&!editor.state.simulation?.held_object);
+  const canIntervene=()=>Boolean(editor.state&&config().intervention_available&&!editor.state.needs_reset&&!editor.pending&&!editor.interventionPending&&ui.connected);
+  const canOperate=()=>editor.mode==="intervene"?canIntervene():canEdit();
+  const movable=object=>object&&!object.held&&String(object.id)!==String(editor.state?.simulation?.held_object);
   const exists=entry=>objects().some(object=>object.label===entry.label);
   const project=point=>[editor.width/2+(point[0]-editor.center[0])*editor.scale,editor.height/2-(point[1]-editor.center[1])*editor.scale];
   const unproject=(x,y)=>[editor.center[0]+(x-editor.width/2)/editor.scale,editor.center[1]-(y-editor.height/2)/editor.scale];
@@ -41,12 +44,12 @@ window.SceneEditor=(()=>{
       &&(bounds.r_min==null||radius>=bounds.r_min+margin)&&(bounds.r_max==null||radius<=bounds.r_max-margin);
   }
   function chooseMode(mode){
-    if(!canEdit()||(mode==="place"&&!placement().bounds))return;
+    if(!(mode==="intervene"?canIntervene():canEdit())||(mode==="place"&&!placement().bounds))return;
     editor.mode=mode;editor.selected=null;editor.chosen=null;editor.drag=null;editor.ghost=null;editor.placeHover=null;editor.yawEditing=false;
-    setError("");setHint(mode==="place"?"点击桌面选择落点，再发送“把苹果放到选定位置”等指令。点选不会直接移动物品。":"编辑模式会直接更新摆场。抓放搬运请使用选择放置点和语言指令。");controls();draw();
+    setError("");setHint(mode==="intervene"?"拖动或旋转未夹持物品，模拟现场变化。操作将在仿真步间生效，机械臂随后通过相机确认；不改变原任务。":mode==="place"?"点击桌面选择落点，再发送“把苹果放到选定位置”等指令。点选不会直接移动物品。":"编辑模式会直接更新摆场。抓放搬运请使用选择放置点和语言指令。");controls();draw();
   }
   function controls(){
-    const available=canEdit(),editing=editor.mode==="edit",object=selected();
+    const available=canEdit(),editing=editor.mode==="edit",intervening=editor.mode==="intervene",operable=canOperate(),object=selected();
     for(const entry of entries()){
       const button=editor.library.get(String(entry.id));if(!button)continue;
       const present=exists(entry),full=objects().length>=safeNumber(config().max_objects,6);
@@ -57,20 +60,21 @@ window.SceneEditor=(()=>{
     }
     byId("editor-delete").disabled=!available||!editing||!object;
     byId("editor-clear").disabled=!available||!editing||objects().length===0;
-    byId("editor-yaw").disabled=!available||!editing||!object;
+    byId("editor-yaw").disabled=!operable||(!editing&&!intervening)||!object||(intervening&&!movable(object));
     byId("editor-mode-edit").disabled=!available;
     byId("editor-mode-place").disabled=!available||!placement().bounds;
-    for(const mode of ["edit","place"]){const button=byId(`editor-mode-${mode}`);button.classList.toggle("active",editor.mode===mode);button.setAttribute("aria-pressed",String(editor.mode===mode));}
+    byId("editor-mode-intervene").disabled=!canIntervene();
+    for(const mode of ["edit","place","intervene"]){const button=byId(`editor-mode-${mode}`);button.classList.toggle("active",editor.mode===mode);button.setAttribute("aria-pressed",String(editor.mode===mode));}
     byId("editor-destination-clear").disabled=!available||!editor.destination;
     byId("editor-destination-info").textContent=editor.destination?`选定桌面点 · X ${editor.destination[0].toFixed(3)} / Y ${editor.destination[1].toFixed(3)} m` :"未选择放置点 · 也可直接说“放回抓取区”";
     byId("editor-selected-name").textContent=object?displayLabel(object.label):editor.chosen?entries().find(entry=>String(entry.id)===editor.chosen)?.name||"待放置物品":"未选中物品";
     byId("editor-selected-position").textContent=object?`X ${position(object)[0].toFixed(3)} · Y ${position(object)[1].toFixed(3)} m`:editor.chosen?"在虚线抓取区内点击放置":"点击或拖动物体";
     if(!editor.yawEditing){const degrees=object?Math.round(safeNumber(object.yaw)*180/Math.PI):0;byId("editor-yaw").value=Math.max(-180,Math.min(180,degrees));byId("editor-yaw-value").textContent=`${degrees}°`;}
     byId("editor-count").textContent=`${objects().length} / ${safeNumber(config().max_objects,6)} 件 · 每类最多一件`;
-    const locked=!available;
+    const locked=!operable;
     byId("editor-lock").hidden=!locked;
-    byId("editor-lock").querySelector("span").textContent=editor.pending?"正在更新摆场…":editor.state?.busy?"任务运行中，摆场已锁定":editor.state?.simulation?.held_object?"夹持物体时不能编辑":editor.state?.needs_reset?"请先重置场景":!ui.connected?"等待服务连接":"正在准备可编辑场景";
-    map.classList.toggle("editor-editable",available&&editing);map.classList.toggle("editor-placing",available&&!editing);map.setAttribute("aria-disabled",String(!available));
+    byId("editor-lock").querySelector("span").textContent=editor.interventionPending?"干预已排队，等待仿真步间生效…":editor.pending?"正在更新摆场…":editor.state?.busy?"任务运行中；可切换“运行中干预”移动物品":editor.state?.simulation?.held_object?"夹持物体时不能编辑摆场，可干预其他物品":editor.state?.needs_reset?"请先重置场景":!ui.connected?"等待服务连接":"正在准备可编辑场景";
+    map.classList.toggle("editor-editable",operable&&(editing||intervening));map.classList.toggle("editor-placing",operable&&editor.mode==="place");map.classList.toggle("editor-intervening",intervening);map.setAttribute("aria-disabled",String(!operable));
   }
   function buildLibrary(){
     const signature=JSON.stringify(entries());if(signature===editor.catalogSignature)return;
@@ -91,6 +95,7 @@ window.SceneEditor=(()=>{
     byId("object-library").replaceChildren(...nodes);
   }
   async function edit(action,fields={}){
+    if(editor.mode==="intervene")return intervene(action,fields);
     if(!canEdit()||editor.mode!=="edit")return;
     clearDestination();
     editor.pending=true;editor.pendingVersion=version();editor.accepted=false;ui.pending=true;setError("");controls();updateControls();
@@ -101,6 +106,19 @@ window.SceneEditor=(()=>{
       renderState(await api("/api/state"));
     }catch(error){editor.pending=false;editor.accepted=false;ui.pending=false;setError(error.message);setHint("修改未完成，请检查提示后重新摆放。");}
     finally{controls();updateControls();draw();}
+  }
+  async function intervene(action,fields){
+    if(!canIntervene()||action!=="move")return;
+    const object=objects().find(item=>String(item.id)===String(fields.object_id));
+    if(!movable(object)){setError("机械臂夹持中的物品不能移动；请选择其他物品。");return;}
+    clearDestination();editor.interventionPending=true;editor.interventionVersion=version();editor.interventionRequestId=null;setError("");controls();
+    try{
+      const result=await api("/api/scene-intervene",{scene_version:editor.interventionVersion,action,...fields});
+      editor.interventionRequestId=result.request_id??null;editor.ghost=null;editor.drag=null;
+      setHint(result.queued===false?"干预已生效；后续动作将通过相机局部确认变化。":"干预已排队，将在仿真步间生效；原抓取任务继续执行。");
+      renderState(await api("/api/state"));
+    }catch(error){editor.interventionPending=false;setError(error.message);setHint("干预未完成，原任务继续执行；请查看提示后重试。");}
+    finally{controls();draw();}
   }
   function polygon(points,fill,stroke,width=1,dash=[]){
     if(!points.length)return;ctx.beginPath();points.map(project).forEach((point,index)=>index?ctx.lineTo(...point):ctx.moveTo(...point));ctx.closePath();
@@ -170,7 +188,7 @@ window.SceneEditor=(()=>{
     return [...objects()].reverse().find(object=>{const p=object.center||[...position(object),0],s=window.RobotGeometry.dimensions(object);return Math.abs(xy[0]-p[0])<=Math.max(s[0]/2,.014)&&Math.abs(xy[1]-p[1])<=Math.max(s[1]/2,.014);});
   }
   map.addEventListener("pointerdown",event=>{
-    if(!canEdit()||event.button!==0)return;map.focus();const xy=pointer(event);setError("");
+    if(!canOperate()||event.button!==0)return;map.focus();const xy=pointer(event);setError("");
     if(editor.mode==="place"){
       const point=xy.map(value=>Math.round(value*10000)/10000);
       if(!pointAllowed(point)){clearDestination();setError("该点超出可选桌面范围，请在范围内重新选择。");return;}
@@ -178,13 +196,14 @@ window.SceneEditor=(()=>{
       setHint("放置点已选好。发送“把苹果放到选定位置”等指令后，机械臂会检查空间并执行。");controls();draw();return;
     }
     const object=hit(xy);
+    if(editor.mode==="intervene"&&object&&!movable(object)){setError("机械臂夹持中的物品不能移动；请选择其他物品。");return;}
     if(object){editor.selected=String(object.id);editor.chosen=null;const p=position(object);editor.drag={objectId:String(object.id),object,start:xy,offset:[p[0]-xy[0],p[1]-xy[1]],xy:p,yaw:safeNumber(object.yaw),moved:false};map.setPointerCapture(event.pointerId);setHint(`已选中${displayLabel(object.label)}，拖动调整位置或使用右侧朝向。`);}
-    else if(editor.chosen){const chosen=editor.chosen;edit("add",{catalog_id:chosen,xy,yaw:0});}
-    else{editor.selected=null;setHint("拖动物品库卡片到抓取区，或点击已有物体移动。");}
+    else if(editor.chosen&&editor.mode==="edit"){const chosen=editor.chosen;edit("add",{catalog_id:chosen,xy,yaw:0});}
+    else{editor.selected=null;setHint(editor.mode==="intervene"?"请选择桌上未被夹持的物品，拖动或旋转以模拟变化。":"拖动物品库卡片到抓取区，或点击已有物体移动。");}
     controls();draw();
   });
   map.addEventListener("pointermove",event=>{
-    if(!canEdit())return;const xy=pointer(event);
+    if(!canOperate())return;const xy=pointer(event);
     if(editor.mode==="place"){editor.placeHover=xy;draw();return;}
     if(editor.drag){const drag=editor.drag;drag.xy=[xy[0]+drag.offset[0],xy[1]+drag.offset[1]];drag.moved=drag.moved||Math.hypot(xy[0]-drag.start[0],xy[1]-drag.start[1])>.002;editor.ghost={object:drag.object,xy:drag.xy,yaw:drag.yaw};draw();}
     else if(editor.chosen){editor.ghost={xy};draw();}
@@ -203,19 +222,20 @@ window.SceneEditor=(()=>{
     edit("add",{catalog_id:catalogId,xy:pointer(event),yaw:0});
   });
   byId("editor-yaw").addEventListener("input",event=>{
-    const object=selected();if(!canEdit()||!object)return;editor.yawEditing=true;const degrees=safeNumber(event.target.value);byId("editor-yaw-value").textContent=`${degrees}°`;editor.ghost={object,xy:position(object),yaw:degrees*Math.PI/180};draw();
+    const object=selected();if(!canOperate()||!object||(editor.mode==="intervene"&&!movable(object)))return;editor.yawEditing=true;const degrees=safeNumber(event.target.value);byId("editor-yaw-value").textContent=`${degrees}°`;editor.ghost={object,xy:position(object),yaw:degrees*Math.PI/180};draw();
   });
   byId("editor-yaw").addEventListener("change",event=>{const object=selected();editor.yawEditing=false;editor.ghost=null;if(object)edit("move",{object_id:String(object.id),xy:position(object),yaw:safeNumber(event.target.value)*Math.PI/180});});
   byId("editor-delete").addEventListener("click",()=>{const object=selected();if(object)edit("remove",{object_id:String(object.id)});});
   byId("editor-clear").addEventListener("click",()=>edit("clear"));
   byId("editor-mode-edit").addEventListener("click",()=>chooseMode("edit"));
   byId("editor-mode-place").addEventListener("click",()=>chooseMode("place"));
+  byId("editor-mode-intervene").addEventListener("click",()=>chooseMode("intervene"));
   byId("editor-destination-clear").addEventListener("click",()=>{if(canEdit()){clearDestination();setHint("已取消放置点，可以重新选择或直接指定区域。");}});
   map.addEventListener("keydown",event=>{
-    if(event.key==="Escape"&&canEdit()){editor.chosen=null;editor.selected=null;editor.ghost=null;editor.drag=null;clearDestination();return;}
-    if(editor.mode!=="edit")return;
-    const object=selected();if(!canEdit()||!object)return;
-    if(event.key==="Delete"||event.key==="Backspace"){event.preventDefault();edit("remove",{object_id:String(object.id)});return;}
+    if(event.key==="Escape"&&canOperate()){editor.chosen=null;editor.selected=null;editor.ghost=null;editor.drag=null;clearDestination();return;}
+    if(editor.mode!=="edit"&&editor.mode!=="intervene")return;
+    const object=selected();if(!canOperate()||!object||(editor.mode==="intervene"&&!movable(object)))return;
+    if(event.key==="Delete"||event.key==="Backspace"){if(editor.mode==="edit"){event.preventDefault();edit("remove",{object_id:String(object.id)});}return;}
     const deltas={ArrowLeft:[-.005,0],ArrowRight:[.005,0],ArrowUp:[0,.005],ArrowDown:[0,-.005]},delta=deltas[event.key];
     if(delta){event.preventDefault();const p=position(object);edit("move",{object_id:String(object.id),xy:[p[0]+delta[0],p[1]+delta[1]],yaw:safeNumber(object.yaw)});}
   });
@@ -223,6 +243,14 @@ window.SceneEditor=(()=>{
   new ResizeObserver(resize).observe(wrap);
   function update(state){
     editor.state=state;
+    if(editor.interventionPending){
+      const completion=(state.events||[]).findLast(event=>["scene_intervention_applied","scene_intervention_rejected"].includes(event.kind)&&editor.interventionRequestId!=null&&event.request_id===editor.interventionRequestId);
+      if(completion||state.needs_reset){
+        editor.interventionPending=false;editor.interventionRequestId=null;
+        if(completion?.kind==="scene_intervention_rejected")setError(completion.message||"干预未生效，请重新选择位置。");
+        setHint(state.needs_reset?"任务已停止，请先重置场景。":completion?.message||"干预已生效；后续动作将通过相机局部确认变化。");
+      }
+    }
     if(editor.destination&&(state.needs_reset||(!state.busy&&editor.destinationVersion!==sceneVersion()))){clearDestination();setHint("场景已更新，原放置点已清除；需要时请重新点选。");}
     if(editor.pending&&editor.accepted&&(version()!==editor.pendingVersion||!state.busy)){
       editor.pending=false;editor.accepted=false;ui.pending=false;
@@ -232,7 +260,7 @@ window.SceneEditor=(()=>{
     }
     if(editor.selected&&!selected())editor.selected=null;
     if(editor.chosen){const entry=entries().find(item=>String(item.id)===editor.chosen);if(!entry||exists(entry)||objects().length>=safeNumber(config().max_objects,6)){editor.chosen=null;editor.ghost=null;}}
-    if(state.busy&&!editor.pending){editor.drag=null;editor.ghost=null;editor.placeHover=null;editor.yawEditing=false;}
+    if(state.busy&&!editor.pending&&editor.mode!=="intervene"){editor.drag=null;editor.ghost=null;editor.placeHover=null;editor.yawEditing=false;}
     buildLibrary();controls();draw();
   }
   resize();

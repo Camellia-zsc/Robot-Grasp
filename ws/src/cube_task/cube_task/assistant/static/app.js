@@ -180,7 +180,7 @@ function renderMessages(state){
   });
   for(const [key,node] of ui.messageNodes)if(!activeKeys.has(key)){node.remove();ui.messageNodes.delete(key);}
   for(const event of Array.isArray(state.events)?state.events:[]){
-    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted"].includes(event.kind)||!event.message)continue;
+    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected"].includes(event.kind)||!event.message)continue;
     if(["decision","recovery_result"].includes(event.kind)&&messages.some(message=>message.role==="assistant"&&assistantText(message,String(message.content??message.text??""),false)===event.message))continue;
     const key=String(event.id??event.seq??`${event.time}-${event.message}`);
     if(ui.eventNodes.has(key))continue;

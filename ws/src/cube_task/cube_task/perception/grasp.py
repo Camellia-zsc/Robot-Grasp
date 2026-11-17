@@ -555,6 +555,19 @@ class GraspPlanner:
         else:
             z_grasp, expected, open_w, reason, more = self._profile_grasp(
                 det, prof, top, z_floor)
+            if reason and kind == 'square':
+                # One visible face can lie outside the neutral axis's local
+                # section, leaving only cap points there. Try the other square
+                # face pair with its own measured support and neighbor checks.
+                alt = choose_closing_angle(closing + math.pi / 2.0, x, y, math.pi)
+                alt_prof = section_profile(pts, (x, y), alt, table_z, with_support=True)
+                if alt_prof is not None:
+                    alt_z, alt_width, alt_open, alt_reason, alt_more = self._profile_grasp(
+                        det, alt_prof, top, z_floor)
+                    if not alt_reason and self.finger_hits(det, alt, x, y, alt_width) == 0:
+                        closing = alt
+                        z_grasp, expected, open_w = alt_z, alt_width, alt_open
+                        reason, more = alt_reason, alt_more
             info.update(more)
         if self._opens_full(det.label):
             open_w = self.max_width

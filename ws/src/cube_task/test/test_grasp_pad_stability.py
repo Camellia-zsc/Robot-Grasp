@@ -4,6 +4,7 @@ import math
 import numpy as np
 import pytest
 
+from cube_task.core.transforms import closing_angle_of
 from cube_task.perception.grasp import GraspPlanner
 from test_task_fakes import make_cfg, make_det
 
@@ -106,6 +107,53 @@ def test_four_isolated_rings_are_not_a_continuous_short_sidewall():
     # those samples is missing for 4.8 mm inside both bins.
     det, plan = _plan([0., .010], [.030, .030], top=.010, min_depth=.008,
                       observed_heights=[.0001, .0049, .0051, .0099])
+
+    assert not plan.feasible
+    assert 'dome' in plan.reason
+
+
+def _partly_observed_square(*, sidewall=True, blocked=False):
+    # An overhead RGB-D view sees the cap and one face. The neutral closing
+    # axis slices through the cap only; the perpendicular pair sees the wall.
+    xy = np.linspace(-.024, .024, 49)
+    xx, yy = np.meshgrid(xy, xy)
+    cap = np.column_stack((.30 + xx.ravel(), yy.ravel(),
+                           np.full(xx.size, .048)))
+    cloud = cap
+    if sidewall:
+        yy, zz = np.meshgrid(xy, np.linspace(.008, .048, 161))
+        wall = np.column_stack((np.full(yy.size, .324), yy.ravel(), zz.ravel()))
+        cloud = np.vstack((cap, wall))
+    det = make_det('unlisted_box', .30, 0., size=.048, height=.048)
+    det.extra.update(_points_base=cloud, cap_center_xy=[.30, 0.])
+    if blocked:
+        det.extra['_neighbor_xy'] = np.array([[.34, 0.]])
+    return det
+
+
+def test_a_partial_square_uses_the_face_pair_with_measured_sidewall_contact():
+    det = _partly_observed_square()
+    planner = GraspPlanner(make_cfg(robot__gripper__max_width=.100), 'L1')
+    plan = planner.plan(det)
+
+    assert plan.feasible, plan.reason
+    assert abs(math.sin(plan.closing_angle)) < 1e-9
+    assert plan.expected_width == pytest.approx(.048, abs=.001)
+    for pose in (plan.T_pre, plan.T_grasp, plan.T_lift):
+        assert closing_angle_of(pose) == pytest.approx(plan.closing_angle)
+
+
+def test_measured_sidewall_fallback_does_not_turn_into_a_neighbor():
+    det = _partly_observed_square(blocked=True)
+    plan = GraspPlanner(make_cfg(robot__gripper__max_width=.100), 'L1').plan(det)
+
+    assert not plan.feasible
+    assert 'dome' in plan.reason
+
+
+def test_a_square_cap_alone_does_not_establish_sidewall_contact():
+    det = _partly_observed_square(sidewall=False)
+    plan = GraspPlanner(make_cfg(robot__gripper__max_width=.100), 'L1').plan(det)
 
     assert not plan.feasible
     assert 'dome' in plan.reason

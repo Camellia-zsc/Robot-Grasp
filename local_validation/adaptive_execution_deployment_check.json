@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "status": "ready",
+  "batch": "idle",
+  "model_configured": true,
+  "objects": 6,
+  "messages": 6,
+  "metrics": {
+    "requests": 2,
+    "successes": 1,
+    "model_requests": 4
+  },
+  "confirmed": 6,
+  "pending": 0,
+  "layout_and_history_preserved": true,
+  "assets_match": true,
+  "placement_metadata_valid": true,
+  "camera_jpeg_valid": true,
+  "intervention_available": true,
+  "observation_stats": {
+    "frames": 6,
+    "full_scans": 1,
+    "local_scans": 0
+  },
+  "online_api_called": false,
+  "interaction_check": "HTTP state and exact static assets; no browser available"
+}

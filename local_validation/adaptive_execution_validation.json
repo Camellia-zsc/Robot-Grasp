@@ -1,0 +1,471 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-17",
+  "scope": "L1 kinematic simulation: adaptive neighbor grasp, local observation, run-time intervention, bounded obstacle relocation and restoration",
+  "unit_and_protocol": {
+    "passed": 449,
+    "pytest_elapsed_seconds": 44.79,
+    "wrapper_elapsed_seconds": 47.0,
+    "actual_command": [
+      "C:\\Users\\Zeng\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "--tb=short",
+      "--basetemp=D:\\大四上\\智能车项目\\.git\\adaptive-controller-final-20261117\\unit_protocol",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_adaptive_guard_safety.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_adaptive_neighbor_grasp.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_batch.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_batch_identity.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_batch_llm.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_cancelled_clearance.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_catalog.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_feedback.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_final_verification.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_free_placement_protocol.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_free_placement_queue.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_intervention_server.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_llm.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_mixed_color_perception.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_observation_policy.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_observations.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_obstacle_recovery.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_preview.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_recovery.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_recovery_workflow.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_scene_server.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_server.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_grasp_pad_stability.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_placement_observation.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_runner_local_release.py"
+    ],
+    "log_sha256": "dce3b44f65218116dfc3818d3ef269779740aa43365be71fab5125550a2a5ab0",
+    "runner_log_text_sha256": "22b2786eecd2bddcb02b8aa34b0d7a76ed3c501877d5c3744d22ca70f43cd71f",
+    "runner_log_hash_canonicalization": "UTF-8 text with CRLF normalized to LF",
+    "source_manifest_sha256": "d5432ef77523133d2e5dff34c40bc062e2f9113544bd2b80328d0907f7aea4ad",
+    "additional_regressions": [
+      "test_assistant_cancelled_clearance.py::test_stop_after_obstacle_move_preserves_restore_and_prevents_more_motion[single]",
+      "test_assistant_cancelled_clearance.py::test_stop_after_obstacle_move_preserves_restore_and_prevents_more_motion[batch]"
+    ]
+  },
+  "real_execution_suite": {
+    "passed": 9,
+    "pytest_elapsed_seconds": 389.47,
+    "wrapper_elapsed_seconds": 391.96899999999914,
+    "exit_code": 0,
+    "source_frozen": true,
+    "source_manifest": {
+      "file_count": 116,
+      "sha256": "050d956784f6a4622ead8a50dfc65e664d8a48f6de890e413ac4df98b2591014",
+      "canonicalization": "UTF-8 JSON of forward-slash relative-path -> SHA-256 mapping; sorted keys; compact separators",
+      "key_files": {
+        "ws/src/cube_task/cube_task/assistant/observation_policy.py": "5136ae602ecde0f1747e297605ba2ac5ba1e79985e50d9ed2bc32ba637e9b9f5",
+        "ws/src/cube_task/cube_task/assistant/obstacle_recovery.py": "78d9aa99b6c63dd693909dc45abce0220ee76b06604f8af8a6924fb33611e802",
+        "ws/src/cube_task/cube_task/assistant/placement_observation.py": "66d6d561b4ad5cc72b7ea2e88fd546b026bf94526f6458dd4ea715b1627bff2c",
+        "ws/src/cube_task/cube_task/assistant/server.py": "8929e63af8aa8cbe0771b79aac44c82c2e32e11c408a9202606a888f4b599fdd",
+        "ws/src/cube_task/cube_task/assistant/simulation.py": "72f02b6187ea636e10ef90e7ddd4b6d1ab9e903c78fc3a594cf706bcfc84911d",
+        "ws/src/cube_task/cube_task/assistant/static/editor.js": "8642ef083a11f281aaee229f826e0307b658f27e7d5f6d71c116695eb66945c9",
+        "ws/src/cube_task/cube_task/perception/grasp.py": "83ab949f06099c775321bdbbd5abe053173bdf04583ccc93044bc54a92892172",
+        "ws/src/cube_task/cube_task/task/runner.py": "7cc9414d7481ab19718df5735fcce3d3232bd7a8e8a9969a25add9ea99f01a15",
+        "ws/src/cube_task/cube_task/task/skills.py": "ba07d2bc43ffcccaef4362641bf917b459ba8f86cc9e53d9f7a9ea3a0bb56d4c"
+      }
+    },
+    "actual_command": [
+      "C:\\Users\\Zeng\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+      "-m",
+      "pytest",
+      "-v",
+      "--tb=short",
+      "--basetemp=D:\\大四上\\智能车项目\\.git\\adaptive-final-20261117\\cases",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_adaptive_execution.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_recovery_simulation.py",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_free_placement_backend.py::test_conflicting_or_outside_destination_refused_without_commands",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_free_placement_backend.py::test_banana_center_reaches_point_despite_offset_grasp",
+      "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_free_placement_backend.py::test_banana_regrasped_from_yellow_uses_rotated_cloud_bounds_for_point_center"
+    ],
+    "report_sha256": "36320d26201d853a832958314c4fff0ba9e57c9032a23bc9fe0d30f9e50e19d3",
+    "cases": [
+      {
+        "case": "exact_banana_neighbor",
+        "ok": true,
+        "observation_stats": {
+          "frames": 9,
+          "full_scans": 1,
+          "local_scans": 2
+        },
+        "evidence_file": "cases/test_exact_banana_neighbor_sce0/exact_banana.json",
+        "evidence_sha256": "2d0ab2c333af932798b4c0ae0e7d0f6916896d1d5eea979e6d3def321657362e",
+        "result": {
+          "ok": true,
+          "stage": "done",
+          "controller_ok": true,
+          "camera_verified": true,
+          "grasp_width": 0.07061855810353895
+        }
+      },
+      {
+        "case": "destination_occupied_during_transit",
+        "ok": true,
+        "observation_stats": {
+          "frames": 10,
+          "full_scans": 1,
+          "local_scans": 2
+        },
+        "evidence_file": "cases/test_neighbor_moved_into_plann0/occupied_slot_replan.json",
+        "evidence_sha256": "8591a3b8661fd571db412d5cfcf71707d67b516c905073548037d0e103339a8b",
+        "initial_slot": [
+          0.195,
+          -0.385
+        ],
+        "final_slot": [
+          0.15500000000000003,
+          -0.33999999999999997
+        ],
+        "result": {
+          "ok": true,
+          "stage": "done",
+          "controller_ok": true,
+          "camera_verified": true,
+          "grasp_width": 0.05047900513789304
+        }
+      },
+      {
+        "case": "target_moved_before_descent",
+        "ok": true,
+        "observation_stats": {
+          "frames": 12,
+          "full_scans": 1,
+          "local_scans": 4
+        },
+        "evidence_file": "cases/test_target_moved_during_pre_a0/moved_target_recovery.json",
+        "evidence_sha256": "47b8fe910803fae9cedbb98913c491d897ce2010837d6431221a459a6d97f233",
+        "first_attempt": {
+          "ok": false,
+          "stage": "descend",
+          "error": "scene_changed",
+          "holding": false
+        },
+        "recovered": {
+          "ok": true,
+          "stage": "done",
+          "controller_ok": true,
+          "camera_verified": true
+        }
+      },
+      {
+        "case": "two_item_queue",
+        "ok": true,
+        "observation_stats": {
+          "frames": 13,
+          "full_scans": 1,
+          "local_scans": 4
+        },
+        "evidence_file": "cases/test_two_real_sequential_tasks0/two_object_queue.json",
+        "evidence_sha256": "a238e1f193ae1d5a3920e711ae19748fd534034ef8cad74b3dbdf649b51432e3",
+        "batch": {
+          "status": "complete",
+          "total": 2,
+          "completed": 2
+        },
+        "metrics": {
+          "requests": 1,
+          "successes": 1,
+          "model_requests": 1
+        }
+      }
+    ]
+  },
+  "clearance_module": {
+    "ok": true,
+    "source_frozen": true,
+    "source_manifest": {
+      "file_count": 116,
+      "sha256": "050d956784f6a4622ead8a50dfc65e664d8a48f6de890e413ac4df98b2591014",
+      "canonicalization": "UTF-8 JSON of forward-slash relative-path -> SHA-256 mapping; sorted keys; compact separators",
+      "key_files": {
+        "ws/src/cube_task/cube_task/assistant/observation_policy.py": "5136ae602ecde0f1747e297605ba2ac5ba1e79985e50d9ed2bc32ba637e9b9f5",
+        "ws/src/cube_task/cube_task/assistant/obstacle_recovery.py": "78d9aa99b6c63dd693909dc45abce0220ee76b06604f8af8a6924fb33611e802",
+        "ws/src/cube_task/cube_task/assistant/placement_observation.py": "66d6d561b4ad5cc72b7ea2e88fd546b026bf94526f6458dd4ea715b1627bff2c",
+        "ws/src/cube_task/cube_task/assistant/server.py": "8929e63af8aa8cbe0771b79aac44c82c2e32e11c408a9202606a888f4b599fdd",
+        "ws/src/cube_task/cube_task/assistant/simulation.py": "72f02b6187ea636e10ef90e7ddd4b6d1ab9e903c78fc3a594cf706bcfc84911d",
+        "ws/src/cube_task/cube_task/assistant/static/editor.js": "8642ef083a11f281aaee229f826e0307b658f27e7d5f6d71c116695eb66945c9",
+        "ws/src/cube_task/cube_task/perception/grasp.py": "83ab949f06099c775321bdbbd5abe053173bdf04583ccc93044bc54a92892172",
+        "ws/src/cube_task/cube_task/task/runner.py": "7cc9414d7481ab19718df5735fcce3d3232bd7a8e8a9969a25add9ea99f01a15",
+        "ws/src/cube_task/cube_task/task/skills.py": "ba07d2bc43ffcccaef4362641bf917b459ba8f86cc9e53d9f7a9ea3a0bb56d4c"
+      }
+    },
+    "reproduction_command": [
+      "python",
+      ".git/verify_adaptive_clearance.py",
+      "--execute",
+      "--output",
+      ".git/adaptive-clearance-final-20261117"
+    ],
+    "elapsed_seconds": 311.4529999999995,
+    "fixture": "test/fixtures/adaptive_clearance_scene.json",
+    "initial_target_blocker_overlap_area_m2": 0.0,
+    "initial_direct_grasp_feasible": false,
+    "initial_direct_grasp_reason": "blocked_by_neighbor: no measured collision-free finger sweep",
+    "option_id": "clear_restore_yellow",
+    "steps": [
+      {
+        "step": "move_obstacle",
+        "label": "yellow",
+        "ok": true,
+        "stage": "done",
+        "controller_ok": true,
+        "camera_verified": true,
+        "holding": false
+      },
+      {
+        "step": "original_task",
+        "label": "banana",
+        "ok": true,
+        "stage": "done",
+        "controller_ok": true,
+        "camera_verified": true,
+        "holding": false
+      },
+      {
+        "step": "restore_obstacle",
+        "label": "yellow",
+        "ok": true,
+        "stage": "done",
+        "controller_ok": true,
+        "camera_verified": true,
+        "holding": false
+      }
+    ],
+    "target_ok": true,
+    "pending_restore": null,
+    "independent_restore_truth": {
+      "center_error_m": 0.005578175931843794,
+      "yaw_error_deg": 0.966405462064247
+    },
+    "network_attempts": 0,
+    "report_sha256": "5c49985a42f308e3283424335370992bcbac86ba5d53f61179b3d6431de8b0fb"
+  },
+  "clearance_recovery_protocol": {
+    "ok": true,
+    "source_frozen": true,
+    "source_manifest": {
+      "file_count": 116,
+      "sha256": "050d956784f6a4622ead8a50dfc65e664d8a48f6de890e413ac4df98b2591014",
+      "canonicalization": "UTF-8 JSON of forward-slash relative-path -> SHA-256 mapping; sorted keys; compact separators",
+      "key_files": {
+        "ws/src/cube_task/cube_task/assistant/observation_policy.py": "5136ae602ecde0f1747e297605ba2ac5ba1e79985e50d9ed2bc32ba637e9b9f5",
+        "ws/src/cube_task/cube_task/assistant/obstacle_recovery.py": "78d9aa99b6c63dd693909dc45abce0220ee76b06604f8af8a6924fb33611e802",
+        "ws/src/cube_task/cube_task/assistant/placement_observation.py": "66d6d561b4ad5cc72b7ea2e88fd546b026bf94526f6458dd4ea715b1627bff2c",
+        "ws/src/cube_task/cube_task/assistant/server.py": "8929e63af8aa8cbe0771b79aac44c82c2e32e11c408a9202606a888f4b599fdd",
+        "ws/src/cube_task/cube_task/assistant/simulation.py": "72f02b6187ea636e10ef90e7ddd4b6d1ab9e903c78fc3a594cf706bcfc84911d",
+        "ws/src/cube_task/cube_task/assistant/static/editor.js": "8642ef083a11f281aaee229f826e0307b658f27e7d5f6d71c116695eb66945c9",
+        "ws/src/cube_task/cube_task/perception/grasp.py": "83ab949f06099c775321bdbbd5abe053173bdf04583ccc93044bc54a92892172",
+        "ws/src/cube_task/cube_task/task/runner.py": "7cc9414d7481ab19718df5735fcce3d3232bd7a8e8a9969a25add9ea99f01a15",
+        "ws/src/cube_task/cube_task/task/skills.py": "ba07d2bc43ffcccaef4362641bf917b459ba8f86cc9e53d9f7a9ea3a0bb56d4c"
+      }
+    },
+    "reproduction_command": [
+      "python",
+      ".git/verify_adaptive_clearance_protocol.py",
+      "--execute",
+      "--output",
+      ".git/adaptive-clearance-protocol-final-20261117"
+    ],
+    "elapsed_seconds": 285.3909999999996,
+    "fixture": "test/fixtures/adaptive_clearance_scene.json",
+    "initial_target_blocker_overlap_area_m2": 0.0,
+    "initial_direct_grasp_feasible": false,
+    "initial_direct_grasp_reason": "blocked_by_neighbor: no measured collision-free finger sweep",
+    "option_id": "clear_restore_yellow",
+    "steps": [
+      {
+        "step": "move_obstacle",
+        "label": "yellow",
+        "ok": true,
+        "stage": "done",
+        "controller_ok": true,
+        "camera_verified": true,
+        "holding": false
+      },
+      {
+        "step": "original_task",
+        "label": "banana",
+        "ok": true,
+        "stage": "done",
+        "controller_ok": true,
+        "camera_verified": true,
+        "holding": false
+      },
+      {
+        "step": "restore_obstacle",
+        "label": "yellow",
+        "ok": true,
+        "stage": "done",
+        "controller_ok": true,
+        "camera_verified": true,
+        "holding": false
+      }
+    ],
+    "target_ok": true,
+    "pending_restore": null,
+    "independent_restore_truth": {
+      "center_error_m": 0.005557849003361035,
+      "yaw_error_deg": 0.884310483912931
+    },
+    "network_attempts": 0,
+    "report_sha256": "005eb59e4fec210a95832cc49896175c2b9141ff5ceb6a5110b715b982f09fb3"
+  },
+  "fixture_sha256": {
+    "assistant_banana_neighbor_scene.json": "c37ea2a71e9e094ee9965b715c0d0a3ba37a6f9073c30fcd710e108b3a37e82c",
+    "assistant_banana_neighbor_cloud.npz": "c3759faa3775d48aab027786af76dfb66b6c5d225dda261c80d9db76a29ff044",
+    "adaptive_clearance_scene.json": "9f460aaf6195b8a10980b388fe2a2dd7303b9b51b37518f4f1315c36d4b4b7b8"
+  },
+  "limits": [
+    "All frozen-source claims refer to their named evidence runs; later source changes require their own verification.",
+    "Real browser access was unavailable; UI validation covers DOM event listeners, HTTP and static assets, not interactive browser appearance.",
+    "The independent runs use no paid online model requests. Local fixed intent replies only replace model selection; perception, IK, motion and feedback use production simulation code.",
+    "Simulator object truth is limited to initial fixtures and independent assertions; it is not planner input.",
+    "This is L1 kinematic/geometric simulation, without friction, contact dynamics, stiffness, Gazebo or MoveIt2 physics validation.",
+    "The tests cover recorded scenes and interventions, not arbitrary clutter or guaranteed recovery."
+  ],
+  "release": {
+    "status": "deployed",
+    "production_commit": "476bd40",
+    "feature_commits": [
+      "ee1af1f",
+      "e1a5a31",
+      "476bd40"
+    ],
+    "repository": "https://github.com/Camellia-zsc/Robot-Grasp",
+    "branch": "main",
+    "dashboard_url": "http://127.0.0.1:8767",
+    "deployment_record": "adaptive_execution_deployment_check.json",
+    "deployed_checkout_regression": {
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "ws/src/cube_task/test/test_assistant_cancelled_clearance.py",
+        "ws/src/cube_task/test/test_assistant_intervention_server.py",
+        "ws/src/cube_task/test/test_assistant_observation_policy.py",
+        "-q"
+      ],
+      "passed": 32,
+      "elapsed_seconds": 1.22
+    },
+    "state_preserved": [
+      "object ids and full transforms",
+      "messages",
+      "metrics",
+      "usage",
+      "simulation speed",
+      "seed"
+    ],
+    "new_preparation": {
+      "confirmed_objects": 6,
+      "full_scans": 1,
+      "frames": 6
+    },
+    "online_api_called_for_validation": false
+  },
+  "prior_unit_and_protocol": {
+    "passed": 447,
+    "elapsed_seconds": 46.94,
+    "pytest_base_command": [
+      "python",
+      "-m",
+      "pytest",
+      "-q"
+    ],
+    "selection_rule": {
+      "include_glob": "test_assistant_*.py",
+      "exclude_filename_patterns": [
+        "simulation",
+        "catalog_perception",
+        "pear_regression",
+        "yellow_regression",
+        "adaptive_execution",
+        "free_placement_backend"
+      ],
+      "additional_files": [
+        "test_adaptive_neighbor_grasp.py",
+        "test_adaptive_guard_safety.py",
+        "test_runner_local_release.py",
+        "test_placement_observation.py",
+        "test_grasp_pad_stability.py"
+      ]
+    },
+    "shell_command_record": "full shell text was not retained; selector rule above provided by runner",
+    "log_sha256": "633e844324a339c72a425358854471d37f1dbde1eeda4d21a688fb91a81ed801"
+  },
+  "controller_final_verification": {
+    "source_frozen": true,
+    "source_manifest": {
+      "file_count": 116,
+      "sha256": "d5432ef77523133d2e5dff34c40bc062e2f9113544bd2b80328d0907f7aea4ad",
+      "canonicalization": "UTF-8 JSON of forward-slash relative-path -> SHA-256 mapping; sorted keys; compact separators",
+      "key_files": {
+        "ws/src/cube_task/cube_task/assistant/observation_policy.py": "5136ae602ecde0f1747e297605ba2ac5ba1e79985e50d9ed2bc32ba637e9b9f5",
+        "ws/src/cube_task/cube_task/assistant/obstacle_recovery.py": "78d9aa99b6c63dd693909dc45abce0220ee76b06604f8af8a6924fb33611e802",
+        "ws/src/cube_task/cube_task/assistant/placement_observation.py": "66d6d561b4ad5cc72b7ea2e88fd546b026bf94526f6458dd4ea715b1627bff2c",
+        "ws/src/cube_task/cube_task/assistant/server.py": "1155d0e36cd89b56eacdf59a218e404f07b4463751272d070979cd1e14554904",
+        "ws/src/cube_task/cube_task/assistant/simulation.py": "72f02b6187ea636e10ef90e7ddd4b6d1ab9e903c78fc3a594cf706bcfc84911d",
+        "ws/src/cube_task/cube_task/assistant/static/editor.js": "8642ef083a11f281aaee229f826e0307b658f27e7d5f6d71c116695eb66945c9",
+        "ws/src/cube_task/cube_task/perception/grasp.py": "83ab949f06099c775321bdbbd5abe053173bdf04583ccc93044bc54a92892172",
+        "ws/src/cube_task/cube_task/task/runner.py": "7cc9414d7481ab19718df5735fcce3d3232bd7a8e8a9969a25add9ea99f01a15",
+        "ws/src/cube_task/cube_task/task/skills.py": "ba07d2bc43ffcccaef4362641bf917b459ba8f86cc9e53d9f7a9ea3a0bb56d4c"
+      }
+    },
+    "report_sha256": "b563b1bc26be7c331ac82a6686abf5f78144a42cc88ba4892460f0dc2e1977c1",
+    "production_changes_since_real_suite": [
+      {
+        "path": "ws/src/cube_task/cube_task/assistant/server.py",
+        "previous_sha256": "8929e63af8aa8cbe0771b79aac44c82c2e32e11c408a9202606a888f4b599fdd",
+        "current_sha256": "1155d0e36cd89b56eacdf59a218e404f07b4463751272d070979cd1e14554904"
+      }
+    ],
+    "stopping_clearance": {
+      "single_and_batch_regressions_passed": true,
+      "preserves": [
+        "pending_restore",
+        "clearance_steps",
+        "recovery_history",
+        "stopped UI notice"
+      ],
+      "prevents_further_motion": true
+    },
+    "real_two_item_batch": {
+      "passed": 1,
+      "pytest_elapsed_seconds": 38.44,
+      "wrapper_elapsed_seconds": 40.60900000000038,
+      "actual_command": [
+        "C:\\Users\\Zeng\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "--basetemp=D:\\大四上\\智能车项目\\.git\\adaptive-controller-final-20261117\\real_batch",
+        "C:\\Users\\Zeng\\.codex\\worktrees\\flexible-object-grasp\\智能车项目\\ws\\src\\cube_task\\test\\test_assistant_adaptive_execution.py::test_two_real_sequential_tasks_share_one_intent_and_initial_full_scan"
+      ],
+      "log_sha256": "eb816142bce018963c5b2d56d55b84bc9e695848f6203e682f9f7bd8fd467f95",
+      "runner_log_text_sha256": "4a71d89a8b5043a9ddfa388ae496965a54db9529e37a8b9c8701bb4afed17564",
+      "runner_log_hash_canonicalization": "UTF-8 text with CRLF normalized to LF",
+      "case_sha256": "574727129a3289a3edda1433df5f228851e10470a96c61900d79f255f922fb96",
+      "observation_stats": {
+        "frames": 13,
+        "full_scans": 1,
+        "local_scans": 4
+      },
+      "batch": {
+        "status": "complete",
+        "total": 2,
+        "completed": 2
+      },
+      "metrics": {
+        "requests": 1,
+        "successes": 1,
+        "model_requests": 1
+      }
+    }
+  }
+}

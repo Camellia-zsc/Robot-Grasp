@@ -325,7 +325,8 @@ class SimulationSession:
         self._apply_interventions()
         self._emit('inspect_place', {'message': '已到目标区域上方，正在局部确认空位'})
         from .observation_policy import merge_local_detections, measurement_visible
-        from .placement_observation import candidate_visibility_filter, safe_inspection_poses
+        from .placement_observation import (candidate_visibility_filter, safe_inspection_poses,
+                                             safe_inspection_route)
         from ..core.extrinsics import camera_pose_in_base
         neighbors = list(self._observed_detections)
         def measure():
@@ -348,31 +349,52 @@ class SimulationSession:
             return updated, why, revision
         updated, why, revision = measure()
         if updated is None:
-            ext = self.runner.ext
-            T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
-            high = max([float(self.cfg.get('perception.table.expected_z', 0) or 0)] + [float(d.top_z) for d in neighbors
-                       if d.top_z is not None and d.label != target.label])
-            xy = (options['placement_zone'].center[:2] if options else
-                  self.runner.zones[zone_name].center[:2])
-            poses, minimum = safe_inspection_poses(self.arm, grasp, T_fc,
-                             self.runner.T_flange_tcp, xy, high,
-                             table_z=float(self.cfg.get('perception.table.expected_z', 0) or 0),
-                             free_tilt_deg=self.runner.free_tilt,
-                             nominal=self.runner.nominal.get(target.label),
-                             intrinsics=self.camera.intrinsics())
-            if poses:
-                lift = self.arm.get_tcp_pose().value.copy()
-                lift[2, 3] = max(float(lift[2, 3]), minimum)
-                self.runner.skill._move(result, 'inspect_lift', lift, True)
-                for inspection in poses[:4]:
-                    self.runner.skill._move(result, 'inspect_place', inspection, False)
-                    self.runner.skill._verify_held(result, 'dropped_in_transit')
+            # Extra views only help when the measurements admit a reachable
+            # release. Known occupancy can already rule every candidate out;
+            # raising the held object again cannot resolve that obstruction.
+            capacity, capacity_why = self.runner.replan_release(
+                target, grasp, place, width, neighbors, **options)
+            if capacity is None:
+                why = '当前测量下无可确认的放置方案：' + str(capacity_why)
+            else:
+                ext = self.runner.ext
+                T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
+                table = float(self.cfg.get('perception.table.expected_z', 0) or 0)
+                xy = (options['placement_zone'].center[:2] if options else
+                      self.runner.zones[zone_name].center[:2])
+                # The pose generator bounds rotations above the table. Actual
+                # obstacles are checked against each full swept route below,
+                # so a distant tall item cannot mandate an impossible lift.
+                poses, _minimum = safe_inspection_poses(self.arm, grasp, T_fc,
+                                 self.runner.T_flange_tcp, xy, table,
+                                 table_z=table, free_tilt_deg=self.runner.free_tilt,
+                                 nominal=self.runner.nominal.get(target.label),
+                                 intrinsics=self.camera.intrinsics())
+                observed_views = 0
+                for inspection in poses:
+                    current = self.arm.get_tcp_pose().value.copy()
+                    route, route_why = safe_inspection_route(
+                        self.arm, grasp, current, inspection, neighbors, width,
+                        table_z=table, nominal=self.runner.nominal.get(target.label),
+                        neighbor_nominal=self.runner.nominal,
+                        free_tilt_deg=self.runner.free_tilt)
+                    if not route:
+                        why = route_why
+                        continue
+                    observed_views += 1
+                    route_revision = self._environment_revision
+                    for waypoint in route:
+                        self._apply_interventions()
+                        if self._environment_revision != route_revision:
+                            break
+                        self.runner.skill._move(result, 'inspect_place', waypoint, True)
+                        self.runner.skill._verify_held(result, 'dropped_in_transit')
                     updated, why, revision = measure()
-                    if updated is not None:
+                    if updated is not None or observed_views >= 4:
                         break
         self._active_revision = revision
         if updated is None:
-            self._emit('placement_changed', {'message': '目标区当前无可确认的安全空位，将保持夹持', 'reason': why})
+            self._emit('placement_changed', {'message': '当前测量下无法确认安全放置方案，将保持夹持', 'reason': why})
             return None
         self._observed_detections = copy.deepcopy(neighbors)
         info = dict(self.runner.placer.last_info)
@@ -513,6 +535,8 @@ class SimulationSession:
                                              unique_target)
             from ..core.extrinsics import camera_pose_in_base
             local = target is not None
+            require_grasp = bool(local and target.get('require_grasp'))
+            grasp_target = None
             self._last_fresh = []
             order = self._view_order(target) if local else list(range(self._base_view_count))
             if local and purpose == 'verify_place':
@@ -552,11 +576,38 @@ class SimulationSession:
                                       self._stable_cloud(measured, revision) is not None or
                                       sum(any(d.valid and d.label == label for d in ds)
                                           for ds in views.values()) >= 2)
+                    if require_grasp:
+                        # A complete silhouette can still hide the contact
+                        # section. Seek another target view when the unchanged
+                        # grasp planner cannot confirm stable pad contact.
+                        from .obstacle_recovery import _grasp
+                        if reliable:
+                            peers = [d for d in self._observed_detections
+                                     if d.label != label]
+                            peers += [d for d in views[view] if d.label != label]
+                            _candidate, planned = _grasp(self, measured, peers)
+                            if planned.feasible:
+                                grasp_target = measured
+                        if grasp_target is not None and geometry_ready:
+                            break
+                        continue
                     if (reliable and (geometry_ready or purpose == 'verify_place')) or (not label and len(coverage) >= 1):
                         break
             detections, diagnostics = merge_observations(
                 views, dist=self.runner.view_merge,
                 partial=lambda d: not d.valid or self.runner._partial(d))
+            if require_grasp:
+                # Preserve the actual successful profile, rather than letting
+                # the generic density ranking choose a denser rejected view.
+                label = target.get('label')
+                if grasp_target is not None:
+                    detections = [d for d in detections if d.label != label]
+                    detections.append(copy.deepcopy(grasp_target))
+                else:
+                    for d in detections:
+                        if d.label == label:
+                            d.valid = False
+                            d.reject_reason = 'stable_grasp_not_observed'
             fresh = list(detections)
             for det in fresh:
                 cloud = self._placement_cloud(det, views, fresh)
@@ -568,6 +619,12 @@ class SimulationSession:
                     det.extra['_cloud_views'] = max(2 if previous_cloud is not None else 0,
                                                      det.extra.get('_placement_view_count', 0))
                 det.extra['_observed_revision'] = revision
+            if require_grasp and grasp_target is not None:
+                final_target = next(d for d in fresh if d.label == target.get('label'))
+                _candidate, planned = _grasp(self, final_target, fresh)
+                if not planned.feasible:
+                    final_target.valid = False
+                    final_target.reject_reason = 'stable_grasp_not_observed: ' + str(planned.reason)
             if local:
                 detections = merge_local_detections(
                     self._observed_detections, fresh,
@@ -1057,7 +1114,7 @@ class SimulationSession:
         return summary
 
     def prepare_recovery(self, failure, goal, attempt, history, reference_xy=None, completed_zones=(),
-                         completed_positions=()):
+                         completed_positions=(), protected_goals=()):
         """Offer goal-preserving local repairs, observing without moving a held cube."""
         with self._operation_lock:
             self._check_open()
@@ -1089,10 +1146,15 @@ class SimulationSession:
                 self._recovery_neighbors = neighbors
                 observations = [d.summary() for d in neighbors]
                 if getattr(self.runner, 'has_held_recovery', False):
-                    options.append({'id': 'place_held_alternate', 'description':
+                    previous = history or failure.get('recovery_history') or []
+                    repeated = sum(item.get('option_id') == 'place_held_alternate' and not item.get('ok') for item in previous)
+                    if repeated < 2:
+                        options.append({'id': 'place_held_alternate', 'description':
                         '保持当前夹持，依据相机测得的已有物体重新选择原目标区域中的空位，'
                         '排除之前失败的放置点，抬升后移动、下降、放下并核验；'
                         '不重复抓取，不在空中松爪。本次是第 %d 次重新选位。' % attempt})
+                    from .held_recovery import propose_held_recovery
+                    options.extend(propose_held_recovery(self, goal, protected_goals))
             elif healthy:
                 observation_mode = 'target_search'
                 scene = self.observe(target=self._recovery_target.summary() |
@@ -1160,7 +1222,7 @@ class SimulationSession:
                                            'detections': [d.summary() for d in result.detections]})
         return result.detections
 
-    def execute_recovery(self, decision, cancel_event=None):
+    def execute_recovery(self, decision, cancel_event=None, confirmed=False):
         """Execute only a current locally offered action, preserving the original goal."""
         from .recovery import validate_recovery_decision
 
@@ -1179,6 +1241,10 @@ class SimulationSession:
             try:
                 if self.cancel_event.is_set():
                     raise RuntimeError('任务已停止')
+                self._apply_interventions()
+                if chosen['option_id'].startswith('stage_'):
+                    from .held_recovery import execute_held_recovery
+                    return execute_held_recovery(self, chosen['option_id'], cancel_event, confirmed)
                 if chosen['option_id'].startswith('clear_restore_'):
                     from .obstacle_recovery import execute_clearance
                     saved = {key: copy.deepcopy(getattr(self, key)) for key in

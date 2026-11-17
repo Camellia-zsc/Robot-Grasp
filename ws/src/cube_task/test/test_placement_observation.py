@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from cube_task.assistant.placement_observation import (
-    candidate_visibility_filter, safe_inspection_poses,
+    candidate_visibility_filter, safe_inspection_poses, safe_inspection_route,
 )
 from cube_task.core.transforms import make_T, top_down_T
 from cube_task.core.types import CameraIntrinsics, Detection, Frame, GraspPlan
@@ -89,3 +89,55 @@ def test_inspection_without_reachability_check_refuses_to_offer_unchecked_motion
     poses, _minimum = safe_inspection_poses(SimpleNamespace(), grasp, np.eye(4), np.eye(4),
                                            [.3, 0.], .1)
     assert poses == []
+
+
+def test_inspection_checks_native_path_and_can_retract_without_an_unreachable_lift():
+    _target, grasp, _frame, _camera = inputs()
+    current = top_down_T(.4, 0., .15, 0.)
+    destination = top_down_T(.2, .08, .18, 0.)
+    checked = []
+
+    def path(a, b, _seed, _tilt):
+        checked.append((a.copy(), b.copy()))
+        # A direct orientation/translation path is unavailable from extension;
+        # the fixed-orientation inward waypoint remains reachable.
+        direct = np.allclose(a, current) and np.allclose(b, destination)
+        return not direct, 'direct path unavailable' if direct else ''
+
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''), _check_linear_path=path)
+    route, why = safe_inspection_route(arm, grasp, current, destination, [], .05)
+    assert len(route) == 2 and not why
+    np.testing.assert_allclose(route[0][:3, :3], current[:3, :3])
+    assert route[0][2, 3] == current[2, 3]
+    assert route[0][0, 3] < current[0, 3]
+    assert len(checked) == 3  # refused direct, accepted inward, accepted final
+
+
+def test_inspection_swept_carried_box_cannot_pass_through_a_measured_neighbor():
+    _target, grasp, _frame, _camera = inputs()
+    obstacle = Detection('green', 1., center_base=np.array([.2, 0., .19]),
+                         top_z=.19, height=.19, length=.06, width=.06, yaw=0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''))
+    route, why = safe_inspection_route(arm, grasp, top_down_T(0., 0., .15, 0.),
+                                      top_down_T(.4, 0., .15, 0.), [obstacle], .05)
+    assert route == [] and 'overlaps' in why
+
+
+def test_far_tall_neighbor_does_not_raise_the_local_inspection_path():
+    _target, grasp, _frame, _camera = inputs()
+    far = Detection('green', 1., center_base=np.array([.2, .3, .6]),
+                    top_z=.6, height=.6, length=.06, width=.06, yaw=0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''))
+    route, why = safe_inspection_route(arm, grasp, top_down_T(0., 0., .15, 0.),
+                                      top_down_T(.25, 0., .15, 0.), [far], .05)
+    assert len(route) == 1 and not why
+    assert route[0][2, 3] == .15
+
+
+def test_no_inspection_motion_is_offered_when_every_native_path_is_rejected():
+    _target, grasp, _frame, _camera = inputs()
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                          _check_linear_path=lambda *a: (False, 'joint path unavailable'))
+    route, why = safe_inspection_route(arm, grasp, top_down_T(.4, 0., .15, 0.),
+                                      top_down_T(.2, 0., .18, 0.), [], .05)
+    assert not route and why == 'joint path unavailable'

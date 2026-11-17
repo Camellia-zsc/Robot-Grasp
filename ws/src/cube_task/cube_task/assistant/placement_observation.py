@@ -188,11 +188,16 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
 
     proposals = []
     for height in (.27, .32, .38, .44):
-        for distance, side in ((.14, 0.), (.18, .08), (.18, -.08), (.22, 0.)):
+        # Short baselines also cover staging points near the robot. The longer
+        # original baselines can otherwise put every proposed TCP inside the
+        # arm's inner workspace even though the landing point is reachable.
+        for distance, side in ((.14, 0.), (.18, .08), (.18, -.08), (.22, 0.),
+                               (.06, 0.), (.08, .08), (.08, -.08), (.10, 0.)):
             eye = np.r_[target[:2] - distance * radial + side * lateral, target[2] + height]
             for forward, sideways in ((0., 0.), (-.10, 0.), (.10, 0.), (0., .10),
                                        (0., -.10), (-.08, .08), (-.08, -.08),
-                                       (.08, .08), (.08, -.08)):
+                                       (.08, .08), (.08, -.08), (0., .14), (0., -.14),
+                                       (-.04, .14), (-.04, -.14), (.04, .14), (.04, -.14)):
                 gaze = target + np.r_[forward * radial + sideways * lateral, 0.]
                 z = gaze - eye
                 z /= np.linalg.norm(z)
@@ -201,11 +206,13 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
                     continue
                 x /= np.linalg.norm(x)
                 y = np.cross(z, x)
-                T_bc = np.eye(4)
-                T_bc[:3, :3], T_bc[:3, 3] = np.column_stack([x, y, z]), eye
-                T_tcp = T_bc @ T_camera_tcp
-                if float(T_tcp[2, 3]) >= minimum_tcp_z:
-                    proposals.append((visibility_score(T_bc), T_tcp))
+                for roll in ((0., -.75, .75) if distance <= .10 else (0.,)):
+                    c, s = math.cos(roll), math.sin(roll)
+                    T_bc = np.eye(4)
+                    T_bc[:3, :3], T_bc[:3, 3] = np.column_stack([c*x+s*y, -s*x+c*y, z]), eye
+                    T_tcp = T_bc @ T_camera_tcp
+                    if float(T_tcp[2, 3]) >= minimum_tcp_z:
+                        proposals.append((visibility_score(T_bc), T_tcp))
     poses = []
     for _score, T_tcp in sorted(proposals, key=lambda item: item[0], reverse=True):
         kwargs = {'max_tilt_deg': free_tilt_deg} if accepts_kwarg(check, 'max_tilt_deg') else {}
@@ -215,3 +222,127 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
             if len(poses) >= 12:
                 break
     return poses, minimum_tcp_z
+
+
+def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
+                          table_z=0., nominal=None, neighbor_nominal=None,
+                          free_tilt_deg=40.):
+    """Return a fully prechecked linear held-camera route, or hold position.
+
+    Endpoint reachability alone does not establish a reachable lift or a safe
+    swept volume. Each proposed route keeps the measured grasp fixed, checks
+    the carried box and both finger boxes through the actual interpolated TCP
+    path, and invokes the arm's normal linear-path preflight before any motion.
+    The small interval padding bounds translation plus rotation between samples.
+    """
+    import cv2
+    from ..robot.kinematics import rot_log
+    from ..robot.safety import interpolate_pose
+
+    check = getattr(arm, 'check_reachable', None)
+    if check is None:
+        return [], 'inspection route has no reachability preflight'
+    det = grasp.target
+    length, width, height = _dimensions(det, nominal)
+    table = detection_table_z(det)
+    if table is None:
+        return [], 'inspection route has no measured support height'
+    xy = _rectangle(np.asarray(det.center_base[:2]), length, width, float(det.yaw or 0.))
+    box = np.vstack([np.column_stack([xy, np.full(4, z)]) for z in (table, table + height)])
+    local_boxes = [(box - grasp.T_grasp[:3, 3]) @ grasp.T_grasp[:3, :3]]
+    signs = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
+    for sign in (-1, 1):
+        center = np.array([0., sign * (float(opening) / 2 + .006), -.025])
+        local_boxes.append(center + signs * [.010, .006, .025])
+    radius = max(float(np.max(np.linalg.norm(b, axis=1))) for b in local_boxes)
+    obstacles = []
+    for other in neighbors:
+        if other is det or other.center_base is None:
+            continue
+        try:
+            a, b, h = _dimensions(other, (neighbor_nominal or {}).get(other.label))
+            top = float(other.top_z)
+            yaw = float(other.yaw)
+        except (ValueError, TypeError):
+            return [], 'inspection route has incomplete neighbor geometry'
+        obstacles.append((_rectangle(np.asarray(other.center_base[:2]), a, b, yaw), top - h, top))
+
+    def overlap(a, b, gap):
+        for polygon in (a, b):
+            for edge in np.roll(polygon, -1, axis=0) - polygon:
+                axis = np.array([-edge[1], edge[0]])
+                size = float(np.linalg.norm(axis))
+                if size < 1e-10:
+                    continue
+                axis /= size
+                u, v = a @ axis, b @ axis
+                if u.max() + gap < v.min() or v.max() + gap < u.min():
+                    return False
+        return True
+
+    def clear(T, pad):
+        for local in local_boxes:
+            carried = local @ T[:3, :3].T + T[:3, 3]
+            low, high = float(carried[:, 2].min()), float(carried[:, 2].max())
+            if low < float(table_z) + pad:
+                return False
+            polygon = cv2.convexHull(carried[:, :2].astype(np.float32)).reshape(-1, 2)
+            for footprint, bottom, top in obstacles:
+                if low > top + pad or high < bottom - pad:
+                    continue
+                if overlap(polygon, footprint, pad):
+                    return False
+        return True
+
+    current, inspection = np.asarray(current, float), np.asarray(inspection, float)
+    choices = [[inspection]]
+    # Retract without rotating the held object before a high/leaned view. This
+    # avoids asking a near-extended arm for an impossible fixed-XY vertical lift.
+    radial = current[:2, 3] / max(float(np.linalg.norm(current[:2, 3])), 1e-6)
+    for distance in (.06, .12):
+        inward = current.copy()
+        inward[:2, 3] -= distance * radial
+        choices.append([inward, inspection])
+    raised = current.copy()
+    raised[2, 3] = max(float(current[2, 3]), float(inspection[2, 3]))
+    choices.append([raised, inspection])
+    last_reason = 'no collision-free reachable inspection route'
+    for route in choices:
+        start = current
+        joints = arm.get_joints() if hasattr(arm, 'get_joints') else None
+        seed = None if joints is None else joints.value
+        accepted = True
+        for end in route:
+            kwargs = {'max_tilt_deg': free_tilt_deg} if accepts_kwarg(check, 'max_tilt_deg') else {}
+            if accepts_kwarg(check, 'q_seed'):
+                kwargs['q_seed'] = seed
+            ok, last_reason = check(end, **kwargs)
+            if not ok:
+                accepted = False
+                break
+            distance = float(np.linalg.norm(end[:3, 3] - start[:3, 3]))
+            angle = float(np.linalg.norm(rot_log(start[:3, :3].T @ end[:3, :3])))
+            count = max(1, int(math.ceil(max(distance / .008, angle / math.radians(4)))))
+            pad = .008 + (distance + radius * angle) / (2 * count)
+            samples = [interpolate_pose(start, end, k / count) for k in range(count + 1)]
+            if not all(clear(pose, pad) for pose in samples):
+                last_reason, accepted = 'inspection swept held object or fingers overlaps a measured obstacle', False
+                break
+            native = getattr(arm, '_check_linear_path', None)
+            if native is not None:
+                ok, last_reason = native(start, end, seed, free_tilt_deg)
+                if ok and getattr(arm, '_kin', None) is not None:
+                    seed, _ep, _eo = arm._ik_tcp(end, seed)
+            else:
+                ok = True
+                for pose in samples:
+                    ok, last_reason = check(pose, **kwargs)
+                    if not ok:
+                        break
+            if not ok:
+                accepted = False
+                break
+            start = end
+        if accepted:
+            return route, ''
+    return [], last_reason

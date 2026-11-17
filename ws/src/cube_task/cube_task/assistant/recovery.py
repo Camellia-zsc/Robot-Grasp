@@ -17,8 +17,11 @@ goal.destination 表示抓取区或指定桌面点，必须完整保持；指定
 请结合 failure、相机实测 observations、已有 history，从本地提供的 options 中选择一个恢复方案。
 options 由本地程序检查，模型只能选择其中已有的 id；不能输出新坐标、轨迹、关节角、代码或机器人命令。
 clear_restore 策略表示先临时搬开测得的遮挡物、完成原任务、再放回原位置与朝向，三个步骤由本地顺序执行。
+stage_regrasp 表示先在安全桌面位置暂放持物目标，再重新观察并抓取同一目标完成原任务。
+stage_rearrange 表示先安全暂放目标，再把挡住目的区的一件物品调整到保持其原目标约束的新位置，最后重新抓取原目标；中间步骤不等于原任务完成。
+requires_confirmation=true 的方案会由界面列出步骤并等待人工同意；模型选中不等于已获同意。不得要求跳过确认或几何检查。
 直接抓取会先尝试足够夹住目标的较小开口及可行姿态；若仍受邻物阻挡，优先考虑提供的clear_restore方案，不能无限重复同一个失败动作。
-holding=true 表示夹爪仍拿着目标，不得要求重新抓取或擅自张开夹爪；只能选择提供的持物恢复方案。
+holding=true 表示夹爪仍拿着目标，不得直接再次抓取或在空中松爪；可以选择提供的安全暂放后重抓/重排方案。
 observation_mode=stationary_with_last_scan 表示静止新帧与上次完整扫描的合并；未进入当前视野的物体尚未重新确认，不能把未再次检测等同于不存在。
 若用户已经取消（failure.aborted=true）或没有可用方案，返回 stop。
 attempt 是本次允许的恢复序号，最多 max_attempts 次；达到上限后由本地程序停止，不能要求额外尝试。
@@ -126,9 +129,12 @@ def model_recovery_context(context: dict) -> dict:
         seen.add(option_id)
         entry = {'id': option_id, 'description': _text(option.get('description'), '方案说明')}
         entry.update(_copy_fields(
-            option, strings=('strategy', 'action', 'zone_name', 'label'),
-            flags=('reachable', 'previously_failed'),
+            option, strings=('strategy', 'action', 'zone_name', 'label', 'question'),
+            flags=('reachable', 'previously_failed', 'requires_confirmation'),
             numbers=('clearance', 'edge_margin', 'distance')))
+        steps = option.get('steps')
+        if isinstance(steps, list) and len(steps) <= 8 and all(isinstance(s, str) and 0 < len(s) <= 300 for s in steps):
+            entry['steps'] = list(steps)
         xyz = option.get('position')
         if isinstance(xyz, (list, tuple)) and len(xyz) == 3 and all(_number(v) for v in xyz):
             entry['position'] = list(xyz)

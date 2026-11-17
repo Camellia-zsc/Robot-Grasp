@@ -6,6 +6,7 @@ import json
 import logging
 import threading
 import time
+import uuid
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -52,6 +53,8 @@ class DashboardController:
         self._events = deque(maxlen=160)
         self._next_id = 0
         self._last_result = None
+        self._approval_event = threading.Event()
+        self._recovery_approval = {'status': 'none'}
         self._batch = idle_batch()
         self._speed = 1.0
         self._needs_reset = False
@@ -92,7 +95,141 @@ class DashboardController:
             self._status = status
             self._stage = stage
 
+    def _approval_scene_current(self, version):
+        snapshot = self._session.snapshot()
+        current = snapshot.get('scene_version', self._session.scene.get('scene_version'))
+        return (current == version and
+                not snapshot.get('editor', {}).get('intervention_pending', 0))
+
+    def approve_recovery(self, request):
+        if (not isinstance(request, dict) or set(request) !=
+                {'request_id', 'scene_version', 'approved'} or
+                type(request.get('approved')) is not bool or
+                type(request.get('scene_version')) is not int):
+            raise ValueError('请明确选择同意或拒绝当前方案')
+        with self._lock:
+            pending = self._recovery_approval
+            if (not self._busy or self._cancel.is_set() or pending.get('status') != 'pending'
+                    or request['request_id'] != pending.get('request_id')
+                    or request['scene_version'] != pending.get('scene_version')):
+                raise ValueError('确认请求已过期，请查看当前方案')
+            if not self._approval_scene_current(pending['scene_version']):
+                pending.update(status='stale', message='现场已变化，原方案失效，未执行')
+                self._approval_event.set()
+                raise ValueError('现场已变化，原方案已过期')
+            pending.update(status='approved' if request['approved'] else 'declined',
+                           message='已同意，准备重新检查并执行' if request['approved'] else '已拒绝，保留现场并停止')
+            self._approval_event.set()
+
+    def _await_recovery_approval(self, context, chosen):
+        option = next(item for item in context['options'] if item['id'] == chosen['option_id'])
+        if not option.get('requires_confirmation'):
+            return True
+        with self._lock:
+            self._approval_event.clear()
+            self._recovery_approval = dict(status='pending', request_id=uuid.uuid4().hex,
+                scene_version=context['scene_version'],
+                question=option.get('question') or '是否按以下方案调整现场并继续原任务？',
+                steps=copy.deepcopy(option.get('steps') or [option['description']]),
+                message=option['description'])
+            self._status, self._stage = 'awaiting_approval', '等待你确认恢复方案，机械臂保持当前状态'
+            self._recovery.update(status='awaiting_approval', message=self._stage)
+        self._event('recovery_approval', {'message': self._recovery_approval['question']})
+        while not self._approval_event.wait(.2):
+            if self._cancel.is_set():
+                break
+            if not self._approval_scene_current(context['scene_version']):
+                with self._lock:
+                    self._recovery_approval.update(status='stale', message='现场已变化，方案失效，未执行')
+                break
+        with self._lock:
+            if self._cancel.is_set():
+                self._recovery_approval.update(status='declined', message='任务已停止，未执行方案')
+                raise RuntimeError('任务已停止')
+            accepted = self._recovery_approval['status'] == 'approved'
+            if accepted and not self._approval_scene_current(context['scene_version']):
+                self._recovery_approval.update(status='stale', message='确认后现场又变化，未执行方案')
+                accepted = False
+            return accepted
+
+    def resume_recovery(self):
+        """Explicitly continue a recoverable held failure, preserving its goal."""
+        with self._lock:
+            session = self._session
+            if (self._busy or self._closed or self._cancel.is_set() or session is None
+                    or not getattr(getattr(session, 'runner', None), 'has_held_recovery', False)
+                    or not session.snapshot().get('held_object')
+                    or session.cancel_event.is_set()):
+                raise ValueError('当前没有可以继续处理的持物任务；已停止的任务需先重置')
+            goal = copy.deepcopy(session._recovery_goal)
+            failure = copy.deepcopy(self._last_result or {})
+            instruction = next((m['content'] for m in reversed(self._messages)
+                                if m.get('role') == 'user' and isinstance(m.get('content'), str)),
+                               '继续完成当前持物的原目标')
+            protected = [self._goal(item['label'], item) for item in self._batch.get('items', [])
+                         if item['status'] in ('succeeded', 'skipped')]
+            active = next((item for item in self._batch.get('items', [])
+                           if item['label'] == goal['label'] and
+                           item['status'] not in ('succeeded', 'skipped')), None)
+            if active is not None:
+                active.update(status='recovering', message='继续分析原持物任务的恢复方案')
+                self._batch.update(status='running', current_index=active['index'])
+            self._needs_reset = False
+
+            def run():
+                result = self._recover_task(instruction, goal, failure, protected_goals=protected)
+                with self._lock:
+                    self._last_result = copy.deepcopy(result)
+                    self._scene = session.scene
+                    if self._cancel.is_set():
+                        self._last_result.update(ok=False, aborted=True)
+                        raise RuntimeError('任务已停止')
+                target_ok = bool(result.get('ok'))
+                if target_ok and getattr(session, 'targeted_observation', False):
+                    changed = [item for item in self._batch.get('items', [])
+                               if item['status'] in ('succeeded', 'skipped') and
+                               (item.get('result') or {}).get('verified_revision') != session._environment_revision]
+                    if changed:
+                        checked = session.verify_goals([self._goal(item['label'], item) for item in changed])
+                        if not checked['ok']:
+                            failed = {v['goal']['label'] for v in checked.get('items', []) if not v['ok']}
+                            with self._lock:
+                                for item in changed:
+                                    if not failed or item['label'] in failed:
+                                        item.update(status='failed', message='现场变化后原已完成目标未通过核验')
+                                self._recovery.update(status='exhausted', message='当前物品已恢复，但部分原已完成目标发生变化')
+                            result = dict(result, ok=False, target_ok=True, final_goal_verification=checked,
+                                          message='当前物品已恢复，但部分原已完成目标发生变化')
+                with self._lock:
+                    if self._cancel.is_set():
+                        self._last_result = dict(result, ok=False, aborted=True)
+                        raise RuntimeError('任务已停止')
+                    if active is not None:
+                        active.update(status='succeeded' if target_ok else 'failed',
+                                      message=result.get('message', ''), result=copy.deepcopy(result))
+                        completed = sum(item['status'] in ('succeeded', 'skipped') for item in self._batch['items'])
+                        complete = completed == self._batch['total']
+                        self._batch.update(completed=completed, status='complete' if complete else 'failed',
+                                           message='全部目标已完成' if complete else
+                                           '当前恢复已结束；后续取消的任务未自动重启（完成 %d/%d 件）' % (completed, self._batch['total']))
+                        self._last_result = self._batch_result(complete, result)
+                    else:
+                        self._last_result = result
+                    self._scene = session.scene
+                    self._needs_reset = bool(result.get('holding') or result.get('fault') or result.get('aborted'))
+                    final_ok = bool(self._last_result.get('ok'))
+                    self._status = 'complete' if final_ok else 'error'
+                    self._stage = (self._batch['message'] if active is not None else
+                                   result.get('message') or '恢复尚未完成，保留当前状态')
+                    if final_ok:
+                        self._metrics['successes'] += 1
+                self._event('result', {'message': self._stage, 'result': self._last_result})
+            self._launch(run, 'observing', '继续核对当前持物，保留原任务与现场')
+
     def _stopped_message(self):
+        transaction = (self._last_result or {}).get('pending_rearrangement')
+        if transaction:
+            return '任务已停止；暂放或区域调整尚未完成，已保留各步记录，请先核对物品位置'
         pending = (self._last_result or {}).get('pending_restore')
         if pending:
             names = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块',
@@ -156,6 +293,7 @@ class DashboardController:
             self._scene = {}
             self._needs_reset = True
             self._batch = idle_batch()
+            self._recovery_approval = {'status': 'none'}
             self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
                               'reason': '', 'message': '', 'history': []}
         if previous_preview is not None:
@@ -505,7 +643,9 @@ class DashboardController:
                         last_result = self._recover_task(instruction, goal, last_result,
                                                          reference_xy=item['reference_xy'],
                                                          completed_zones=completed_zones,
-                                                         completed_positions=completed_positions)
+                                                         completed_positions=completed_positions,
+                                                         protected_goals=[self._goal(done['label'], done) for done in items
+                                                                          if done['status'] in ('succeeded', 'skipped')])
                     elif not last_result.get('ok') and (last_result.get('truth') or {}).get('success'):
                         last_result = dict(last_result, fault=True,
                                            message='本件已落位，但机械臂后续动作异常，已停止后续任务')
@@ -567,7 +707,7 @@ class DashboardController:
         self._event('result', {'message': self._stage, 'result': self._last_result})
 
     def _recover_task(self, instruction, goal, initial_result, reference_xy=None,
-                      completed_zones=(), completed_positions=()):
+                      completed_zones=(), completed_positions=(), protected_goals=()):
         """Ask the real model to select bounded local repairs, checking every result."""
         from .recovery import MAX_RECOVERY_ATTEMPTS, validate_recovery_decision
 
@@ -593,13 +733,17 @@ class DashboardController:
             reply = None
             try:
                 if reference_xy is None:
-                    context = self._session.prepare_recovery(result, goal, attempt, history)
+                    extras = ({'protected_goals': protected_goals} if protected_goals and
+                              getattr(self._session, 'targeted_observation', False) else {})
+                    context = self._session.prepare_recovery(result, goal, attempt, history, **extras)
                 else:
                     identity = {'reference_xy': reference_xy}
                     if completed_zones:
                         identity['completed_zones'] = completed_zones
                     if completed_positions:
                         identity['completed_positions'] = completed_positions
+                    if protected_goals and getattr(self._session, 'targeted_observation', False):
+                        identity['protected_goals'] = protected_goals
                     context = self._session.prepare_recovery(result, goal, attempt, history,
                                                               **identity)
                 if self._cancel.is_set():
@@ -637,6 +781,9 @@ class DashboardController:
                 if chosen['action'] == 'stop':
                     reason = chosen['message']
                     break
+                if not self._await_recovery_approval(context, chosen):
+                    reason = self._recovery_approval.get('message') or '未获得人工同意，已停止'
+                    break
                 with self._lock:
                     if self._cancel.is_set():
                         raise RuntimeError('任务已停止')
@@ -645,7 +792,11 @@ class DashboardController:
                         attempt, chosen['message'])
                 if self._cancel.is_set():
                     raise RuntimeError('任务已停止')
-                result = self._session.execute_recovery(chosen, cancel_event=self._cancel)
+                selected = next(item for item in context['options'] if item['id'] == chosen['option_id'])
+                if selected.get('requires_confirmation'):
+                    result = self._session.execute_recovery(chosen, cancel_event=self._cancel, confirmed=True)
+                else:
+                    result = self._session.execute_recovery(chosen, cancel_event=self._cancel)
                 history.append({'attempt': attempt, 'option_id': chosen['option_id'],
                                 'action': chosen['action'], 'ok': bool(result.get('ok')),
                                 'stage': result.get('stage', ''), 'error': result.get('error', ''),
@@ -673,6 +824,9 @@ class DashboardController:
                     return dict(result, recovery_history=history)
                 if result.get('pending_restore'):
                     reason = '移障物品尚未复位，已停止后续任务并保留复位目标'
+                    break
+                if result.get('pending_rearrangement'):
+                    reason = result.get('message') or '多步重排尚未完成，已停止并保留各步现场'
                     break
                 if reference_xy is not None and (result.get('truth') or {}).get('success'):
                     result = dict(result, fault=True)
@@ -714,6 +868,7 @@ class DashboardController:
             if not self._busy:
                 return
             self._cancel.set()
+            self._approval_event.set()
             self._needs_reset = True
             self._status, self._stage = 'stopping', '正在停止当前任务'
             if self._recovery['status'] != 'idle':
@@ -740,6 +895,7 @@ class DashboardController:
                      'scene': copy.deepcopy(self._scene), 'speed': self._speed,
                      'needs_reset': self._needs_reset,
                      'recovery': copy.deepcopy(self._recovery),
+                     'recovery_approval': copy.deepcopy(self._recovery_approval),
                      'metrics': copy.deepcopy(self._metrics),
                      'usage': copy.deepcopy(self._last_usage),
                      'messages': copy.deepcopy(self._messages),
@@ -747,6 +903,10 @@ class DashboardController:
                      'last_result': copy.deepcopy(self._last_result)}
             state['batch'] = copy.deepcopy(self._batch)
             state['simulation'] = session.snapshot() if session is not None else {}
+            state['can_resume_recovery'] = bool(session is not None and not self._busy
+                and not self._cancel.is_set() and state['simulation'].get('held_object')
+                and getattr(getattr(session, 'runner', None), 'has_held_recovery', False)
+                and not session.cancel_event.is_set())
             editor = state['simulation'].setdefault('editor', {})
             editor['editable'] = bool(
                 editor.get('editable', True) and session is not None and self._scene
@@ -931,6 +1091,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 result = ctl.intervene_scene(data)
                 self._send(202, dict(result, ok=True))
                 return
+            elif path == '/api/recovery-approval':
+                ctl.approve_recovery(data)
+            elif path == '/api/resume-recovery':
+                if data:
+                    raise ValueError('继续恢复不接受新目标或坐标')
+                ctl.resume_recovery()
             elif path == '/api/reset':
                 ctl.reset()
             elif path == '/api/stop':

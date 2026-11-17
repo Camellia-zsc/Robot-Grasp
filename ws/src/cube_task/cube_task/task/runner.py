@@ -1038,6 +1038,98 @@ class TaskRunner:
             'place': copy.deepcopy(pp), 'width': float(width), 'zone': pp.zone,
             'avoid': [(float(pp.T_release[0, 3]), float(pp.T_release[1, 3]))]}
 
+    def _held_transfer_feedback(self, det):
+        context = self._held_recovery_context
+        if context is None:
+            return None, None, 'no recoverable held grasp from the last pick'
+        if self._aborted() or not self._healthy():
+            return None, None, 'arm stopped or unhealthy'
+        original = context['det']
+        if (det is None or det.label != original.label or not _has_xy(det)
+                or np.linalg.norm(np.asarray(det.center_base[:2]) -
+                                  np.asarray(original.center_base[:2])) > .02):
+            return None, None, 'held transfer target changed'
+        try:
+            width = float(self.skill._read_width())
+        except (TypeError, ValueError):
+            return None, None, 'held grasp feedback missing or changed'
+        if (not math.isfinite(width) or width < self.skill.empty_width or width > self.max_width
+                or abs(width - context['width']) > self.skill.width_tolerance):
+            return None, None, 'held grasp feedback missing or changed'
+        return context, width, ''
+
+    def plan_held_transfer(self, det: Detection, neighbors: Sequence[Detection],
+                           placement_zone, placement_polygon, exact_xy=True):
+        """Check a temporary release without changing the original recovery goal.
+
+        The caller owns the outer transaction and its restoration obligations.
+        This local bundle retains the measured grip; no pick planner, motion or
+        gripper command runs here. The caller must activate this destination's
+        observation callback before executing it.
+        """
+        context, width, why = self._held_transfer_feedback(det)
+        if context is None:
+            return None, why
+        if placement_zone is None:
+            return None, 'temporary release destination is unavailable'
+        original = copy.deepcopy(context['det'])
+        grasp = copy.deepcopy(context['grasp'])
+        placeholder = copy.deepcopy(context['place'])
+        placeholder.zone = placement_zone.name
+        place, why = self.replan_release(
+            original, grasp, placeholder, width, neighbors,
+            placement_zone=placement_zone, placement_polygon=placement_polygon,
+            exact_xy=bool(exact_xy))
+        if place is None:
+            return None, why
+        return {'det': original, 'grasp': grasp, 'place': place, 'width': width,
+                'placement_zone': copy.deepcopy(placement_zone),
+                'placement_polygon': copy.deepcopy(placement_polygon),
+                'exact_xy': bool(exact_xy), '_context_id': id(context)}, ''
+
+    def execute_held_transfer(self, bundle):
+        """Release the same verified grasp into a locally checked temporary slot.
+
+        A failed held continuation keeps its measured grip available. A release
+        expires that grip; it does not count as completing the original goal.
+        """
+        if not isinstance(bundle, dict):
+            return None, 'invalid held transfer bundle'
+        context, width, why = self._held_transfer_feedback(bundle.get('det'))
+        if context is None:
+            return None, why
+        if bundle.get('_context_id') != id(context):
+            return None, 'held transfer context expired'
+        try:
+            grasp, place = bundle['grasp'], bundle['place']
+            saved = context['grasp']
+            same_grip = (np.allclose(grasp.T_grasp, saved.T_grasp, atol=1e-7, rtol=0)
+                         and abs(float(grasp.closing_angle) - float(saved.closing_angle)) < 1e-7
+                         and grasp.target.label == context['det'].label)
+            same_width = abs(width - float(bundle['width'])) <= self.skill.width_tolerance
+            same_zone = place.zone == bundle['placement_zone'].name
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return None, 'invalid held transfer bundle'
+        if not same_grip:
+            return None, 'held transfer would change the held grasp transform'
+        if not same_width:
+            return None, 'held grasp feedback changed after planning'
+        if not same_zone:
+            return None, 'temporary release destination changed'
+        # The skill's observation hook may refine the release plan. Keep the
+        # offered bundle unchanged, and save the actually executed plan below.
+        grasp, place = copy.deepcopy(grasp), copy.deepcopy(place)
+        result = self.skill.place_held(grasp, place, width)
+        self._save_held_recovery(context['det'], grasp, place, result)
+        if self._held_recovery_context is not None:
+            self._held_recovery_context.update(
+                placement_zone=copy.deepcopy(bundle['placement_zone']),
+                placement_polygon=copy.deepcopy(bundle['placement_polygon']),
+                exact_xy=bool(bundle['exact_xy']))
+        if result.ok:
+            self.fault_detail = ''
+        return result, ''
+
     def retry_held_placement(self, det: Detection, zone_name: str,
                              neighbors: Sequence[Detection] = (),
                              avoid: Sequence[Sequence[float]] = (),
@@ -1127,6 +1219,8 @@ class TaskRunner:
             if ok and saved_zone is not None:
                 ok, why = self._adjust_strict_release(original, gp, candidate, neighbors,
                                                      placement_polygon, info['xy'], held)
+            if ok and not np.allclose(gp.T_grasp, context['grasp'].T_grasp, atol=1e-7, rtol=0):
+                return None, 'release planning would change the held grasp transform'
             if ok:
                 pp = candidate
                 break

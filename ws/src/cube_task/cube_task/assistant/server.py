@@ -92,6 +92,15 @@ class DashboardController:
             self._status = status
             self._stage = stage
 
+    def _stopped_message(self):
+        pending = (self._last_result or {}).get('pending_restore')
+        if pending:
+            names = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块',
+                     'apple': '苹果', 'banana': '香蕉', 'pear': '梨'}
+            label = names.get(pending.get('label'), '临时移开的物品')
+            return '任务已停止；%s尚未复位，已保留原位置与朝向，可以重置场景' % label
+        return '任务已停止，可以重置场景'
+
     def _launch(self, fn, status, stage):
         with self._lock:
             if self._closed:
@@ -111,7 +120,7 @@ class DashboardController:
                     with self._lock:
                         cancelled = self._cancel.is_set()
                         if cancelled:
-                            self._status, self._stage = 'stopped', '任务已停止，可以重置场景'
+                            self._status, self._stage = 'stopped', self._stopped_message()
                         else:
                             safe = (str(exc) if isinstance(exc, (ValueError, RuntimeError))
                                     else '操作失败（%s）' % type(exc).__name__)
@@ -129,7 +138,7 @@ class DashboardController:
                 finally:
                     with self._lock:
                         if self._cancel.is_set():
-                            self._status, self._stage = 'stopped', '任务已停止，可以重置场景'
+                            self._status, self._stage = 'stopped', self._stopped_message()
                             self._needs_reset = True
                         self._busy = False
                     if self._closed:
@@ -221,6 +230,30 @@ class DashboardController:
             editable_session()
             self._launch(run, 'editing', '正在调整桌面布局')
 
+    def intervene_scene(self, request):
+        """Queue a physical scene change without entering the robot worker lock."""
+        if not isinstance(request, dict):
+            raise ValueError('干预操作需要为 JSON 对象')
+        if (request.get('action') != 'move'
+                or set(request) - {'action', 'object_id', 'xy', 'yaw', 'scene_version'}):
+            raise ValueError('运行中干预只允许移动或旋转已有物品')
+        with self._lock:
+            session = self._session
+            if self._closed or self._needs_reset:
+                raise ValueError('任务已停止，请先重置场景再干预')
+            if session is None or not self._scene:
+                raise ValueError('仿真尚未准备好，请先重置场景')
+            if not hasattr(session, 'intervene_scene'):
+                raise ValueError('当前仿真不支持运行中干预')
+        # The session queues this request and applies it at an atomic simulation
+        # step; it must never wait for the complete pick-and-place operation.
+        result = session.intervene_scene(copy.deepcopy(request))
+        result = result if isinstance(result, dict) else {'queued': True}
+        self._event('scene_intervention_queued', {
+            'message': '人为干预已受理；生效后将通过相机局部确认变化',
+            'request_id': result.get('request_id')})
+        return result
+
     def submit(self, instruction, destination=None, scene_version=None):
         if not isinstance(instruction, str) or not instruction.strip():
             raise ValueError('请输入抓取指令')
@@ -257,8 +290,10 @@ class DashboardController:
                 self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
                                   'reason': '', 'message': '', 'history': []}
                 self._metrics['requests'] += 1
-            self._set_status('observing', '正在观察桌面并生成物体列表')
-            scene = self._session.observe()
+            self._set_status('observing', '复用桌面观测生成任务计划，执行前局部确认')
+            scene = self._session.scene
+            if not getattr(self._session, 'targeted_observation', False) or not scene.get('objects'):
+                scene = self._session.observe()
             if selected_destination is not None:
                 from .destinations import validate_destination
                 scene = copy.deepcopy(scene)
@@ -359,8 +394,9 @@ class DashboardController:
                 item.update(status='failed' if active_failure else 'cancelled',
                             message=message if active_failure else '任务已停止' if cancelled else '前序任务未完成')
         sim = self._session.snapshot() if self._session is not None else {}
-        self._last_result = self._batch_result(False, {'holding': bool(sim.get('held_object')),
-                                                      'aborted': cancelled, 'fault': not cancelled})
+        self._last_result = self._batch_result(False, dict(
+            self._last_result or {}, holding=bool(sim.get('held_object')),
+            aborted=cancelled, fault=not cancelled))
         if not cancelled:
             self._needs_reset = True
 
@@ -408,12 +444,38 @@ class DashboardController:
                 if any(done.get('completion_xy') is None for done in prior_extended):
                     raise ValueError('已完成同类物品的落位尚未可靠观察，无法确认下一件身份，已停止后续任务')
                 completed_positions = tuple(done['completion_xy'] for done in prior_extended)
-                single, target = bind_item(item, scene, completed_zones, completed_positions)
+                try:
+                    single, target = bind_item(item, scene, completed_zones, completed_positions)
+                except ValueError:
+                    if not getattr(self._session, 'targeted_observation', False):
+                        raise
+                    scene = self._session.observe(target={'label': item['label'],
+                                                  'xy': item['reference_xy']},
+                                                  purpose='recover_queued_target')
+                    if self._session.editor.metadata().get('one_per_class'):
+                        fresh = [d for d in self._session._last_fresh
+                                 if d.valid and d.label == item['label'] and d.center_base is not None]
+                        if len(fresh) == 1:
+                            item['reference_xy'] = fresh[0].center_base[:2].tolist()
+                    single, target = bind_item(item, scene, completed_zones, completed_positions)
                 with self._lock:
                     item['object_id'] = single['object_id']
                 if whole_footprint_at_goal(target, scene, item):
+                    # Skipping is still a claim about current reality, so confirm it locally.
+                    if getattr(self._session, 'targeted_observation', False):
+                        scene = self._session.observe(target=dict(target), purpose='confirm_completed')
+                        single, target = bind_item(item, scene, completed_zones, completed_positions)
+                        fresh = self._session._last_fresh
+                        if not any(d.valid and d.label == target['label'] and d.center_base is not None
+                                   and sum((float(a)-float(b))**2 for a,b in
+                                           zip(d.center_base[:2], target['center_base'][:2])) < .04**2
+                                   for d in fresh):
+                            raise ValueError('未在本次局部观测中确认已完成目标，不能跳过执行')
+                if whole_footprint_at_goal(target, scene, item):
                     last_result = {'ok': True, 'skipped': True, 'observed_in_zone': True,
                                    'message': '实测完整足迹已满足指定目标，无需搬运'}
+                    if getattr(self._session, 'targeted_observation', False):
+                        last_result['verified_revision'] = self._session._observation_revision
                     if item.get('destination') is not None:
                         last_result['destination'] = copy.deepcopy(item['destination'])
                     need_scan = False
@@ -473,6 +535,21 @@ class DashboardController:
                     break
             self._event('batch_item_result', {'index': item['index'], 'ok': last_result.get('ok'),
                                              'message': item['message']})
+        if (self._batch['completed'] == len(items) and
+                getattr(self._session, 'targeted_observation', False)):
+            changed = [item for item in items if (item.get('result') or {}).get('verified_revision')
+                       != self._session._environment_revision]
+            if changed:
+                checked = self._session.verify_goals(changed)
+                last_result = dict(last_result, final_verification=checked)
+                if not checked['ok']:
+                    by_index = {v['goal']['index']: v for v in checked['items']}
+                    for item in changed:
+                        verified = by_index[item['index']]
+                        if not verified['ok']:
+                            item.update(status='failed', message='运行中变化后，目标已不在指定区域')
+                            self._batch['completed'] -= 1
+                    self._batch.update(status='failed', message=checked['message'])
         with self._lock:
             if self._cancel.is_set():
                 raise RuntimeError('任务已停止')
@@ -569,17 +646,23 @@ class DashboardController:
                 if self._cancel.is_set():
                     raise RuntimeError('任务已停止')
                 result = self._session.execute_recovery(chosen, cancel_event=self._cancel)
-                if self._cancel.is_set():
-                    raise RuntimeError('任务已停止')
                 history.append({'attempt': attempt, 'option_id': chosen['option_id'],
                                 'action': chosen['action'], 'ok': bool(result.get('ok')),
                                 'stage': result.get('stage', ''), 'error': result.get('error', ''),
                                 'holding': bool(result.get('holding')),
                                 'message': result.get('message', '')})
+                result = dict(result, recovery_history=copy.deepcopy(history))
                 with self._lock:
                     self._last_result = result
                     self._scene = self._session.scene
                     self._recovery['history'] = copy.deepcopy(history)
+                    if self._cancel.is_set():
+                        self._recovery.update(status='stopped', message=self._stopped_message())
+                # A cancelled clearance can still return a restoration obligation.
+                # Persist that physical result before ending the worker; never
+                # start another repair or queue item after this cancellation.
+                if self._cancel.is_set():
+                    raise RuntimeError('任务已停止')
                 self._event('recovery_result', {'attempt': attempt, 'ok': bool(result.get('ok')),
                              'message': '第 %d 次恢复%s：%s' % (attempt,
                                 '核验成功' if result.get('ok') else '仍未完成',
@@ -588,6 +671,9 @@ class DashboardController:
                     with self._lock:
                         self._recovery.update(status='succeeded', message='恢复后已通过落位核验')
                     return dict(result, recovery_history=history)
+                if result.get('pending_restore'):
+                    reason = '移障物品尚未复位，已停止后续任务并保留复位目标'
+                    break
                 if reference_xy is not None and (result.get('truth') or {}).get('success'):
                     result = dict(result, fault=True)
                     reason = '本件已落位，但机械臂后续动作异常，已停止后续任务'
@@ -841,6 +927,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     raise ValueError('指令字段不符合约定；选择位置时需同时提交目标与场景版本')
             elif path == '/api/scene-edit':
                 ctl.edit_scene(data)
+            elif path == '/api/scene-intervene':
+                result = ctl.intervene_scene(data)
+                self._send(202, dict(result, ok=True))
+                return
             elif path == '/api/reset':
                 ctl.reset()
             elif path == '/api/stop':

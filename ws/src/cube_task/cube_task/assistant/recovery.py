@@ -16,6 +16,8 @@ RECOVERY_PROMPT = '''你是机械臂仿真任务的异常恢复助手。
 goal.destination 表示抓取区或指定桌面点，必须完整保持；指定点不能改到另一位置，抓取区可由本地程序选择其中的空位。
 请结合 failure、相机实测 observations、已有 history，从本地提供的 options 中选择一个恢复方案。
 options 由本地程序检查，模型只能选择其中已有的 id；不能输出新坐标、轨迹、关节角、代码或机器人命令。
+clear_restore 策略表示先临时搬开测得的遮挡物、完成原任务、再放回原位置与朝向，三个步骤由本地顺序执行。
+直接抓取会先尝试足够夹住目标的较小开口及可行姿态；若仍受邻物阻挡，优先考虑提供的clear_restore方案，不能无限重复同一个失败动作。
 holding=true 表示夹爪仍拿着目标，不得要求重新抓取或擅自张开夹爪；只能选择提供的持物恢复方案。
 observation_mode=stationary_with_last_scan 表示静止新帧与上次完整扫描的合并；未进入当前视野的物体尚未重新确认，不能把未再次检测等同于不存在。
 若用户已经取消（failure.aborted=true）或没有可用方案，返回 stop。
@@ -87,7 +89,7 @@ def model_recovery_context(context: dict) -> dict:
                'goal': visible_goal}
     observation_mode = context.get('observation_mode')
     if observation_mode is not None:
-        if observation_mode not in ('stationary_with_last_scan', 'full_scan', 'unavailable'):
+        if observation_mode not in ('stationary_with_last_scan', 'full_scan', 'target_search', 'unavailable'):
             raise ValueError('恢复观测方式无效。')
         visible['observation_mode'] = observation_mode
     failure = context.get('failure', {})

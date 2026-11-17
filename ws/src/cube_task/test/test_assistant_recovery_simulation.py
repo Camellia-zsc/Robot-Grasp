@@ -68,7 +68,7 @@ def test_empty_grasp_reobserves_same_target_and_rejects_stale_recovery(tmp_path,
         monkeypatch.setattr(sim.runner, 'pick_detection', pick)
         goal = {'label': 'yellow', 'zone_name': 'zone_red'}
         context = sim.prepare_recovery(result, goal, 1, [])
-        assert context['observation_mode'] == 'full_scan'
+        assert context['observation_mode'] == 'target_search'
         assert context['options'][0]['id'] == 'reobserve_retry'
         sim.observe()
         calls = sim.arm.inner.n_calls

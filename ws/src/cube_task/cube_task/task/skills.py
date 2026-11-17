@@ -55,7 +55,7 @@ MAX_GRIPPER_FORCE = 3.0
 TASK_GRIPPER_FORCE = {'L1': 1.5, 'L2': 2.5}
 #: stages whose target is a free-space pose (may lean up to max_tilt_free_deg).
 FREE_STAGES = ('pre', 'lift', 'transit', 'retreat', 'recover_retreat', 'recover_up',
-               'putback_lift', 'putback_retreat', 'up', 'retry_lift')
+               'putback_lift', 'putback_retreat', 'up', 'retry_lift', 'inspect_lift', 'inspect_place')
 
 
 def _force_value(v) -> Optional[float]:
@@ -153,6 +153,9 @@ class PickPlaceSkill:
         self.feedback_max_age = float(cfg.get('robot.motion.feedback_max_age_s', 0.5))
         #: called with the stage name before every move (task.live watcher); None = off.
         self.on_stage = None
+        # Explicit execution hooks may refuse motion; display observers above cannot.
+        self.execution_guard = None
+        self.before_release = None
 
     # ------------------------------------------------------------------ public
     def execute(self, grasp: GraspPlan, place: PlacePlan, dry_run: bool = False) -> PickResult:
@@ -224,7 +227,10 @@ class PickPlaceSkill:
                 self._verify_held(r, 'dropped')
             self._move(r, 'transit', place.T_pre, False)
             self._verify_held(r, 'dropped_in_transit')
+            self._inspect_release(r, grasp, place)
+            self._guard('release')
             self._move(r, 'release', place.T_release, self.linear_moves)
+            self._guard('open_release')
             self._release_and_retreat(r, grasp, place)
         except _Lost as exc:
             r.detail['holding'] = False
@@ -375,7 +381,9 @@ class PickPlaceSkill:
         try:
             self._open(r, 'open', g.open_width, need=g.expected_width + OPEN_CLEARANCE)
             self._move(r, 'pre', g.T_pre, False)
+            self._guard('descend')
             self._move(r, 'descend', g.T_grasp, self.linear_descent)
+            self._guard('close')
             w = self._gripper(r, 'close', g.close_width)
             r.grasp_width = w
             if w is None and self.verify:
@@ -393,7 +401,10 @@ class PickPlaceSkill:
                                   ('transit', p.T_pre, False)):
                 self._move(r, stage, T, lin)
                 self._verify_held(r, 'dropped' if stage == 'lift' else 'dropped_in_transit')
+            self._inspect_release(r, g, p)
+            self._guard('release')
             self._move(r, 'release', p.T_release, self.linear_moves)
+            self._guard('open_release')
             self._release_and_retreat(r, g, p)
         except _Lost as e:
             r.detail['holding'] = False
@@ -406,13 +417,35 @@ class PickPlaceSkill:
                 r.detail['fault'] = True
                 return
             if not holding:
-                if e.stage in ('descend',):
+                if e.stage in ('descend', 'close'):
                     self._retreat_empty(r, g, e.error)
+                return
+            if e.error == 'scene_changed':
+                # Both the old drop site and the old pick site may have changed.
+                # Retain the grasp until new camera evidence supplies a plan.
                 return
             if e.stage == 'release':
                 self._recover_release(r, g, p)
             elif e.stage in ('lift', 'transit'):
                 self._put_back(r, g, from_transit=(e.stage == 'transit'))
+
+    def _guard(self, stage):
+        if self.execution_guard is not None:
+            error = self.execution_guard(stage)
+            if error:
+                raise _StepFailed(stage, error, 'scene changed; camera confirmation required')
+
+    def _inspect_release(self, r, grasp, place):
+        if self.before_release is None:
+            return
+        updated = self.before_release(grasp, place, r.grasp_width, r)
+        if updated is None or not updated.feasible:
+            raise _StepFailed('inspect_place', 'placement_changed',
+                              'fresh destination observation has no safe release')
+        if not np.allclose(updated.T_pre, place.T_pre, atol=1e-5):
+            self._move(r, 'transit', updated.T_pre, False)
+            self._verify_held(r, 'dropped_in_transit')
+        place.__dict__.update(updated.__dict__)
 
     def _release_and_retreat(self, r: PickResult, g: GraspPlan, p: PlacePlan) -> None:
         held = r.grasp_width or 0.0

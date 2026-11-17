@@ -10,6 +10,7 @@ import copy
 import logging
 import math
 import threading
+from collections import deque
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 from typing import Any, Callable, Mapping, Optional
@@ -48,6 +49,7 @@ _STAGE_MESSAGES = {
     'hover_release': '移动到放置预览位置', 'done': '抓放动作结束',
     'verify_close': '检查是否夹住方块', 'dropped': '检查抬升后的夹持状态',
     'dropped_in_transit': '检查移动后的夹持状态',
+    'inspect_lift': '保持夹持并抬升到观察高度', 'inspect_place': '从侧上方观察目标区域空位',
 }
 
 
@@ -129,6 +131,8 @@ class SimulationSession:
     After a stop the abort remains latched; create a new session to restart.
     """
 
+    targeted_observation = True
+
     def __init__(self, seed: int = 0, log_dir: Optional[Path] = None,
                  on_event: Optional[Callable[[str, dict], None]] = None,
                  realtime: bool = True):
@@ -137,6 +141,13 @@ class SimulationSession:
         self.cancel_event = _Cancellation()
         self.clock = _ViewerClock(self.cancel_event, realtime)
         self._operation_lock = threading.RLock()
+        self._intervention_lock = threading.Lock()
+        self._interventions = deque()
+        self._intervention_id = 0
+        self._environment_revision = 0
+        self._active_revision = 0
+        self._observed_detections = []
+        self._scan_stats = {'frames': 0, 'full_scans': 0, 'local_scans': 0}
         self._cache_lock = threading.Lock()
         self._snapshot: dict = {}
         self._jpeg: Optional[bytes] = None
@@ -194,13 +205,16 @@ class SimulationSession:
                                  make_sandbox_perception(self.cfg), self.clock, self.logger,
                                  operator=self.operator, mode='sim')
         self._configure_observation_views()
+        self._base_view_count = len(self.runner.views)
         self.runner.skill.on_stage = self._on_stage
+        self.runner.skill.execution_guard = self._execution_guard
+        self.runner.skill.before_release = self._before_release
         try:
             self.arm.connect()
             if not self.arm.enable():
                 raise RuntimeError('simulation arm did not enable')
             self.camera.start()
-            self.clock.on_tick = self._publish_snapshot
+            self.clock.on_tick = self._tick
             self._publish_snapshot()
         except BaseException:
             self.close()
@@ -219,12 +233,160 @@ class SimulationSession:
         self._emit('stage', {'stage': stage,
                              'message': _STAGE_MESSAGES.get(stage, '正在执行机械臂动作')})
 
+    def _tick(self):
+        self._apply_interventions()
+        self._publish_snapshot()
+
+    def intervene_scene(self, request):
+        """Queue an edit; only the simulation owner mutates world geometry."""
+        if not isinstance(request, dict) or request.get('action') != 'move':
+            raise ValueError('运行中干预仅支持移动或旋转未夹持物品')
+        if set(request) - {'action', 'object_id', 'xy', 'yaw', 'scene_version'}:
+            raise ValueError('干预请求含有不支持的字段')
+        snap = self.snapshot()
+        if self._closed or self.cancel_event.is_set() or not self._prepared:
+            raise ValueError('当前不能干预，请先准备或重置仿真')
+        obj = next((o for o in snap.get('objects', []) if o['id'] == request.get('object_id')), None)
+        if obj is None or obj.get('held'):
+            raise ValueError('请选择桌面上未夹持的物品')
+        if type(request.get('scene_version')) is not int or request['scene_version'] != snap['scene_version']:
+            raise ValueError('场景版本已变化，请刷新后重试')
+        # Validate syntax now; geometry is checked again at the application boundary.
+        for key, size in (('xy', 2), ('yaw', None)):
+            if key not in request:
+                continue
+            value = request[key]
+            values = value if size else [value]
+            if (size and (not isinstance(value, list) or len(value) != size)) or any(
+                    isinstance(v, bool) or not isinstance(v, (int, float)) or abs(v) > 1e6 or not math.isfinite(v)
+                    for v in values):
+                raise ValueError('干预坐标与角度必须为有限数字')
+        if 'xy' not in request and 'yaw' not in request:
+            raise ValueError('干预需要坐标或角度')
+        with self._intervention_lock:
+            if len(self._interventions) >= 12:
+                raise ValueError('等待生效的干预过多，请稍后重试')
+            self._intervention_id += 1
+            request_id = self._intervention_id
+            self._interventions.append((request_id, copy.deepcopy(request)))
+        self._emit('scene_intervention_queued', {'request_id': request_id,
+                   'message': '干预已排队，将在下一仿真时刻生效'})
+        # Idle sessions have no ticking worker. Nonblocking ownership avoids a race.
+        if self._operation_lock.acquire(blocking=False):
+            try:
+                self._apply_interventions()
+                self._publish_snapshot()
+            finally:
+                self._operation_lock.release()
+        return {'queued': True, 'request_id': request_id, 'message': '干预已接收'}
+
+    def _apply_interventions(self):
+        with self._intervention_lock:
+            pending = list(self._interventions)
+            self._interventions.clear()
+        for request_id, request in pending:
+            try:
+                obj = next((o for o in self.world.objects if o.name == request['object_id']), None)
+                if obj is None or obj is self.world.held:
+                    raise ValueError('物品已被夹持或已不存在，干预未生效')
+                candidate = obj.copy()
+                xy = request.get('xy', obj.center_xy())
+                candidate.place_upright(float(xy[0]), float(xy[1]),
+                                       float(request.get('yaw', obj.yaw())), self.world.table_z)
+                table = self._placement['table_bounds']
+                polygon = [[table['x'][0], table['y'][0]], [table['x'][1], table['y'][0]],
+                           [table['x'][1], table['y'][1]], [table['x'][0], table['y'][1]]]
+                CatalogEditor(self.world, polygon)._check_placement(
+                    candidate, [o for o in self.world.objects if o is not obj and not
+                                (o is self.world.held and
+                                 float(o.aabb()[0][2]) > float(candidate.aabb()[1][2]) + .008)])
+                # Keep object identity: held/evaluation references must remain meaningful.
+                obj.T_base_obj = candidate.T_base_obj.copy()
+                self._environment_revision += 1
+                self._emit('scene_intervention_applied', {'request_id': request_id,
+                           'message': '人为干预已生效，后续动作将通过相机重新确认'})
+            except ValueError as exc:
+                self._emit('scene_intervention_rejected', {'request_id': request_id,
+                           'message': str(exc)})
+
+    def _execution_guard(self, stage):
+        self._apply_interventions()
+        if (stage in ('descend', 'close') and
+                self._environment_revision != self._active_revision):
+            return 'scene_changed'
+        if (stage in ('release', 'open_release') and
+                self._environment_revision != self._active_revision):
+            return 'scene_changed'
+        return None
+
+    def _before_release(self, grasp, place, width, result):
+        """At the destination hover, measure occupancy before choosing a final slot."""
+        target, destination, zone_name, options = self._active_placement
+        self._apply_interventions()
+        self._emit('inspect_place', {'message': '已到目标区域上方，正在局部确认空位'})
+        from .observation_policy import merge_local_detections, measurement_visible
+        from .placement_observation import candidate_visibility_filter, safe_inspection_poses
+        from ..core.extrinsics import camera_pose_in_base
+        neighbors = list(self._observed_detections)
+        def measure():
+            nonlocal neighbors
+            revision = self._environment_revision
+            fresh = self._stationary_recovery_observation()
+            frame = self.camera._last
+            flange = self.arm.get_flange_pose()
+            pose = camera_pose_in_base(self.runner.ext, flange.value, self.runner.T_flange_tcp)
+            fresh = [d for d in fresh if d.center_base is not None and d.label != target.label]
+            neighbors = merge_local_detections(neighbors, fresh,
+                         lambda d: measurement_visible(d, frame, pose), forget=[target])
+            self._recovery_neighbors = copy.deepcopy(neighbors)
+            self._refresh_placement_occupancy(target, neighbors, destination)
+            visible = candidate_visibility_filter(target, grasp, frame, pose,
+                        nominal=self.runner.nominal.get(target.label),
+                        max_open_width=self.runner.placer.open_width)
+            updated, why = self.runner.replan_release(target, grasp, place, width, neighbors,
+                                                      observation_filter=visible, **options)
+            return updated, why, revision
+        updated, why, revision = measure()
+        if updated is None:
+            ext = self.runner.ext
+            T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
+            high = max([float(self.cfg.get('perception.table.expected_z', 0) or 0)] + [float(d.top_z) for d in neighbors
+                       if d.top_z is not None and d.label != target.label])
+            xy = (options['placement_zone'].center[:2] if options else
+                  self.runner.zones[zone_name].center[:2])
+            poses, minimum = safe_inspection_poses(self.arm, grasp, T_fc,
+                             self.runner.T_flange_tcp, xy, high,
+                             table_z=float(self.cfg.get('perception.table.expected_z', 0) or 0),
+                             free_tilt_deg=self.runner.free_tilt,
+                             nominal=self.runner.nominal.get(target.label),
+                             intrinsics=self.camera.intrinsics())
+            if poses:
+                lift = self.arm.get_tcp_pose().value.copy()
+                lift[2, 3] = max(float(lift[2, 3]), minimum)
+                self.runner.skill._move(result, 'inspect_lift', lift, True)
+                for inspection in poses[:4]:
+                    self.runner.skill._move(result, 'inspect_place', inspection, False)
+                    self.runner.skill._verify_held(result, 'dropped_in_transit')
+                    updated, why, revision = measure()
+                    if updated is not None:
+                        break
+        self._active_revision = revision
+        if updated is None:
+            self._emit('placement_changed', {'message': '目标区当前无可确认的安全空位，将保持夹持', 'reason': why})
+            return None
+        self._observed_detections = copy.deepcopy(neighbors)
+        info = dict(self.runner.placer.last_info)
+        self._placement_center = list(info.get('xy', updated.T_release[:2, 3]))
+        self._emit('placement_refined', {'message': '已根据局部观测确认放置位置',
+                                         'position': self._placement_center})
+        return updated
+
     def _record_feedback(self, kind: str, fields: dict) -> None:
         """Expose existing measured checks; viewer feedback never commands motion."""
-        if kind == 'decision' and fields.get('action') in ('pick', 'retry_held_placement'):
+        if kind == 'decision' and fields.get('action') in ('pick', 'retry_held_placement', 'replan_release'):
             self._placement_center = list((fields.get('place') or {}).get('xy')
                                           or (fields.get('release_xyz') or [])[:2])
-            if fields.get('action') == 'retry_held_placement':
+            if fields.get('action') != 'pick':
                 return
             target = fields.get('target') or {}
             self._feedback['grasp_plan'] = {
@@ -272,6 +434,8 @@ class SimulationSession:
             if self.world.held is not None:
                 raise ValueError('夹爪仍夹着物品，不能编辑场景')
             change = self.editor.apply(request)
+            self._environment_revision += 1
+            self._observed_detections = []
             self.runner._placed.clear()
             self.runner._placed_labels.clear()
             self.runner._tracks.clear()
@@ -335,7 +499,7 @@ class SimulationSession:
             self.clock.paced = True
             return scene
 
-    def observe(self) -> dict:
+    def observe(self, target=None, purpose='search', forget=()) -> dict:
         """Capture fresh detections, assigning new IDs for this observation only."""
         with self._operation_lock:
             self._check_open()
@@ -345,25 +509,23 @@ class SimulationSession:
                 raise RuntimeError('simulation is stopped; reset it before observing')
             self._status = 'observing'
             self._publish_snapshot()
-            with self._cache_lock:
-                self._observation_views = {}
-                self._observation_jpegs = {}
-            self._emit_scan_view(0)
-            result, why = self.runner.observe_once()
-            if result is None:
-                self._invalidate_scene(why)
-                self._status = 'error'
-                self._publish_snapshot()
-                raise RuntimeError('simulation observation failed: ' + why)
-            self._cache_observation(0, result, getattr(self.camera, '_last', None))
-            views = {0: tag_view(result.detections, 0)}
-            warnings = list(result.warnings)
-            # The official L1 scene uses several taught wrist views. Scan with
-            # the runner's same camera/perception path, then use its existing
-            # merge rule, then explain clipped mixed silhouettes using only
-            # measured geometry from the other views of this same scan.
-            for view in range(1, len(self.runner.views)):
-                self._emit_scan_view(view)
+            from .observation_policy import (merge_local_detections, measurement_visible,
+                                             unique_target)
+            from ..core.extrinsics import camera_pose_in_base
+            local = target is not None
+            self._last_fresh = []
+            order = self._view_order(target) if local else list(range(self._base_view_count))
+            if local and purpose == 'verify_place':
+                order = order[:2]
+            self._scan_stats['local_scans' if local else 'full_scans'] += 1
+            if not local:
+                with self._cache_lock:
+                    self._observation_views = {}
+                    self._observation_jpegs = {}
+            views, warnings, coverage = {}, [], []
+            revision = self._environment_revision
+            for step, view in enumerate(order, 1):
+                self._emit_scan_view(view, step=step, total=len(order), local=local)
                 status, next_result, frame = self.runner._observe(view)
                 if status != 'ok' or next_result is None:
                     why = '%s: %s' % (status, self.runner._last_obs_failure)
@@ -372,12 +534,96 @@ class SimulationSession:
                     self._publish_snapshot()
                     raise RuntimeError('simulation observation failed: ' + why)
                 result = next_result
+                self._scan_stats['frames'] += 1
                 self._cache_observation(view, result, frame)
                 views[view] = tag_view(result.detections, view)
                 warnings.extend(result.warnings)
+                flange = self.arm.get_flange_pose()
+                pose = camera_pose_in_base(self.runner.ext, flange.value, self.runner.T_flange_tcp)
+                coverage.append((frame, pose))
+                if local:
+                    label = target.get('label')
+                    measured = unique_target(views[view], label,
+                        partial=lambda d: self._target_partial(d, target)) if label else None
+                    # A pear's low bulb view is valid but insufficient for neck grasping.
+                    reliable = measured is not None and (label != 'pear' or
+                                float(measured.height or 0) >= float(target.get('height', 0) or 0) - .007)
+                    geometry_ready = (label not in ('banana', 'pear') or
+                                      self._stable_cloud(measured, revision) is not None or
+                                      sum(any(d.valid and d.label == label for d in ds)
+                                          for ds in views.values()) >= 2)
+                    if (reliable and (geometry_ready or purpose == 'verify_place')) or (not label and len(coverage) >= 1):
+                        break
             detections, diagnostics = merge_observations(
                 views, dist=self.runner.view_merge,
                 partial=lambda d: not d.valid or self.runner._partial(d))
+            fresh = list(detections)
+            for det in fresh:
+                cloud = self._placement_cloud(det, views, fresh)
+                previous_cloud = self._stable_cloud(det, revision)
+                if previous_cloud is not None:
+                    cloud = previous_cloud if cloud is None else np.vstack([previous_cloud, cloud])
+                if cloud is not None:
+                    det.extra['_placement_points_base'] = cloud
+                    det.extra['_cloud_views'] = max(2 if previous_cloud is not None else 0,
+                                                     det.extra.get('_placement_view_count', 0))
+                det.extra['_observed_revision'] = revision
+            if local:
+                detections = merge_local_detections(
+                    self._observed_detections, fresh,
+                    lambda d: any(measurement_visible(d, f, p) for f, p in coverage),
+                    forget=forget)
+            self._last_fresh = fresh
+            self._observation_revision = revision
+            self._last_observation_purpose = purpose
+            self._observed_detections = copy.deepcopy(detections)
+            self._emit('observation_complete', {'purpose': purpose, 'views': list(views),
+                       'message': '局部观测完成' if local else '首次全场观测完成',
+                       'stats': copy.deepcopy(self._scan_stats)})
+            return self._publish_scene(detections, warnings, diagnostics, result.frame_stamp)
+
+    def _stable_cloud(self, det, revision):
+        if det is None or det.center_base is None:
+            return None
+        previous = [d for d in self._observed_detections if d.label == det.label and d.valid]
+        if len(previous) != 1:
+            return None
+        old = previous[0]
+        if det.label in ('banana', 'pear') and old.extra.get('_cloud_views', 0) < 2:
+            return None
+        if (old.extra.get('_observed_revision') != revision or
+                np.linalg.norm(det.center_base[:2] - old.center_base[:2]) > .003):
+            return None
+        if det.label in ('banana', 'pear') and abs(math.remainder(
+                float(det.yaw or 0) - float(old.yaw or 0), math.pi)) > math.radians(4):
+            return None
+        if any(a is None or b is None or abs(a-b) > .10 * max(a, b)
+               for a, b in ((det.length, old.length), (det.width, old.width))):
+            return None
+        return old.extra.get('_placement_points_base')
+
+    def _target_partial(self, det, reference):
+        """A known complete fruit need not match the old competition size prior."""
+        if not self.runner._partial(det):
+            return False
+        return not all(a is not None and b is not None and
+                       .9 * float(b) <= float(a) <= 1.15 * float(b)
+                       for a, b in ((det.length, reference.get('length')),
+                                    (det.width, reference.get('width')),
+                                    (det.height, reference.get('height'))))
+
+    def _view_order(self, target):
+        from .observation_policy import rank_views
+        ext = self.runner.ext
+        T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
+        cameras = [self.arm.kin.fk(q) @ T_fc for q in self.runner.views]
+        point = target.get('center_base') or target.get('xy') or [.26, 0]
+        return rank_views(cameras, self.camera.intrinsics(), point[:2],
+                          preferred=target.get('view'),
+                          half_extent=max(.04, float(target.get('length') or .08) / 2),
+                          target_z=float(target.get('top_z') or .04))
+
+    def _publish_scene(self, detections, warnings, diagnostics, stamp):
             self._scene_version += 1
             mapping = {}
             objects = []
@@ -391,12 +637,10 @@ class SimulationSession:
                                  if z.contains_xy(x, y)), None)
                 object_id = 'v%d-object-%d' % (self._scene_version, index)
                 measured = copy.deepcopy(det)
+                measured.extra['object_id'] = object_id
                 # Keep the visible support from every uniquely associated
                 # wrist view. A curved object's rectangle center is not a
                 # rigid anchor when it is rotated for a later placement.
-                cloud = self._placement_cloud(det, views, detections)
-                if cloud is not None:
-                    measured.extra['_placement_points_base'] = cloud
                 if measured.center_base is not None:
                     measured.center_base.setflags(write=False)
                 if measured.mask is not None:
@@ -406,13 +650,15 @@ class SimulationSession:
                                     in_zone=zone is not None, zone=zone,
                                     view=measured.extra.get('view', 0)))
             self._detections = MappingProxyType(mapping)
+            self._observed_detections = list(mapping.values())
             self._scene = {'scene_version': self._scene_version, 'objects': objects,
                            'zones': self._zones(),
                            'placement': copy.deepcopy(self._placement),
                            'class_to_zone': dict(self.runner.class_to_zone),
                            'task': 'Sandbox', 'mode': 'sim',
                            'observation_diagnostics': diagnostics,
-                           'observed_at': float(result.frame_stamp),
+                           'observed_at': float(stamp),
+                           'observation_stats': copy.deepcopy(self._scan_stats),
                            'warnings': warnings}
             self._status = 'ready'
             self._stage = ''
@@ -425,8 +671,8 @@ class SimulationSession:
             return None
         peers = [d for d in merged if d.label == det.label and d.valid and d.center_base is not None]
         radius = max(.05, float(self.runner._footprint(det) or 0) * .75)
-        clouds = []
-        for detections in views.values():
+        clouds, used_views = [], set()
+        for view_id, detections in views.items():
             for candidate in detections:
                 if candidate.label != det.label or candidate.center_base is None or candidate.score < .5:
                     continue
@@ -436,19 +682,22 @@ class SimulationSession:
                 points = np.asarray((candidate.extra or {}).get('_points_base'), dtype=float)
                 if points.ndim == 2 and points.shape[1] == 3 and len(points) >= 40 and np.all(np.isfinite(points)):
                     clouds.append(points)
+                    used_views.add(view_id)
         if not clouds:
             return None
         points = np.vstack(clouds)
         _, keep = np.unique(np.floor(points / .002).astype(np.int64), axis=0, return_index=True)
         points = points[np.sort(keep)]
+        det.extra['_placement_view_count'] = len(used_views)
         points.setflags(write=False)
         return points
 
-    def _emit_scan_view(self, view: int) -> None:
-        total = len(self.runner.views)
+    def _emit_scan_view(self, view: int, step=None, total=None, local=False) -> None:
+        total = len(self.runner.views) if total is None else total
         label = self._view_labels[view]
         self._emit('scan_view', {'view': view, 'total': total, 'label': label,
-                                 'message': '正在扫描 %d/%d：%s' % (view + 1, total, label)})
+                                 'message': ('正在局部观察：' + label if local else
+                                             '正在扫描 %d/%d：%s' % (step or view + 1, total, label))})
 
     def _cache_observation(self, view: int, result, frame, label=None) -> None:
         """Freeze each processed camera view; gallery reads never render or move."""
@@ -505,6 +754,7 @@ class SimulationSession:
                 if det.label not in self.runner.class_to_zone:
                     return self._refusal('invalid_target', 'target is not a configured catalog class',
                                          object_id, zone_name)
+                # Reject malformed or out-of-workspace requests before any camera motion.
                 if destination is not None:
                     if zone_name is not None:
                         return self._refusal('invalid_destination', '放置区域与桌面目标不能同时指定', object_id, zone_name)
@@ -517,15 +767,46 @@ class SimulationSession:
                 else:
                     placement_options = {}
                     zone_name = zone_name or self.runner.class_to_zone[det.label]
-                if destination is None and zone_name not in self.runner.zones:
-                    return self._refusal('invalid_zone', 'target zone does not exist',
+                    if zone_name not in self.runner.zones:
+                        return self._refusal('invalid_zone', 'target zone does not exist', object_id, zone_name)
+                # Initial intent is stable; coordinates must be confirmed in a new image.
+                original = copy.deepcopy(det)
+                preconfirmed = (getattr(self, '_last_observation_purpose', '') in
+                                ('recover_target', 'recover_queued_target') and
+                                self._observation_revision == self._environment_revision and
+                                any(d.valid and d.label == original.label and d.center_base is not None and
+                                    np.linalg.norm(d.center_base[:2] - original.center_base[:2]) < .003
+                                    for d in self._last_fresh))
+                if not preconfirmed:
+                    self.observe(target=original.summary() | {'view': original.extra.get('view')},
+                                 purpose='confirm_pick', forget=[original])
+                self._last_observation_purpose = 'consumed_for_pick'
+                from .observation_policy import unique_target
+                det = unique_target(self._last_fresh, original.label,
+                                    partial=lambda d: self._target_partial(d, original.summary()))
+                if det is None:
+                    return self._refusal('target_lost', '目标未在新相机图像中可靠找到，未执行旧坐标抓取',
                                          object_id, zone_name)
+                if (np.linalg.norm(det.center_base[:2] - original.center_base[:2]) > .04
+                        and not self.editor.metadata().get('one_per_class')):
+                    return self._refusal('target_ambiguous', '目标发生较大移动，无法唯一确认身份', object_id, zone_name)
+                self._active_revision = self._observation_revision
                 # Pass the exact measured target among the valid neighbors; this
                 # preserves the runner's identity checks for transit clearance.
                 target = copy.deepcopy(det)
-                neighbors = [target if d is det else copy.deepcopy(d)
-                             for d in self._detections.values()
-                             if d.center_base is not None and (d.valid or destination is not None)]
+                self.runner._tracks = [t for t in self.runner._tracks if not
+                    (t.get('label') == det.label and
+                     np.linalg.norm(np.asarray(t['xy']) - det.center_base[:2]) < .04 and
+                     str(t.get('reason', '')).startswith('grasp infeasible: blocked_by_neighbor'))]
+                if get('_restore_yaw') is not None:
+                    yaw = get('_restore_yaw')
+                    if isinstance(yaw, bool) or not isinstance(yaw, (float, int)) or not math.isfinite(yaw):
+                        raise ValueError('恢复朝向无效')
+                    target.extra['_restore_yaw'] = float(yaw)
+                neighbors = [target]
+                neighbors.extend(copy.deepcopy(d) for d in self._observed_detections
+                                 if d.center_base is not None and not (d.label == det.label and
+                                 np.linalg.norm(d.center_base[:2] - det.center_base[:2]) < .04))
                 if destination is not None and destination['type'] == 'point':
                     # The requested point can lie beyond the old pick/card
                     # views. Measure its surroundings before committing a grasp.
@@ -570,6 +851,7 @@ class SimulationSession:
                                                    np.linalg.norm(np.asarray(t['xy']) - det.center_base[:2]) < .03
                                                    and str(t.get('reason', '')).startswith(('place infeasible', 'unreachable')))]
                 self._status = 'executing'
+                self._active_placement = (target, destination, zone_name, placement_options)
                 self._publish_snapshot()
                 result, why = self.runner.pick_detection(target, zone_name=zone_name,
                                                          neighbors=neighbors, **placement_options)
@@ -621,11 +903,15 @@ class SimulationSession:
             q, _ep, _er = self.arm.kin.ik(look_at(eye, target) @ inv_T(T_fc),
                                           q_seed=self.runner.views[len(self.runner.views)//2])
             if q is not None:
-                self.runner.views.append(q.tolist())
-                self._view_labels.append('桌面目标点视角')
+                # Reuse one transient view instead of growing every future scan.
+                view = self._base_view_count
+                if len(self.runner.views) == view:
+                    self.runner.views.append(q.tolist())
+                    self._view_labels.append('桌面目标点视角')
+                else:
+                    self.runner.views[view] = q.tolist()
                 self.runner.multi_view = True
-                view = len(self.runner.views) - 1
-                self._destination_views[key] = view
+                self._destination_views = {key: view}
                 return view
 
     def _verify_destination(self, obj, destination):
@@ -638,6 +924,41 @@ class SimulationSession:
         return footprint_in_destination(np.vstack(obj.footprint_polygons()),
                                         {'placement': self._placement}, destination)
 
+    def verify_goals(self, goals):
+        """Recheck changed completed goals, sharing one local view per destination."""
+        from .batch import whole_footprint_at_goal
+        groups = {}
+        for goal in goals:
+            destination = goal.get('destination')
+            if destination is None:
+                zone = self.runner.zones[goal['zone_name']]
+                key, xy = ('zone', zone.name), zone.center[:2].tolist()
+            elif destination['type'] == 'point':
+                key, xy = ('point', *destination['xy']), destination['xy']
+            else:
+                key, xy = ('region', destination['name']), [.26, 0.]
+            groups.setdefault(key, (xy, []))[1].append(goal)
+        items = []
+        for xy, group in groups.values():
+            scene = self.observe(target={'xy': xy}, purpose='verify_place')
+            fresh = list(self._last_fresh)
+            for goal in group:
+                def confirmed():
+                    return (self._observation_revision == self._environment_revision and any(
+                        d.valid and d.label == goal['label'] and
+                        whole_footprint_at_goal(d.summary(), scene, goal) for d in fresh))
+                if not confirmed():
+                    scene = self.observe(target={'xy': xy, 'label': goal['label']}, purpose='verify_place')
+                    fresh = list(self._last_fresh)
+                items.append({'label': goal['label'], 'ok': confirmed(),
+                              'verified_revision': self._observation_revision,
+                              'goal': copy.deepcopy(goal)})
+        for item in items:
+            item['ok'] = item['ok'] and item['verified_revision'] == self._environment_revision
+        ok = all(item['ok'] for item in items)
+        return {'ok': ok, 'items': items, 'verified_revision': self._environment_revision,
+                'message': '新相机图像已确认全部目标' if ok else '场景变化后部分目标不再满足原任务'}
+
     def _finish_attempt(self, result, why, object_id, zone_name, det, evaluation_object,
                         destination=None):
         """Use the same independent placement check for initial and recovery actions."""
@@ -648,6 +969,7 @@ class SimulationSession:
             summary['diagnostics'] = str(result.detail.get('last_motion_detail') or
                                          result.detail.get('reason') or why or '')[:500]
         summary['object_id'] = object_id
+        summary['source_xy'] = det.center_base[:2].tolist()
         if destination is not None:
             summary['destination'] = copy.deepcopy(destination)
             summary['placement_center'] = copy.deepcopy(self._placement_center)
@@ -657,12 +979,22 @@ class SimulationSession:
         if destination is not None and result is None and not summary['aborted']:
             self._status, self._stage = 'ready', ''
         else:
-            self._invalidate_scene('observation invalidated after execution')
+            self._status = 'ready'
         if result is None and destination is not None and not summary['aborted']:
             pass  # Planning refusal sent no commands and preserves this observation.
         elif not summary['aborted'] and not summary.get('fault') and not summary['holding']:
             try:
-                self.observe()
+                if destination is not None:
+                    xy = (self._placement_center or destination.get('xy') or [.26, 0])
+                    if destination['type'] == 'point':
+                        self._ensure_destination_view(destination)
+                    query = {'xy': xy}
+                else:
+                    query = {'xy': self.runner.zones[zone_name].center[:2].tolist()}
+                if result is not None and result.ok:
+                    query.update(label=det.label, height=det.height)
+                self.observe(target=query, purpose='verify_place',
+                             forget=[det] if result is not None and result.ok else [])
             except RuntimeError as exc:
                 summary['observation_error'] = str(exc)
         else:
@@ -683,9 +1015,23 @@ class SimulationSession:
         if destination is not None:
             summary['truth']['expected_destination'] = copy.deepcopy(destination)
             summary['truth']['expected_zone'] = None
-        summary['ok'] = summary['controller_ok'] and truth_success
+        from .batch import whole_footprint_at_goal
+        goal = {'zone_name': zone_name}
+        if destination is not None:
+            goal['destination'] = destination
+        camera_success = any(d.valid and d.label == det.label and
+                             whole_footprint_at_goal(d.summary(), self._scene, goal)
+                             for d in getattr(self, '_last_fresh', []))
+        summary['camera_verified'] = camera_success
+        summary['verified_revision'] = getattr(self, '_observation_revision', -1)
+        camera_success = camera_success and (getattr(self, '_observation_revision', -1) ==
+                                              getattr(self, '_environment_revision', -2))
+        summary['camera_verified'] = camera_success
+        summary['ok'] = summary['controller_ok'] and truth_success and camera_success
         if summary['controller_ok'] and not truth_success:
             summary['error'] = 'placement_not_verified'
+        elif summary['controller_ok'] and not camera_success:
+            summary['error'] = 'placement_not_observed'
         colors = {'red': '红色', 'green': '绿色', 'yellow': '黄色'}
         if summary['aborted']:
             summary['message'] = ('任务已停止，夹爪保持夹持，机械臂保持当前位置'
@@ -732,17 +1078,14 @@ class SimulationSession:
                 # The last full scan records the neighbors before this grasp.
                 # Replace only visible measured neighbors; the carried target
                 # must never become an occupied placement slot.
-                neighbors = [copy.deepcopy(d) for d in self._recovery_neighbors]
-                for det in fresh:
-                    if det.valid and det.center_base is not None:
-                        # A new view of the carried target must not erase all
-                        # other objects of its class. Keep known neighbors and
-                        # accept new geometry only when it lies on the table.
-                        if det.label == goal['label'] and float(det.center_base[2]) > float(self._recovery_target.center_base[2]) + .04:
-                            continue
-                        neighbors = [d for d in neighbors if d.label != det.label or
-                                     np.linalg.norm(d.center_base[:2] - det.center_base[:2]) > .03]
-                        neighbors.append(copy.deepcopy(det))
+                from .observation_policy import merge_local_detections, measurement_visible
+                from ..core.extrinsics import camera_pose_in_base
+                pose = camera_pose_in_base(self.runner.ext, self.arm.get_flange_pose().value,
+                                            self.runner.T_flange_tcp)
+                neighbors = merge_local_detections(self._recovery_neighbors,
+                    [d for d in fresh if d.center_base is not None and d.label != goal['label']],
+                    lambda d: measurement_visible(d, self.camera._last, pose),
+                    forget=[self._recovery_target])
                 self._recovery_neighbors = neighbors
                 observations = [d.summary() for d in neighbors]
                 if getattr(self.runner, 'has_held_recovery', False):
@@ -751,8 +1094,10 @@ class SimulationSession:
                         '排除之前失败的放置点，抬升后移动、下降、放下并核验；'
                         '不重复抓取，不在空中松爪。本次是第 %d 次重新选位。' % attempt})
             elif healthy:
-                observation_mode = 'full_scan'
-                scene = self.observe()
+                observation_mode = 'target_search'
+                scene = self.observe(target=self._recovery_target.summary() |
+                                     {'view': self._recovery_target.extra.get('view')},
+                                     purpose='recover_target', forget=[self._recovery_target])
                 observations = scene['objects']
                 matches = [o for o in observations if o.get('valid') and
                            o.get('label') == goal['label']]
@@ -760,6 +1105,8 @@ class SimulationSession:
                     from .batch import matching_objects
                     matches = matching_objects(scene, goal['label'], reference_xy, completed_zones,
                                                completed_positions)
+                    if not matches and self.editor.metadata().get('one_per_class'):
+                        matches = [o for o in scene['objects'] if o.get('valid') and o.get('label') == goal['label']]
                 if len(matches) == 1:
                     target = matches[0]
                     self._recovery_retry = {
@@ -768,7 +1115,13 @@ class SimulationSession:
                     if goal.get('destination') is not None:
                         self._recovery_retry['destination'] = copy.deepcopy(goal['destination'])
                     options.append({'id': 'reobserve_retry', 'description':
-                        '根据刚完成的六视角扫描，重新定位同一个目标，重新规划抓取并放入原指定区域。'})
+                        '根据刚完成的目标优先观测，重新定位同一个目标，使用实测截面与邻物间隙重新规划。'})
+                    from .obstacle_recovery import propose_clearance
+                    measured = self._detections[target['object_id']]
+                    clearance = propose_clearance(self, measured, goal)
+                    if clearance:
+                        # A direct retry was already geometrically ruled out.
+                        options = clearance
             else:
                 self._scene_version += 1
             if holding:
@@ -800,6 +1153,7 @@ class SimulationSession:
             raise RuntimeError('恢复时无法读取相机坐标变换')
         pose = camera_pose_in_base(self.runner.ext, flange.value, self.runner.T_flange_tcp)
         result = self.runner.perception.process(frame, pose, self.runner.zones)
+        self._scan_stats['frames'] += 1
         self.runner._last_stamp = float(frame.stamp)
         self._cache_observation(6, result, frame, label='恢复时静止观测')
         self._emit('recovery_observation', {'message': '已保持夹持并完成静止相机观测',
@@ -825,6 +1179,17 @@ class SimulationSession:
             try:
                 if self.cancel_event.is_set():
                     raise RuntimeError('任务已停止')
+                if chosen['option_id'].startswith('clear_restore_'):
+                    from .obstacle_recovery import execute_clearance
+                    saved = {key: copy.deepcopy(getattr(self, key)) for key in
+                             ('_recovery_target', '_recovery_goal', '_recovery_neighbors')}
+                    saved_evaluation = self._recovery_evaluation
+                    outcome = execute_clearance(self, chosen['option_id'], cancel_event)
+                    if not outcome.get('ok') and not outcome.get('pending_restore') and not outcome.get('holding'):
+                        for key, value in saved.items():
+                            setattr(self, key, value)
+                        self._recovery_evaluation = saved_evaluation
+                    return outcome
                 if chosen['option_id'] == 'reobserve_retry':
                     if self.world.held is not None or self._recovery_retry is None:
                         raise ValueError('当前状态不能重复抓取')
@@ -969,6 +1334,8 @@ class SimulationSession:
                             'held': obj is self.world.held, 'placed': zone is not None,
                             'zone': None if zone is None else zone.name})
         editor = dict(self.editor.metadata(), scene_version=self._scene_version,
+                      intervention_available=self._prepared and not self.cancel_event.is_set(),
+                      intervention_pending=len(self._interventions),
                       editable=(self._prepared and not self.cancel_event.is_set()
                                 and self.world.held is None and self._status in ('ready', 'error')))
         snap = {'mode': 'sim', 'simulation_kind': 'kinematic', 'seed': self.seed,
@@ -987,6 +1354,7 @@ class SimulationSession:
                 'pick_polygon': to_jsonable(self.info['pick_polygon']),
                 'held_object': None if self.world.held is None else self.world.held.name,
                 'editor': editor, 'feedback': copy.deepcopy(self._feedback),
+                'observation_stats': copy.deepcopy(self._scan_stats),
                 'score': self.world.score(self.runner.class_to_zone),
                 'class_to_zone': dict(self.runner.class_to_zone)}
         with self._cache_lock:

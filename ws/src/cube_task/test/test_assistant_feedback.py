@@ -4,9 +4,10 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+import numpy as np
 
 from cube_task.assistant.simulation import SimulationSession
-from cube_task.core.types import PickResult
+from cube_task.core.types import Detection, PickResult, Zone
 
 
 @pytest.fixture
@@ -15,7 +16,8 @@ def session():
     session.cancel_event = threading.Event()
     session._scene = {'scene_version': 2, 'objects': []}
     session._feedback = {'grasp_plan': {}, 'checks': []}
-    zone = SimpleNamespace(name='zone_red', label='red')
+    zone = Zone('zone_red', np.array([.17, -.35, 0]), (.2, .2), label='red')
+    session._environment_revision = session._observation_revision = 0
     session.world = SimpleNamespace(held=None, score=Mock(return_value={}),
                                     zone_of=Mock(return_value=zone))
     session.runner = SimpleNamespace(class_to_zone={'apple': 'zone_red'},
@@ -33,7 +35,8 @@ def test_placement_feedback_passes_when_correctly_placed_but_retreat_failed(sess
                                label='apple', zone='zone_red')
     summary = session._finish_attempt(
         motion_result, '', 'v1-object-1', 'zone_red',
-        SimpleNamespace(label='apple'), SimpleNamespace(name='catalog-apple-1'))
+        Detection('apple', 1., center_base=np.array([.17, -.35, .06]), height=.06),
+        SimpleNamespace(name='catalog-apple-1'))
 
     assert summary['truth']['success'] is True
     assert summary['controller_ok'] is False
@@ -48,7 +51,8 @@ def test_placement_feedback_fails_when_motion_finished_outside_target_zone(sessi
     motion_result = PickResult(ok=True, stage='done', label='apple', zone='zone_red')
     summary = session._finish_attempt(
         motion_result, '', 'v1-object-1', 'zone_red',
-        SimpleNamespace(label='apple'), SimpleNamespace(name='catalog-apple-1'))
+        Detection('apple', 1., center_base=np.array([.17, -.35, .06]), height=.06),
+        SimpleNamespace(name='catalog-apple-1'))
 
     assert summary['truth']['success'] is False
     assert summary['truth']['actual_zone'] is None

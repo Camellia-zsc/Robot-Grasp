@@ -432,7 +432,8 @@ def test_actual_recovery_does_not_substitute_a_far_away_object_of_the_same_class
     session._check_open = Mock()
     session.cancel_event = threading.Event()
     session._recovery_goal = {'label': 'apple', 'zone_name': 'zone_red'}
-    session._recovery_target = object()
+    session._recovery_target = SimpleNamespace(summary=lambda: {'label': 'apple'}, extra={})
+    session.editor = SimpleNamespace(metadata=lambda: {'one_per_class': False})
     session.arm = SimpleNamespace(health=lambda: SimpleNamespace(ok=True))
     session.world = SimpleNamespace(held=None)
     session._scene_version = 8
@@ -440,7 +441,7 @@ def test_actual_recovery_does_not_substitute_a_far_away_object_of_the_same_class
     observed = scene(8)
     observed['objects'] = [observed['objects'][0]]
     observed['objects'][0]['center_base'] = [.46, .05, .06]
-    session.observe = lambda: observed
+    session.observe = lambda **_kwargs: observed
     context = session.prepare_recovery({'ok': False}, session._recovery_goal, 1, [],
                                        reference_xy=[.24, -.08])
     assert not context['options'] and session._recovery_retry is None
@@ -453,7 +454,8 @@ def test_actual_recovery_does_not_regrasp_a_completed_same_class_object():
     session._check_open = Mock()
     session.cancel_event = threading.Event()
     session._recovery_goal = {'label': 'apple', 'zone_name': 'zone_red'}
-    session._recovery_target = object()
+    session._recovery_target = SimpleNamespace(summary=lambda: {'label': 'apple'}, extra={})
+    session.editor = SimpleNamespace(metadata=lambda: {'one_per_class': False})
     session.arm = SimpleNamespace(health=lambda: SimpleNamespace(ok=True))
     session.world = SimpleNamespace(held=None)
     session._scene_version = 8
@@ -461,7 +463,7 @@ def test_actual_recovery_does_not_regrasp_a_completed_same_class_object():
     observed = scene(8)
     observed['objects'] = [observed['objects'][0]]
     observed['objects'][0]['center_base'] = [.17, -.35, .06]
-    session.observe = lambda: observed
+    session.observe = lambda **_kwargs: observed
     context = session.prepare_recovery({'ok': False}, session._recovery_goal, 1, [],
                                        reference_xy=[.20, -.35], completed_zones=['zone_red'])
     assert not context['options'] and session._recovery_retry is None

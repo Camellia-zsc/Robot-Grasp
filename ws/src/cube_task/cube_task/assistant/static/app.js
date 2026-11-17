@@ -2,7 +2,7 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const stateLabels = {preparing:"正在准备",editing:"正在更新摆场",ready:"场景就绪",observing:"相机观测中",thinking:"模型决策中",executing:"机械臂执行中",recovering:"自动恢复中",verifying:"结果验证中",complete:"任务已完成",stopping:"正在停止",stopped:"已停止",error:"执行异常"};
+const stateLabels = {preparing:"正在准备",editing:"正在更新摆场",ready:"场景就绪",observing:"相机观测中",thinking:"模型决策中",executing:"机械臂执行中",recovering:"自动恢复中",awaiting_approval:"等待方案确认",verifying:"结果验证中",complete:"任务已完成",stopping:"正在停止",stopped:"已停止",error:"执行异常"};
 const labelNames = {red:"红色方块",red_cube:"红色方块",green:"绿色方块",green_cube:"绿色方块",yellow:"黄色方块",yellow_cube:"黄色方块",blue:"蓝色方块",blue_cube:"蓝色方块",apple:"苹果",banana:"香蕉",pear:"梨"};
 const palette = {red:"#cc7771",green:"#7cab90",yellow:"#d1b76d",blue:"#789fc3",apple:"#cf766b",banana:"#d5b85f",pear:"#a9b76a"};
 const ui = {state:null,connected:false,pending:false,messageNodes:new Map(),eventNodes:new Map(),trail:[],lastScene:null,lastCameraAt:0,lastCameraVersion:null,lastTime:null,cameraMode:"live",cameraViews:[],cameraKey:null,cameraLoading:false};
@@ -32,7 +32,7 @@ async function api(path,body){
   try{
     const response=await fetch(path,{method:body===undefined?"GET":"POST",headers:body===undefined?{}:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body),cache:"no-store",signal:abort.signal});
     let result;try{result=await response.json();}catch{throw new Error(`服务返回了无法读取的响应 (${response.status})`);}
-    if(!response.ok || result.ok===false && !result.simulation)throw new Error(result.error||result.message||`请求未成功 (${response.status})`);
+    if(!response.ok || result.ok===false && !result.simulation){const error=new Error(result.error||result.message||`请求未成功 (${response.status})`);error.status=response.status;throw error;}
     return result;
   }finally{clearTimeout(timer);}
 }
@@ -41,15 +41,17 @@ function setConnection(connected){
   setText("connection-text",connected?"服务已连接":"连接中断");
 }
 function updateControls(){
-  const state=ui.state||{};const busy=Boolean(state.busy||ui.pending);const ready=ui.connected&&state.status!=="preparing";
+  const state=ui.state||{};renderResumeRecovery(state);
+  const awaiting=state.status==="awaiting_approval";const resuming=Boolean(ui.resumeRecovery?.submitting||ui.resumeRecovery?.submitted);const busy=Boolean(state.busy||ui.pending||awaiting||resuming);const ready=ui.connected&&state.status!=="preparing";
   $("send-button").disabled=busy||!ready||Boolean(state.needs_reset);$("instruction").disabled=busy||Boolean(state.needs_reset);
-  $("reset-button").disabled=busy||!ready;$("stop-button").disabled=!state.busy||state.status==="stopping";
+  $("reset-button").disabled=busy||!ready;$("stop-button").disabled=(!state.busy&&!awaiting&&!resuming)||state.status==="stopping";
   document.querySelectorAll("[data-instruction]").forEach(button=>button.disabled=busy||!ready||Boolean(state.needs_reset));
-  setText("command-hint",state.needs_reset?"任务已停止，请先重置场景":busy?"指令处理中，请观察执行流程":"Enter 发送 · Shift + Enter 换行");
+  setText("command-hint",awaiting?"操作已暂停，请在恢复方案中选择同意或拒绝":resuming?"正在继续处理当前持物，请等待模型分析":state.needs_reset?(state.can_resume_recovery?"当前持物尚未完成，可选择“继续处理当前持物”":"任务已停止，请先重置场景"):busy?"指令处理中，请观察执行流程":"Enter 发送 · Shift + Enter 换行");
   document.querySelectorAll("[data-speed]").forEach(button=>{button.classList.toggle("active",number(button.dataset.speed)===number(state.speed,1));button.disabled=!ready||ui.pending;});
+  renderRecoveryApproval(state);
 }
 async function submitInstruction(instruction){
-  const text=String(instruction||"").trim();if(!text||ui.pending||ui.state?.busy||ui.state?.needs_reset)return;
+  const text=String(instruction||"").trim();if(!text||ui.pending||ui.state?.busy||ui.state?.status==="awaiting_approval"||ui.state?.needs_reset||ui.resumeRecovery?.submitting||ui.resumeRecovery?.submitted)return;
   const selection=window.SceneEditor?.selection?.();
   ui.pending=true;showError("");updateControls();
   try{await api("/api/command",{instruction:text,...(selection||{})});$("instruction").value="";}
@@ -66,6 +68,74 @@ $("reset-button").addEventListener("click",async()=>{
 });
 $("stop-button").addEventListener("click",async()=>{try{await api("/api/stop",{});}catch(error){showError(error.message);}});
 document.querySelectorAll("[data-speed]").forEach(button=>button.addEventListener("click",async()=>{try{await api("/api/speed",{speed:number(button.dataset.speed,1)});}catch(error){showError(error.message);}}));
+
+// Approval is tied to the exact proposed scene. Text commands never approve it.
+function renderRecoveryApproval(state){
+  const panel=$("recovery-approval");if(!panel)return;
+  const approval=state.recovery_approval||{};
+  const pending=approval.status==="pending";
+  panel.hidden=!pending;if(!pending)return;
+  const key=JSON.stringify([approval.request_id,approval.scene_version]);
+  if(ui.recoveryApproval?.key!==key)ui.recoveryApproval={key,submitting:false,submitted:false,invalid:false,error:""};
+  const local=ui.recoveryApproval;
+  const valid=typeof approval.request_id==="string"&&approval.request_id.length>0&&Number.isInteger(approval.scene_version)&&approval.scene_version>=0;
+  setText("recovery-approval-question",approval.question||"是否执行以下恢复方案？");
+  setText("recovery-approval-message",approval.message||"操作已暂停，只有点击同意后才会继续执行此方案。拒绝将停止本次任务。");
+  const steps=Array.isArray(approval.steps)?approval.steps:[];
+  const signature=JSON.stringify(steps);
+  if(panel.dataset.steps!==signature){
+    panel.dataset.steps=signature;
+    $("recovery-approval-steps").replaceChildren(...steps.map(step=>{const item=document.createElement("li");item.textContent=String(step);return item;}));
+  }
+  const disabled=!valid||!ui.connected||state.status!=="awaiting_approval"||Boolean(state.needs_reset)||Boolean(ui.pending)||local.submitting||local.submitted||local.invalid;
+  $("recovery-approval-accept").disabled=disabled;$("recovery-approval-decline").disabled=disabled;
+  setText("recovery-approval-status",local.error||(!valid?"方案信息不完整，请停止任务后重试。":local.submitting?"正在提交你的选择…":local.submitted?"已提交，等待处理。":!ui.connected?"连接中断，恢复连接后再选择。":state.status!=="awaiting_approval"?"正在更新方案状态，请稍候。":"等待你的明确选择，机械臂不会继续执行此方案。"));
+  $("recovery-approval-status").classList.toggle("error",Boolean(local.error)||!valid);
+}
+async function submitRecoveryApproval(approved){
+  const state=ui.state||{},approval=state.recovery_approval||{},local=ui.recoveryApproval;
+  if(typeof approved!=="boolean"||approval.status!=="pending"||state.status!=="awaiting_approval"||!ui.connected||state.needs_reset||ui.pending||!local||local.submitting||local.submitted||local.invalid)return;
+  if(local.key!==JSON.stringify([approval.request_id,approval.scene_version])||typeof approval.request_id!=="string"||!approval.request_id||!Number.isInteger(approval.scene_version)||approval.scene_version<0)return;
+  local.submitting=true;local.error="";renderRecoveryApproval(state);
+  try{
+    await api("/api/recovery-approval",{request_id:approval.request_id,scene_version:approval.scene_version,approved});
+    local.submitted=true;
+  }catch(error){
+    // A lost response may already have reached the server; refresh before any retry.
+    local.invalid=true;local.error=error.message||"无法确认提交结果，请查看最新方案状态。";
+    try{renderState(await api("/api/state"));}catch{local.error+=" 暂时无法刷新状态，请等待连接恢复或停止任务。";}
+    showError(local.error);
+  }finally{local.submitting=false;renderRecoveryApproval(ui.state||{});}
+}
+$("recovery-approval-accept").addEventListener("click",()=>submitRecoveryApproval(true));
+$("recovery-approval-decline").addEventListener("click",()=>submitRecoveryApproval(false));
+
+function renderResumeRecovery(state){
+  const panel=$("resume-recovery");if(!panel)return;
+  const available=state.can_resume_recovery===true&&!state.busy&&state.status!=="awaiting_approval";
+  panel.hidden=!available;
+  if(!available){ui.resumeRecovery=null;return;}
+  // A new terminal event also releases the lock if a very short attempt fell between polls.
+  const terminal=(Array.isArray(state.events)?state.events:[]).filter(event=>["result","error","stopped"].includes(event.kind)).at(-1);
+  const key=JSON.stringify([state.status,terminal?.id,state.recovery_approval?.request_id,state.recovery_approval?.status]);
+  if(!ui.resumeRecovery||ui.resumeRecovery.key!==key&&!ui.resumeRecovery.submitting)ui.resumeRecovery={key,submitting:false,submitted:false,error:""};
+  const local=ui.resumeRecovery;
+  $("resume-recovery-button").disabled=!ui.connected||ui.pending||local.submitting||local.submitted;
+  setText("resume-recovery-status",local.error|| (local.submitting?"正在提交，保留当前持物状态…":local.submitted?"已提交，等待恢复分析。":!ui.connected?"连接中断，恢复连接后可继续处理。":"保留原目标，先分析恢复方案。需要确认的方案仍会等待你点击“同意执行”。"));
+  $("resume-recovery-status").classList.toggle("error",Boolean(local.error));
+}
+async function resumeRecovery(){
+  const state=ui.state||{},local=ui.resumeRecovery;
+  if(state.can_resume_recovery!==true||state.busy||state.status==="awaiting_approval"||!ui.connected||ui.pending||!local||local.submitting||local.submitted)return;
+  local.submitting=true;local.error="";updateControls();
+  try{await api("/api/resume-recovery",{});local.submitted=true;}
+  catch(error){
+    local.error=error.message||"暂时无法继续处理当前持物。";
+    try{renderState(await api("/api/state"));}catch{local.error+=" 暂时无法刷新状态，请等待连接恢复。";local.submitted=true;}
+    showError(local.error);
+  }finally{local.submitting=false;updateControls();}
+}
+$("resume-recovery-button").addEventListener("click",resumeRecovery);
 
 // Decode only received characters. An unfinished escape stays invisible until
 // its remaining characters arrive, so the displayed text never invents a token.

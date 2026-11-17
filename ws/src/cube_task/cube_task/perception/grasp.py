@@ -1170,7 +1170,10 @@ class PlacePlanner:
              pending: Sequence[Sequence[float]] = (), center_only: bool = False,
              avoid: Sequence[Sequence[float]] = (), lower: float = 0.0,
              near_center: Optional[float] = None,
-             candidate_filter: Optional[Callable[[float, float], bool]] = None) -> PlacePlan:
+             candidate_filter: Optional[Callable[[float, float], bool]] = None,
+             strict: bool = False, fixed_xy: bool = False,
+             pose_filter: Optional[Callable[[float, float, float], bool]] = None,
+             avoid_poses: Sequence[Sequence[float]] = ()) -> PlacePlan:
         """
         Return a PlacePlan for releasing into zone (poses in the base frame, m).
 
@@ -1216,9 +1219,17 @@ class PlacePlanner:
             L = float(held.get('length', 0.0) or 0.0)
             W = float(held.get('width', 0.0) or 0.0)
         if held is not None and _finite(L) and _finite(W) and max(L, W) > 0.0:
-            x, y, ang, info = self.release_pose(zone, held, occupied, center_first, pending,
-                                                center_only, avoid, lower, near_center,
-                                                candidate_filter)
+            if strict:
+                candidate = self._strict_release(zone, held, occupied, avoid, lower,
+                                                 fixed_xy, candidate_filter, pose_filter, avoid_poses)
+                if candidate is None:
+                    return PlacePlan(zone.name, eye, eye.copy(), eye.copy(), self.open_width,
+                                     False, 'no_clear_supported_release')
+                x, y, ang, info = candidate
+            else:
+                x, y, ang, info = self.release_pose(zone, held, occupied, center_first, pending,
+                                                    center_only, avoid, lower, near_center,
+                                                    candidate_filter)
             open_w = info['open_width']
             self.last_info = info
             # On a flat card a footprint clear of the objects already there drops from the
@@ -1245,6 +1256,58 @@ class PlacePlanner:
                          T_release=top_down_T(x, y, z_rel, ang),
                          T_retreat=top_down_T(x, y, z_rel + self.retreat_height, ang),
                          open_width=open_w)
+
+    def _strict_release(self, zone, held, occupied, avoid, lower, fixed_xy,
+                        candidate_filter, pose_filter, avoid_poses):
+        """Search only fully clear candidates; an exact point never drifts."""
+        L, W = sorted((float(held['length']), float(held['width'])), reverse=True)
+        grip = float(held.get('grip_width', W) or W)
+        opening = min(self.open_width, grip + RELEASE_OPEN_EXTRA)
+        floor = self.release_height_flat - lower + float(held.get('grip_z', 0)) - PAD_HALF
+        center = tuple(float(v) for v in zone.center[:2])
+        candidates = [center]
+        if not fixed_xy:
+            nx = int(float(zone.size[0]) / 2 / SLOT_GRID_STEP)
+            ny = int(float(zone.size[1]) / 2 / SLOT_GRID_STEP)
+            c, s = math.cos(zone.yaw), math.sin(zone.yaw)
+            grid = [(center[0] + c * i * SLOT_GRID_STEP - s * j * SLOT_GRID_STEP,
+                     center[1] + s * i * SLOT_GRID_STEP + c * j * SLOT_GRID_STEP)
+                    for i in range(-nx, nx + 1) for j in range(-ny, ny + 1)]
+            candidates += sorted(grid, key=lambda p: math.hypot(p[0]-center[0], p[1]-center[1]))
+        for x, y in candidates:
+            axes = self._axes(zone, x, y, L, W, bool(held.get('elongated')))
+            angles = [(axis, neutral_closing_angle(x, y) if axis is None else
+                       choose_closing_angle(axis + math.pi / 2, x, y, math.pi)) for axis in axes]
+            neutral = neutral_closing_angle(x, y)
+            for turn in (2, 1, -1, 3):
+                closing = choose_closing_angle(neutral + turn * math.pi / 4, x, y, math.pi)
+                angles.append((closing - math.pi/2 if held.get('elongated') else None, closing))
+            for axis, closing in angles:
+                delta = closing - float(held.get('grasp_closing', closing))
+                c, s = math.cos(delta), math.sin(delta)
+                offset = held.get('center_offset', (0.0, 0.0))
+                tx, ty = (x - c * offset[0] + s * offset[1],
+                          y - s * offset[0] - c * offset[1])
+                if ((candidate_filter is not None and not candidate_filter(tx, ty))
+                        or any(math.hypot(x-a[0], y-a[1]) <= AVOID_RADIUS for a in avoid)
+                        or any(math.hypot(x-a[0], y-a[1]) < 1e-6 and
+                               abs(wrap_pi(closing-a[2])) < 1e-5 for a in avoid_poses)):
+                    continue
+                cap = footprint_capsule(x, y, L, W, axis)
+                edge = capsule_edge_margin(zone, cap)
+                if edge < -1e-9 or (pose_filter is not None and not pose_filter(x, y, closing)):
+                    continue
+                fp, fg = self._clearance(cap, closing,
+                                         opening/2 + FINGER_OUTER - FINGER_HALF_BAND,
+                                         floor, occupied)
+                if min(fp, fg) < 0:
+                    continue
+                info = {'xy': [x, y], 'axis': axis, 'closing_angle': closing, 'edge_margin': edge,
+                        'footprint_clearance': None if not math.isfinite(fp) else fp,
+                        'finger_clearance': None if not math.isfinite(fg) else fg,
+                        'open_width': opening, 'tier': 'exact_point' if fixed_xy else 'strict_grid'}
+                return tx, ty, closing, info
+        return None
 
 
 def strip_axis(zone: Zone) -> float:

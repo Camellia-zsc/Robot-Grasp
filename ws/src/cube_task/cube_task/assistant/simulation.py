@@ -21,6 +21,7 @@ from ..core.clock import SimClock
 from ..core.extrinsics import extrinsics_from_cfg
 from ..core.logger import RunLogger, to_jsonable
 from ..core.transforms import inv_T
+from ..core.types import Zone
 from ..core.zones import parse_zones
 from ..robot.factory import make_arm
 from ..task.operator import Operator
@@ -30,6 +31,8 @@ from ..tools.common import load_cfg_for
 from .catalog import CatalogEditor
 from .catalog_perception import configure_sandbox, make_sandbox_perception
 from .observations import merge_observations
+from .destinations import (destination_label, footprint_in_destination, placement_metadata,
+                           validate_destination)
 
 _LOG = logging.getLogger(__name__)
 _STAGE_MESSAGES = {
@@ -159,6 +162,9 @@ class SimulationSession:
                                log_dir=None if log_dir is None else str(log_dir))
         self.cfg, self.world, self.info = load_cfg_for(args, 'L1')
         configure_sandbox(self.cfg)
+        self._placement = placement_metadata(self.cfg, self.info['pick_polygon'])
+        self._placement_center = None
+        self._destination_views = {}
         self.editor = CatalogEditor(self.world, self.info['pick_polygon'])
         # Fail closed even if a future scenario overlay changes its backend.
         if self.cfg.get('robot.backend') != 'sim' or self.cfg.get('camera.backend') != 'sim':
@@ -170,6 +176,8 @@ class SimulationSession:
         region = list(self.cfg.get('perception.roi.pick_polygon', None) or [])
         for zone in zones.values():
             region.extend(zone.corners_xy().tolist())
+        xb, yb = self._placement['bounds']['x'], self._placement['bounds']['y']
+        region.extend([[x, y] for x in xb for y in yb])
         if region:
             lo, hi = np.min(region, axis=0), np.max(region, axis=0)
             self.cfg.set('perception.roi.pick_polygon', [
@@ -213,7 +221,11 @@ class SimulationSession:
 
     def _record_feedback(self, kind: str, fields: dict) -> None:
         """Expose existing measured checks; viewer feedback never commands motion."""
-        if kind == 'decision' and fields.get('action') == 'pick':
+        if kind == 'decision' and fields.get('action') in ('pick', 'retry_held_placement'):
+            self._placement_center = list((fields.get('place') or {}).get('xy')
+                                          or (fields.get('release_xyz') or [])[:2])
+            if fields.get('action') == 'retry_held_placement':
+                return
             target = fields.get('target') or {}
             self._feedback['grasp_plan'] = {
                 'label': fields.get('label'),
@@ -379,6 +391,12 @@ class SimulationSession:
                                  if z.contains_xy(x, y)), None)
                 object_id = 'v%d-object-%d' % (self._scene_version, index)
                 measured = copy.deepcopy(det)
+                # Keep the visible support from every uniquely associated
+                # wrist view. A curved object's rectangle center is not a
+                # rigid anchor when it is rotated for a later placement.
+                cloud = self._placement_cloud(det, views, detections)
+                if cloud is not None:
+                    measured.extra['_placement_points_base'] = cloud
                 if measured.center_base is not None:
                     measured.center_base.setflags(write=False)
                 if measured.mask is not None:
@@ -390,6 +408,7 @@ class SimulationSession:
             self._detections = MappingProxyType(mapping)
             self._scene = {'scene_version': self._scene_version, 'objects': objects,
                            'zones': self._zones(),
+                           'placement': copy.deepcopy(self._placement),
                            'class_to_zone': dict(self.runner.class_to_zone),
                            'task': 'Sandbox', 'mode': 'sim',
                            'observation_diagnostics': diagnostics,
@@ -400,6 +419,30 @@ class SimulationSession:
             self._publish_snapshot()
             self._emit('scene', self._scene)
             return copy.deepcopy(self._scene)
+
+    def _placement_cloud(self, det, views, merged):
+        if det.center_base is None:
+            return None
+        peers = [d for d in merged if d.label == det.label and d.valid and d.center_base is not None]
+        radius = max(.05, float(self.runner._footprint(det) or 0) * .75)
+        clouds = []
+        for detections in views.values():
+            for candidate in detections:
+                if candidate.label != det.label or candidate.center_base is None or candidate.score < .5:
+                    continue
+                matches = [d for d in peers if np.linalg.norm(d.center_base[:2] - candidate.center_base[:2]) <= radius]
+                if len(matches) != 1 or matches[0] is not det:
+                    continue
+                points = np.asarray((candidate.extra or {}).get('_points_base'), dtype=float)
+                if points.ndim == 2 and points.shape[1] == 3 and len(points) >= 40 and np.all(np.isfinite(points)):
+                    clouds.append(points)
+        if not clouds:
+            return None
+        points = np.vstack(clouds)
+        _, keep = np.unique(np.floor(points / .002).astype(np.int64), axis=0, return_index=True)
+        points = points[np.sort(keep)]
+        points.setflags(write=False)
+        return points
 
     def _emit_scan_view(self, view: int) -> None:
         total = len(self.runner.views)
@@ -431,6 +474,7 @@ class SimulationSession:
         self._scene_version += 1
         self._detections = MappingProxyType({})
         self._scene = {'scene_version': self._scene_version, 'objects': [],
+                       'placement': copy.deepcopy(self._placement),
                        'zones': self._zones(), 'class_to_zone': dict(self.runner.class_to_zone),
                        'task': 'Sandbox', 'mode': 'sim', 'warnings': [reason]}
 
@@ -445,6 +489,7 @@ class SimulationSession:
                 object_id = get('object_id')
                 version = get('scene_version', self._scene_version)
                 zone_name = get('zone_name') or get('zone')
+                destination = get('destination')
                 if self.cancel_event.is_set():
                     return self._refusal('aborted', 'execution cancelled', object_id, zone_name)
                 if get('action', 'pick') != 'pick':
@@ -460,8 +505,19 @@ class SimulationSession:
                 if det.label not in self.runner.class_to_zone:
                     return self._refusal('invalid_target', 'target is not a configured catalog class',
                                          object_id, zone_name)
-                zone_name = zone_name or self.runner.class_to_zone[det.label]
-                if zone_name not in self.runner.zones:
+                if destination is not None:
+                    if zone_name is not None:
+                        return self._refusal('invalid_destination', '放置区域与桌面目标不能同时指定', object_id, zone_name)
+                    try:
+                        destination = validate_destination(destination, self._scene)
+                    except ValueError as exc:
+                        return self._refusal('invalid_destination', str(exc), object_id, None)
+                    placement_options = self._placement_options(destination)
+                    zone_name = placement_options['placement_zone'].name
+                else:
+                    placement_options = {}
+                    zone_name = zone_name or self.runner.class_to_zone[det.label]
+                if destination is None and zone_name not in self.runner.zones:
                     return self._refusal('invalid_zone', 'target zone does not exist',
                                          object_id, zone_name)
                 # Pass the exact measured target among the valid neighbors; this
@@ -469,23 +525,56 @@ class SimulationSession:
                 target = copy.deepcopy(det)
                 neighbors = [target if d is det else copy.deepcopy(d)
                              for d in self._detections.values()
-                             if d.valid and d.center_base is not None]
+                             if d.center_base is not None and (d.valid or destination is not None)]
+                if destination is not None and destination['type'] == 'point':
+                    # The requested point can lie beyond the old pick/card
+                    # views. Measure its surroundings before committing a grasp.
+                    view = self._ensure_destination_view(destination)
+                    if view is None:
+                        return self._refusal('destination_not_observed',
+                                             '无法从可达相机视角确认目标点周围空间', object_id, zone_name)
+                    self._status = 'observing'
+                    self._emit_scan_view(view)
+                    self._publish_snapshot()
+                    status, local, frame = self.runner._observe(view)
+                    if status != 'ok' or local is None:
+                        return self._refusal('destination_not_observed',
+                                             '目标点观测未完成：' + str(status), object_id, zone_name)
+                    self._cache_observation(view, local, frame)
+                    additions = [d for d in local.detections if d.center_base is not None
+                                 and not (d.label == det.label and
+                                          np.linalg.norm(d.center_base[:2] - det.center_base[:2]) < .03)]
+                    for other in additions:
+                        neighbors = [d for d in neighbors if d is target or d.label != other.label or
+                                     np.linalg.norm(d.center_base[:2] - other.center_base[:2]) > .03]
+                        neighbors.append(copy.deepcopy(other))
                 # Independent evaluation only: this association is never used
                 # by the motion planner or the model's selectable scene.
                 evaluation_object = self._evaluation_object(det)
                 self._recovery_target = copy.deepcopy(det)
-                self._recovery_neighbors = copy.deepcopy(neighbors)
-                self._recovery_goal = {'label': det.label, 'zone_name': zone_name}
+                self._recovery_neighbors = copy.deepcopy([d for d in neighbors if d is not target])
+                self._recovery_goal = {'label': det.label,
+                                       'zone_name': None if destination else zone_name}
+                if destination is not None:
+                    self._recovery_goal['destination'] = copy.deepcopy(destination)
                 self._recovery_evaluation = evaluation_object
                 self._recovery_context = None
                 self._feedback = {'grasp_plan': {}, 'checks': []}
-                self._refresh_placement_occupancy(det)
+                self._placement_center = None
+                self._refresh_placement_occupancy(target, neighbors, destination=destination)
+                # A prior explicit request may have failed only because its
+                # destination was blocked. A new destination can be feasible.
+                if destination is not None:
+                    self.runner._tracks = [t for t in self.runner._tracks
+                                           if not (t.get('label') == det.label and
+                                                   np.linalg.norm(np.asarray(t['xy']) - det.center_base[:2]) < .03
+                                                   and str(t.get('reason', '')).startswith(('place infeasible', 'unreachable')))]
                 self._status = 'executing'
                 self._publish_snapshot()
                 result, why = self.runner.pick_detection(target, zone_name=zone_name,
-                                                         neighbors=neighbors)
+                                                         neighbors=neighbors, **placement_options)
                 return self._finish_attempt(result, why, object_id, zone_name,
-                                            det, evaluation_object)
+                                            det, evaluation_object, destination)
             except Exception:
                 # An unexpected adapter/planner failure must expire every
                 # selectable target and retain a held cube for an explicit reset.
@@ -496,7 +585,61 @@ class SimulationSession:
             finally:
                 self.cancel_event.external = None
 
-    def _finish_attempt(self, result, why, object_id, zone_name, det, evaluation_object):
+    def _placement_options(self, destination):
+        """Resolve configured support into a local planning zone, never a world zone."""
+        if destination['type'] == 'region':
+            polygon = np.asarray(self._placement['pick_polygon'], float)
+            low, high = polygon.min(axis=0), polygon.max(axis=0)
+            center, size, name = (low + high) / 2, high - low, 'pick_area'
+        else:
+            table = self._placement['table_bounds']
+            polygon = np.array([[table['x'][0], table['y'][0]], [table['x'][1], table['y'][0]],
+                                [table['x'][1], table['y'][1]], [table['x'][0], table['y'][1]]])
+            center = np.asarray(destination['xy'], float)
+            size = 2 * np.max(np.abs(polygon - center), axis=0) + .01
+            name = 'desktop_point'
+        floor = self.cfg.get('perception.table.expected_z', 0.0)
+        zone = Zone(name=name, center=np.r_[center, float(floor or 0.0)],
+                    size=tuple(float(v) for v in size), label=destination_label(destination))
+        return dict(placement_zone=zone, placement_polygon=polygon,
+                    exact_xy=destination['type'] == 'point')
+
+    def _ensure_destination_view(self, destination):
+        """Add a reachable camera view of a requested point for later instructions."""
+        if destination['type'] != 'point':
+            return
+        key = tuple(round(float(v), 3) for v in destination['xy'])
+        if key in self._destination_views:
+            return self._destination_views[key]
+        from ..sim.scenarios import look_at
+        ext = self.runner.ext
+        T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
+        target = np.r_[destination['xy'], float(self.cfg.get('perception.table.expected_z', 0) or 0) + .025]
+        radial = target[:2] / max(float(np.linalg.norm(target[:2])), 1e-6)
+        for distance, height in ((.13, .255), (.10, .25), (.16, .28), (.08, .22)):
+            eye = np.r_[target[:2] - distance * radial, target[2] + height]
+            q, _ep, _er = self.arm.kin.ik(look_at(eye, target) @ inv_T(T_fc),
+                                          q_seed=self.runner.views[len(self.runner.views)//2])
+            if q is not None:
+                self.runner.views.append(q.tolist())
+                self._view_labels.append('桌面目标点视角')
+                self.runner.multi_view = True
+                view = len(self.runner.views) - 1
+                self._destination_views[key] = view
+                return view
+
+    def _verify_destination(self, obj, destination):
+        """Independent truth check, after execution only; never supplies a plan."""
+        if obj is None or obj is self.world.held or abs(obj.bottom_z() - self.world.table_z) > .01:
+            return False
+        if (destination['type'] == 'point' and
+                np.linalg.norm(obj.center_xy() - destination['xy']) > self._placement['point_tolerance']):
+            return False
+        return footprint_in_destination(np.vstack(obj.footprint_polygons()),
+                                        {'placement': self._placement}, destination)
+
+    def _finish_attempt(self, result, why, object_id, zone_name, det, evaluation_object,
+                        destination=None):
         """Use the same independent placement check for initial and recovery actions."""
         summary = (pick_summary(result) if result is not None else
                    {'ok': False, 'stage': 'plan', 'error': why, 'label': det.label,
@@ -505,11 +648,19 @@ class SimulationSession:
             summary['diagnostics'] = str(result.detail.get('last_motion_detail') or
                                          result.detail.get('reason') or why or '')[:500]
         summary['object_id'] = object_id
+        if destination is not None:
+            summary['destination'] = copy.deepcopy(destination)
+            summary['placement_center'] = copy.deepcopy(self._placement_center)
         summary['aborted'] = self.cancel_event.is_set()
         summary['holding'] = self.world.held is not None
         self._recovery_context = None
-        self._invalidate_scene('observation invalidated after execution')
-        if not summary['aborted'] and not summary.get('fault') and not summary['holding']:
+        if destination is not None and result is None and not summary['aborted']:
+            self._status, self._stage = 'ready', ''
+        else:
+            self._invalidate_scene('observation invalidated after execution')
+        if result is None and destination is not None and not summary['aborted']:
+            pass  # Planning refusal sent no commands and preserves this observation.
+        elif not summary['aborted'] and not summary.get('fault') and not summary['holding']:
             try:
                 self.observe()
             except RuntimeError as exc:
@@ -522,11 +673,16 @@ class SimulationSession:
         truth_success = bool(evaluation_object is not None
                              and evaluation_object is not self.world.held
                              and actual_zone is not None and actual_zone.name == zone_name)
+        if destination is not None:
+            truth_success = self._verify_destination(evaluation_object, destination)
         summary['controller_ok'] = bool(summary['ok'])
         summary['truth'] = {'success': truth_success,
                             'object_name': None if evaluation_object is None else evaluation_object.name,
                             'expected_zone': zone_name,
                             'actual_zone': None if actual_zone is None else actual_zone.name}
+        if destination is not None:
+            summary['truth']['expected_destination'] = copy.deepcopy(destination)
+            summary['truth']['expected_zone'] = None
         summary['ok'] = summary['controller_ok'] and truth_success
         if summary['controller_ok'] and not truth_success:
             summary['error'] = 'placement_not_verified'
@@ -535,11 +691,12 @@ class SimulationSession:
             summary['message'] = ('任务已停止，夹爪保持夹持，机械臂保持当前位置'
                                   if summary['holding'] else '任务已停止，机械臂保持当前位置')
         elif summary['ok']:
-            zone_label = self.runner.zones[zone_name].label
+            zone_label = self.runner.zones[zone_name].label if destination is None else ''
             names = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块',
                      'apple': '苹果', 'banana': '香蕉', 'pear': '梨子'}
-            summary['message'] = '已将%s放到%s区域' % (
-                names.get(det.label, det.label), colors.get(zone_label, zone_label or zone_name))
+            summary['message'] = '已将%s放到%s' % (
+                names.get(det.label, det.label), destination_label(destination) if destination else
+                colors.get(zone_label, zone_label or zone_name) + '区域')
         elif summary['controller_ok']:
             summary['message'] = ('抓放动作已结束，但无法唯一核对目标物品'
                                   if evaluation_object is None else
@@ -553,7 +710,8 @@ class SimulationSession:
         self._emit('execution_result', summary)
         return summary
 
-    def prepare_recovery(self, failure, goal, attempt, history, reference_xy=None, completed_zones=()):
+    def prepare_recovery(self, failure, goal, attempt, history, reference_xy=None, completed_zones=(),
+                         completed_positions=()):
         """Offer goal-preserving local repairs, observing without moving a held cube."""
         with self._operation_lock:
             self._check_open()
@@ -574,11 +732,16 @@ class SimulationSession:
                 # The last full scan records the neighbors before this grasp.
                 # Replace only visible measured neighbors; the carried target
                 # must never become an occupied placement slot.
-                neighbors = [copy.deepcopy(d) for d in self._recovery_neighbors
-                             if d.label != goal['label']]
+                neighbors = [copy.deepcopy(d) for d in self._recovery_neighbors]
                 for det in fresh:
-                    if det.valid and det.center_base is not None and det.label != goal['label']:
-                        neighbors = [d for d in neighbors if d.label != det.label]
+                    if det.valid and det.center_base is not None:
+                        # A new view of the carried target must not erase all
+                        # other objects of its class. Keep known neighbors and
+                        # accept new geometry only when it lies on the table.
+                        if det.label == goal['label'] and float(det.center_base[2]) > float(self._recovery_target.center_base[2]) + .04:
+                            continue
+                        neighbors = [d for d in neighbors if d.label != det.label or
+                                     np.linalg.norm(d.center_base[:2] - det.center_base[:2]) > .03]
                         neighbors.append(copy.deepcopy(det))
                 self._recovery_neighbors = neighbors
                 observations = [d.summary() for d in neighbors]
@@ -595,12 +758,15 @@ class SimulationSession:
                            o.get('label') == goal['label']]
                 if reference_xy is not None:
                     from .batch import matching_objects
-                    matches = matching_objects(scene, goal['label'], reference_xy, completed_zones)
+                    matches = matching_objects(scene, goal['label'], reference_xy, completed_zones,
+                                               completed_positions)
                 if len(matches) == 1:
                     target = matches[0]
                     self._recovery_retry = {
                         'scene_version': scene['scene_version'], 'action': 'pick',
                         'object_id': target['object_id'], 'zone_name': goal['zone_name']}
+                    if goal.get('destination') is not None:
+                        self._recovery_retry['destination'] = copy.deepcopy(goal['destination'])
                     options.append({'id': 'reobserve_retry', 'description':
                         '根据刚完成的六视角扫描，重新定位同一个目标，重新规划抓取并放入原指定区域。'})
             else:
@@ -613,6 +779,8 @@ class SimulationSession:
                        'observations': observations, 'options': options,
                        'observation_mode': observation_mode,
                        'history': copy.deepcopy(history)}
+            if goal.get('destination') is not None:
+                context['placement'] = copy.deepcopy(self._placement)
             self._recovery_context = copy.deepcopy(context)
             self._publish_snapshot()
             return context
@@ -665,16 +833,19 @@ class SimulationSession:
                     raise ValueError('当前状态不能续接放置')
                 target = self._recovery_target
                 goal = self._recovery_goal
-                self._refresh_placement_occupancy(target, self._recovery_neighbors)
+                destination = goal.get('destination')
+                options = self._placement_options(destination) if destination is not None else {}
+                zone_name = options['placement_zone'].name if destination is not None else goal['zone_name']
+                self._refresh_placement_occupancy(target, self._recovery_neighbors, destination)
                 self._status = 'executing'
                 result, why = self.runner.retry_held_placement(
-                    target, goal['zone_name'], neighbors=self._recovery_neighbors)
-                return self._finish_attempt(result, why, 'held-recovery', goal['zone_name'],
-                                            target, self._recovery_evaluation)
+                    target, zone_name, neighbors=self._recovery_neighbors, **options)
+                return self._finish_attempt(result, why, 'held-recovery', zone_name,
+                                            target, self._recovery_evaluation, destination)
             finally:
                 self.cancel_event.external = None
 
-    def _refresh_placement_occupancy(self, target, detections=None) -> None:
+    def _refresh_placement_occupancy(self, target, detections=None, destination=None) -> None:
         """Replace the round's placement history with measured current neighbors.
 
         The target will leave its current slot. Excluding it also lets an
@@ -682,11 +853,13 @@ class SimulationSession:
         """
         occupied, labels = {}, {}
         for det in (self._detections.values() if detections is None else detections):
-            if det is target or not det.valid or det.center_base is None:
+            if det is target or det.center_base is None or (not det.valid and destination is None):
                 continue
             x, y = [float(v) for v in det.center_base[:2]]
             zone = next((z for z in self.runner.zones.values() if z.contains_xy(x, y)), None)
             footprint = self.runner._footprint(det)
+            if destination is not None:
+                zone = self._placement_options(destination)['placement_zone']
             if zone is None or footprint is None:
                 continue
             occupied.setdefault(zone.name, []).append(
@@ -710,11 +883,16 @@ class SimulationSession:
             self._status = 'stopped'
             self._invalidate_scene('execution cancelled')
             self._publish_snapshot()
+        elif self._status == 'observing':
+            self._status = 'ready'
+            self._publish_snapshot()
         messages = {'aborted': '任务已停止，机械臂保持当前位置',
                     'stale_scene': '观察结果已更新，请重新选择目标',
                     'invalid_target': '当前目标没有可用的抓取信息',
                     'invalid_zone': '场景中没有这个放置区域',
-                    'invalid_action': '当前指令不需要执行抓取'}
+                    'invalid_action': '当前指令不需要执行抓取',
+                    'invalid_destination': '放置目标无效',
+                    'destination_not_observed': '当前无法确认目标点周围空间，未执行抓取'}
         summary = {'ok': False, 'stage': 'validation', 'error': error, 'detail': detail,
                    'object_id': object_id, 'zone': zone_name,
                    'message': messages.get(error, '当前无法执行抓取'),
@@ -794,6 +972,7 @@ class SimulationSession:
                       editable=(self._prepared and not self.cancel_event.is_set()
                                 and self.world.held is None and self._status in ('ready', 'error')))
         snap = {'mode': 'sim', 'simulation_kind': 'kinematic', 'seed': self.seed,
+                'placement': copy.deepcopy(self._placement),
                 'status': 'stopped' if self.cancel_event.is_set() else self._status,
                 'stage': self._stage, 'scene_version': self._scene_version,
                 'sim_time': self.clock.now() - self._started_at,

@@ -830,7 +830,8 @@ class TaskRunner:
         return [t['xy'] for t in self._tracks if t['blacklisted']]
 
     def _attempt(self, det: Detection, zone_name: str, rep: TaskReport,
-                 neighbors: Sequence[Detection]) -> Tuple[Optional[str], Optional[PickResult]]:
+                 neighbors: Sequence[Detection], placement_zone=None,
+                 placement_polygon=None, exact_xy=False) -> Tuple[Optional[str], Optional[PickResult]]:
         """Plan and execute one pick. Returns (stop_reason or None, PickResult or None)."""
         track = self._track(det, neighbors)
         if track['blacklisted']:
@@ -859,17 +860,32 @@ class TaskRunner:
         # object does not sweep low over the other objects on the way to the zone.
         gp.T_lift[2, 3] = max(float(gp.T_lift[2, 3]), float(tz))
         lower = self.release_lower.get(det.label, 0.0)
-        zone = self.zones.get(zone_name)
+        zone = placement_zone if placement_zone is not None else self.zones.get(zone_name)
         footprint = self._footprint(det)
         occupied = list(self._placed.get(zone_name, []))
         shape = held_shape(det, gp, self.nominal.get(det.label))
+        strict = placement_zone is not None
+        avoided_poses = []
+        place_options = {}
+        if strict:
+            from .reach import release_workspace_reason
+            if shape is None:
+                self._blacklist(track, 'place infeasible: missing footprint')
+                return None, None
+            shape['center_offset'] = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
+            shape['grasp_closing'] = gp.closing_angle
+            place_options = dict(strict=True, fixed_xy=exact_xy,
+                                 avoid_poses=avoided_poses,
+                                 candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
+                                 pose_filter=self._strict_place_filter(det, gp, neighbors,
+                                                                        placement_polygon))
         pending = [footprint_dims(d, self.nominal.get(d.label)) for d in neighbors
                    if d is not det and self.class_to_zone.get(d.label) == zone_name]
         pending = [p for p in pending if p is not None]
         pp = self.placer.plan(zone, held, tz, footprint=footprint, occupied=occupied,
                               center_first=self._center_first(zone_name), held=shape,
                               pending=pending, lower=lower,
-                              near_center=self.center_labels.get(det.label))
+                              near_center=self.center_labels.get(det.label), **place_options)
         place_info = dict(self.placer.last_info)
         if not pp.feasible:
             self._blacklist(track, 'place infeasible: %s' % pp.reason)
@@ -882,25 +898,38 @@ class TaskRunner:
         report: Dict[str, Any] = {}
         ok, why, tilts = adjust_plan_poses(self.arm, gp, pp, self._floors(det, gp, pp, held),
                                            self.free_tilt, report)
+        if ok and strict:
+            ok, why = self._adjust_strict_release(det, gp, pp, neighbors,
+                                                 placement_polygon, place_info['xy'], held)
         avoid: List[Tuple[float, float]] = []
-        while not ok and footprint is not None and len(avoid) < RELEASE_RETRIES:
+        while not ok and footprint is not None and len(avoid) + len(avoided_poses) < RELEASE_RETRIES:
             # That release position is out of reach: the next free one, not on top of
             # an object already in the zone unless nothing else is left.
-            avoid.append((float(pp.T_release[0, 3]), float(pp.T_release[1, 3])))
+            if strict and exact_xy:
+                avoided_poses.append((*place_info['xy'], place_info['closing_angle']))
+            elif strict:
+                # A region can use another center after the final leaned pose
+                # fails clearance. Reserve yaw retries for a fixed point.
+                avoid.append(tuple(place_info['xy']))
+            else:
+                avoid.append((float(pp.T_release[0, 3]), float(pp.T_release[1, 3])))
             pc = self.placer.plan(zone, held, tz, footprint=footprint, occupied=occupied,
                                   center_first=self._center_first(zone_name), held=shape,
                                   pending=pending, avoid=avoid, lower=lower,
-                                  near_center=self.center_labels.get(det.label))
-            if not pc.feasible or any(math.hypot(float(pc.T_release[0, 3]) - a,
+                                  near_center=self.center_labels.get(det.label), **place_options)
+            if not pc.feasible or (not strict and any(math.hypot(float(pc.T_release[0, 3]) - a,
                                                  float(pc.T_release[1, 3]) - b) < 1e-6
-                                      for a, b in avoid):
+                                      for a, b in avoid)):
                 break
             pp = pc
             place_info = dict(self.placer.last_info)
             ok, why, tilts = adjust_plan_poses(self.arm, gp, pp,
                                                self._floors(det, gp, pp, held),
                                                self.free_tilt, report)
-        if not ok and footprint is not None:
+            if ok and strict:
+                ok, why = self._adjust_strict_release(det, gp, pp, neighbors,
+                                                     placement_polygon, place_info['xy'], held)
+        if not ok and footprint is not None and not strict:
             # Last resort: the zone center, on a flat card only when nothing lies there.
             pc = self.placer.plan(zone, held, tz, occupied=occupied, held=shape,
                                   center_only=True, lower=lower)
@@ -953,6 +982,11 @@ class TaskRunner:
                 self._event('decision', action='live_watch', label=det.label,
                             n=len(self._live_dets), **watcher.stats)
         self._save_held_recovery(det, gp, pp, res)
+        if self._held_recovery_context is not None and strict:
+            self._held_recovery_context.update(placement_zone=copy.deepcopy(zone),
+                                              placement_polygon=copy.deepcopy(placement_polygon),
+                                              exact_xy=bool(exact_xy),
+                                              placement_avoid=[list(place_info['xy'])])
         self._at_observe = False
         if res.detail.get('fault') or res.detail.get('holding'):
             # A held object that could not be put down is a fault as well.
@@ -1000,7 +1034,8 @@ class TaskRunner:
 
     def retry_held_placement(self, det: Detection, zone_name: str,
                              neighbors: Sequence[Detection] = (),
-                             avoid: Sequence[Sequence[float]] = ()
+                             avoid: Sequence[Sequence[float]] = (),
+                             placement_zone=None, placement_polygon=None, exact_xy=False
                              ) -> Tuple[Optional[PickResult], str]:
         """Explicitly replan the same held object's placement in the same zone.
 
@@ -1017,11 +1052,19 @@ class TaskRunner:
         if self._aborted() or not self._healthy():
             return None, 'arm stopped or unhealthy'
         original = context['det']
-        if (zone_name != context['zone'] or zone_name not in self.zones
+        saved_zone = context.get('placement_zone')
+        if (zone_name != context['zone'] or (saved_zone is None and zone_name not in self.zones)
                 or det.label != original.label or not _has_xy(det)
                 or np.linalg.norm(np.asarray(det.center_base[:2])
                                   - np.asarray(original.center_base[:2])) > 0.02):
             return None, 'held recovery target or destination changed'
+        if saved_zone is not None:
+            if (placement_zone is None or placement_zone.name != saved_zone.name
+                    or not np.array_equal(placement_zone.center, saved_zone.center)
+                    or tuple(placement_zone.size) != tuple(saved_zone.size)
+                    or bool(exact_xy) != context.get('exact_xy')
+                    or not np.array_equal(placement_polygon, context.get('placement_polygon'))):
+                return None, 'held recovery target or destination changed'
         width = self.skill._read_width()
         if (width is None or width < self.skill.empty_width
                 or abs(width - context['width']) > self.skill.width_tolerance):
@@ -1037,7 +1080,16 @@ class TaskRunner:
         shape = held_shape(original, gp, self.nominal.get(det.label))
         if shape is not None:
             shape['grip_width'] = max(shape['grip_width'], width)
-        banned = list(context['avoid'])
+        strict_options = {}
+        avoided_poses = []
+        if saved_zone is not None:
+            shape['center_offset'] = np.asarray(original.center_base[:2]) - gp.T_grasp[:2, 3]
+            shape['grasp_closing'] = gp.closing_angle
+            strict_options = dict(strict=True, fixed_xy=exact_xy,
+                                  avoid_poses=avoided_poses,
+                                  pose_filter=self._strict_place_filter(original, gp, neighbors,
+                                                                         placement_polygon))
+        banned = ([] if exact_xy else list(context.get('placement_avoid', context['avoid']))) if saved_zone is not None else list(context['avoid'])
         for point in avoid:
             try:
                 x, y = float(point[0]), float(point[1])
@@ -1049,14 +1101,14 @@ class TaskRunner:
         pp, why = None, 'no reachable alternative release position'
         for _ in range(RELEASE_RETRIES + 1):
             candidate = self.placer.plan(
-                self.zones[zone_name], held, transit, footprint=self._footprint(original),
+                saved_zone if saved_zone is not None else self.zones[zone_name], held, transit, footprint=self._footprint(original),
                 occupied=occupied, held=shape, avoid=banned,
                 candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
                 center_first=self._center_first(zone_name),
-                lower=self.release_lower.get(det.label, 0.0))
+                lower=self.release_lower.get(det.label, 0.0), **strict_options)
             xy = tuple(float(v) for v in candidate.T_release[:2, 3])
-            if (not candidate.feasible or any(math.hypot(xy[0] - a, xy[1] - b) < 1e-6
-                                              for a, b in banned)):
+            if (not candidate.feasible or (saved_zone is None and any(math.hypot(xy[0] - a, xy[1] - b) < 1e-6
+                                              for a, b in banned))):
                 break
             info = self.placer.last_info
             if any(info.get(k) is not None and info[k] < 0.0
@@ -1066,17 +1118,31 @@ class TaskRunner:
             ok, why, _tilts = adjust_plan_poses(
                 self.arm, gp, candidate, self._floors(original, gp, candidate, held),
                 self.free_tilt)
+            if ok and saved_zone is not None:
+                ok, why = self._adjust_strict_release(original, gp, candidate, neighbors,
+                                                     placement_polygon, info['xy'], held)
             if ok:
                 pp = candidate
                 break
-            banned.append(xy)
+            if saved_zone is not None and exact_xy:
+                avoided_poses.append((*info['xy'], info['closing_angle']))
+            elif saved_zone is not None:
+                banned.append(tuple(info['xy']))
+            else:
+                banned.append(xy)
         if pp is None:
             return None, why
         self._event('decision', action='retry_held_placement', label=det.label, zone=zone_name,
                     release_xyz=[round(float(v), 4) for v in pp.T_release[:3, 3]],
+                    place=dict(self.placer.last_info),
                     avoided=[[round(a, 4), round(b, 4)] for a, b in banned])
         result = self.skill.place_held(gp, pp, width)
         self._save_held_recovery(original, gp, pp, result)
+        if self._held_recovery_context is not None and saved_zone is not None:
+            self._held_recovery_context.update(placement_zone=copy.deepcopy(saved_zone),
+                                              placement_polygon=copy.deepcopy(placement_polygon),
+                                              exact_xy=bool(exact_xy),
+                                              placement_avoid=banned + [list(self.placer.last_info['xy'])])
         if self._held_recovery_context is not None:
             self._held_recovery_context['avoid'] = banned + self._held_recovery_context['avoid']
         if result.ok:
@@ -1143,7 +1209,8 @@ class TaskRunner:
         return result, ''
 
     def pick_detection(self, det: Detection, zone_name: Optional[str] = None,
-                       neighbors: Sequence[Detection] = (), budget_s: float = 3600.0
+                       neighbors: Sequence[Detection] = (), budget_s: float = 3600.0,
+                       placement_zone=None, placement_polygon=None, exact_xy=False
                        ) -> Tuple[Optional[PickResult], str]:
         """
         Plan and execute one pick of a detection that did not come from the camera loop.
@@ -1158,15 +1225,16 @@ class TaskRunner:
         nothing moved: no zone, grasp or place infeasible, unreachable pose, or a stop
         condition (aborted / unhealthy arm).
         """
-        zone = zone_name or self.class_to_zone.get(det.label)
-        if zone is None or zone not in self.zones:
+        zone = placement_zone.name if placement_zone is not None else (zone_name or self.class_to_zone.get(det.label))
+        if zone is None or (placement_zone is None and zone not in self.zones):
             return None, ('no zone for label %r (zone=%r, class_to_zone=%s, zones=%s)'
                           % (det.label, zone, self.class_to_zone, sorted(self.zones)))
         if not math.isfinite(self._deadline):
             self._deadline = self.clock.now() + float(budget_s)
         rep = TaskReport(task=self.task, ok=False, required=1, time_limit=self.time_limit,
                          log_dir=str(getattr(self.logger, 'dir', '')))
-        stop, res = self._attempt(det, zone, rep, list(neighbors) or [det])
+        stop, res = self._attempt(det, zone, rep, list(neighbors) or [det],
+                                  placement_zone, placement_polygon, exact_xy)
         if res is not None:
             return res, ''
         if stop is not None:
@@ -1210,6 +1278,142 @@ class TaskRunner:
     def _center_first(self, zone_name: str) -> bool:
         """Release the first object at the zone center unless several labels share the zone."""
         return sum(1 for z in self.class_to_zone.values() if z == zone_name) <= 1
+
+    def _strict_place_filter(self, det, gp, neighbors, support_polygon):
+        """Measured rectangles bound every object corner and the open fingers."""
+        from ..perception.geometry import points_in_polygon
+        from ..perception.grasp import FINGER_OUTER, FINGER_HALF_BAND, RELEASE_OPEN_EXTRA
+
+        polygon = np.asarray(support_polygon, dtype=float)
+        dims = footprint_dims(det, self.nominal.get(det.label))
+        if polygon.ndim != 2 or polygon.shape[1:] != (2,) or dims is None:
+            return lambda x, y, closing: False
+
+        def corners(xy, size, yaw):
+            local = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1]]) * (np.asarray(size) / 2)
+            c, s = math.cos(yaw), math.sin(yaw)
+            return local @ np.array([[c, -s], [s, c]]).T + xy
+
+        def overlaps(a, b):
+            for poly in (a, b):
+                for edge in np.roll(poly, -1, axis=0) - poly:
+                    normal = np.array([-edge[1], edge[0]])
+                    normal /= max(float(np.linalg.norm(normal)), 1e-12)
+                    pa, pb = a @ normal, b @ normal
+                    if max(pa.min(), pb.min()) >= min(pa.max(), pb.max()) + 0.002:
+                        return False
+            return True
+
+        obstacles = []
+        for other in neighbors:
+            if other is det or not _has_xy(other):
+                continue
+            odims = footprint_dims(other, self.nominal.get(other.label))
+            if odims is None or other.yaw is None:
+                # Missing footprint geometry cannot establish a free destination.
+                return lambda x, y, closing: False
+            height = float(other.height or 0.0)
+            bottom = detection_table_z(other)
+            bottom = 0.0 if bottom is None else float(bottom)
+            top = float(other.top_z) if other.top_z is not None else bottom + height
+            obstacles.append((corners(np.asarray(other.center_base[:2]), odims, float(other.yaw)),
+                              height, bottom, top))
+        offset = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
+        margin_offsets = np.array([[.002, .002], [.002, -.002], [-.002, .002], [-.002, -.002]])
+        opening = min(self.placer.open_width, gp.expected_width + RELEASE_OPEN_EXTRA)
+        fingers_length = opening + 2 * FINGER_OUTER
+        finger_floor = self.placer.release_height_flat + max(0.0, float(gp.T_grasp[2, 3]) -
+                                                            (detection_table_z(det) or 0.0)) - .015
+
+        def allowed(x, y, closing, final_yaw=None, tcp_xy=None, held_projection=None,
+                    gripper_pose=None, gripper_open_width=None):
+            delta = closing - gp.closing_angle
+            rotated = np.array([[math.cos(delta), -math.sin(delta)],
+                                [math.sin(delta), math.cos(delta)]]) @ offset
+            obj = corners(np.array([x, y]), dims,
+                          float(det.yaw or 0.0) + delta if final_yaw is None else final_yaw)
+            if held_projection is not None:
+                import cv2
+                obj = cv2.convexHull(np.vstack((obj, held_projection)).astype(np.float32)).reshape(-1, 2)
+            expanded = (obj[:, None, :] + margin_offsets).reshape(-1, 2)
+            if not np.all(points_in_polygon(expanded, polygon)):
+                return False
+            guard = getattr(self.arm, 'guard', None)
+            if guard is not None and (np.any(expanded[:, 0] < guard.x[0])
+                    or np.any(expanded[:, 0] > guard.x[1])
+                    or np.any(expanded[:, 1] < guard.y[0])
+                    or np.any(expanded[:, 1] > guard.y[1])
+                    or np.any(np.linalg.norm(expanded, axis=1) > guard.r_max)):
+                return False
+            fingers = corners(np.array([x, y]) - rotated if tcp_xy is None else tcp_xy,
+                              (fingers_length, 2 * FINGER_HALF_BAND), closing)
+            if any(overlaps(obj, other) or (height > finger_floor and overlaps(fingers, other))
+                   for other, height, _bottom, _top in obstacles):
+                return False
+            if gripper_pose is not None:
+                import cv2
+                width = opening if gripper_open_width is None else float(gripper_open_width)
+                # Fixed tool geometry, matching the physical fingers/palm.
+                # Project all eight box corners after the final reach tilt;
+                # only vertically overlapping obstacles can collide with it.
+                boxes = [(np.array([0., sign * (width / 2 + .006), -.025]),
+                          np.array([.010, .006, .025])) for sign in (-1, 1)]
+                boxes.append((np.array([0., 0., -.095]), np.array([.0225, .045, .045])))
+                signs = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
+                T = np.asarray(gripper_pose, float)
+                for center, half in boxes:
+                    points = (center + signs * half) @ T[:3, :3].T + T[:3, 3]
+                    footprint = cv2.convexHull(points[:, :2].astype(np.float32)).reshape(-1, 2)
+                    low_z, high_z = float(points[:, 2].min()), float(points[:, 2].max())
+                    for other, _height, bottom, top in obstacles:
+                        if top + .002 > low_z and bottom - .002 < high_z and overlaps(footprint, other):
+                            return False
+            return True
+        return allowed
+
+    def _adjust_strict_release(self, det, gp, pp, neighbors, polygon, desired_xy, held):
+        """Recheck final leaned poses and compensate their measured center shift."""
+        from .reach import adjust_plan_poses
+
+        desired = np.asarray(desired_xy, float)
+        table = detection_table_z(det) or 0.0
+        source_center = np.r_[det.center_base[:2], table + float(det.height or 0.0) / 2]
+        cloud = np.asarray((det.extra or {}).get('_placement_points_base'), float)
+        if cloud.ndim != 2 or cloud.shape[1:] != (3,) or len(cloud) < 40 or not np.all(np.isfinite(cloud)):
+            cloud = None
+        source_axis = np.array([math.cos(float(det.yaw or 0)), math.sin(float(det.yaw or 0)), 0])
+        allowed = self._strict_place_filter(det, gp, neighbors, polygon)
+        for _ in range(4):
+            rotation = pp.T_release[:3, :3] @ gp.T_grasp[:3, :3].T
+            if cloud is not None:
+                carried_cloud = (cloud - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3]
+                carried_center = (carried_cloud.min(axis=0) + carried_cloud.max(axis=0)) / 2
+            else:
+                carried_center = pp.T_release[:3, 3] + rotation @ (source_center - gp.T_grasp[:3, 3])
+            delta = desired - carried_center[:2]
+            if np.linalg.norm(delta) > .0002:
+                for T in (pp.T_pre, pp.T_release, pp.T_retreat):
+                    T[:2, 3] += delta
+                ok, why, _tilts = adjust_plan_poses(self.arm, gp, pp,
+                                                   self._floors(det, gp, pp, held), self.free_tilt)
+                if not ok:
+                    return False, why
+                continue
+            axis = rotation @ source_axis
+            yaw = math.atan2(float(axis[1]), float(axis[0]))
+            closing = math.atan2(float(pp.T_release[1, 1]), float(pp.T_release[0, 1]))
+            length, width = footprint_dims(det, self.nominal.get(det.label))
+            c, s = math.cos(float(det.yaw or 0)), math.sin(float(det.yaw or 0))
+            box = np.array([[i * length / 2, j * width / 2, k * float(det.height or 0) / 2]
+                            for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
+            box = box @ np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]]).T + source_center
+            projection = ((box - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3])[:, :2]
+            if not allowed(*desired, closing, final_yaw=yaw, tcp_xy=pp.T_release[:2, 3],
+                           held_projection=projection, gripper_pose=pp.T_release,
+                           gripper_open_width=pp.open_width):
+                return False, 'leaned release has no full footprint or finger clearance'
+            return True, ''
+        return False, 'release center does not converge at requested point'
 
     def _footprint(self, det: Detection) -> Optional[float]:
         """Largest horizontal extent (m), at least the class's place.nominal_footprint."""

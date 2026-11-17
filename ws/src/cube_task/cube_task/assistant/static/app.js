@@ -140,8 +140,8 @@ function renderMessages(state){
   if(!messages.length && !$("welcome").childNodes.length){
     const icon=document.createElement("div");icon.className="welcome-icon";icon.append(svgIcon("cube"));
     const heading=document.createElement("h3");heading.textContent="从一句话开始";
-    const description=document.createElement("p");description.textContent="告诉我你想抓取哪个物品，\n我会根据相机观测选择目标，并调用机械臂执行。";
-    const note=document.createElement("div");note.className="welcome-note";note.textContent="观测场景 → 选择目标 → 执行与验证";
+    const description=document.createElement("p");description.textContent="告诉我一个或多个目标，\n我会根据相机观测生成清单，再由机械臂逐件执行。";
+    const note=document.createElement("div");note.className="welcome-note";note.textContent="观测场景 → 生成顺序清单 → 逐件执行与验证";
     $("welcome").append(icon,heading,description,note);
   }
   const activeKeys=new Set();
@@ -228,6 +228,7 @@ function renderPipeline(state){
   const events=Array.isArray(state.events)?state.events:[];const latest=events.at(-1);
   const text=state.message||state.stage||latest?.message||stateLabels[state.status]||"等待一条指令";
   setText("stage-message",text);$("stage-message").title=text;
+  renderBatch(state);
   renderRecovery(state);
   renderGraspFeedback(state);
   const panel=$("task-result");panel.hidden=!result||Boolean(state.busy);
@@ -238,6 +239,35 @@ function renderPipeline(state){
     description.textContent=result.message||result.summary||result.truth?.message||state.stage||(truthSuccess?"抓取与落位验证通过":failed?"本次任务未完成，请查看执行反馈":"模型回复已完成");
     panel.append(description);
   }
+}
+function renderBatch(state){
+  const batch=state.batch||{},panel=$("batch-panel");if(!panel)return;
+  const total=Math.max(0,number(batch.total)),status=String(batch.status||"idle");
+  panel.hidden=total===0||status==="idle";if(panel.hidden){ui.batchSignature=null;return;}
+  const signature=JSON.stringify(batch);if(ui.batchSignature===signature)return;ui.batchSignature=signature;
+  const completed=Math.min(total,Math.max(0,number(batch.completed)));
+  const items=Array.isArray(batch.items)?batch.items:[];
+  const labels={pending:"等待",observing:"重新观测",executing:"抓放中",recovering:"恢复中",succeeded:"已完成",skipped:"已在目标区",failed:"失败",cancelled:"已取消"};
+  const batchLabels={running:"执行中",complete:"全部完成",failed:"已中止",stopped:"已停止"};
+  const zoneLabel=zone=>({zone_red:"红色区域",zone_green:"绿色区域",zone_yellow:"黄色区域",zone_blue:"蓝色区域"})[zone]||String(zone||"默认区域");
+  panel.dataset.status=status;
+  setText("batch-state",batchLabels[status]||"任务清单");
+  setText("batch-progress",`${completed} / ${total} 件完成`);
+  const current=items.find(item=>number(item.index)===number(batch.current_index,-1));
+  const fallback=status==="running"&&current?`正在处理第 ${current.index} / ${total} 件：${displayLabel(current.label)} · ${labels[current.status]||"处理中"}`:status==="complete"?"所有物品均已完成或确认位于目标区域。":status==="failed"?"当前任务未完成，后续物品已取消。":status==="stopped"?"任务已停止，后续物品不会继续执行。":"等待开始顺序任务。";
+  setText("batch-message",batch.message||fallback);
+  const rows=items.map((item,index)=>{
+    const li=document.createElement("li");li.dataset.status=item.status||"pending";
+    const active=status==="running"&&number(item.index,index+1)===number(batch.current_index,-1)&&["observing","executing","recovering"].includes(item.status);
+    li.classList.toggle("current",active);if(active)li.setAttribute("aria-current","step");
+    const order=document.createElement("span");order.className="batch-order";order.textContent=String(item.index??index+1);
+    const copy=document.createElement("div");copy.className="batch-item-copy";
+    const name=document.createElement("strong");name.textContent=`${displayLabel(item.label)} → ${zoneLabel(item.zone_name)}`;copy.append(name);
+    if(item.message){const message=document.createElement("small");message.textContent=String(item.message);copy.append(message);}
+    const badge=document.createElement("span");badge.className="batch-item-status";badge.textContent=labels[item.status]||"等待";
+    li.append(order,copy,badge);return li;
+  });
+  $("batch-items").replaceChildren(...rows);
 }
 function renderGraspFeedback(state){
   const feedback=state.simulation?.feedback||{},plan=feedback.grasp_plan||{};
@@ -357,6 +387,11 @@ $("camera-image").addEventListener("error",()=>{ui.cameraLoading=false;$("camera
 function cameraRefreshLoop(){refreshCamera();setTimeout(cameraRefreshLoop,350);}
 setTimeout(cameraRefreshLoop,350);
 function selectedId(state){
+  const batch=state.batch;
+  if(batch&&number(batch.total)>0&&batch.status!=="idle"){
+    const current=(Array.isArray(batch.items)?batch.items:[]).find(item=>number(item.index)===number(batch.current_index,-1));
+    return batch.status==="running"&&current&&["executing","recovering"].includes(current.status)?String(current.object_id??""):"";
+  }
   const result=state.last_result||state.result||{};
   const reply=state.status==="executing"?(state.messages||[]).findLast(message=>message.role==="assistant"&&message.decision):null;
   return String(state.selected_object_id??result.selected_object_id??result.object_id??result.decision?.object_id??result.decision?.target_object_id??reply?.decision?.object_id??"");

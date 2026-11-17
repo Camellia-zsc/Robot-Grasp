@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "status": "ready",
+  "batch": "idle",
+  "model_configured": true,
+  "objects": 6,
+  "messages": 19,
+  "metrics": {
+    "requests": 7,
+    "successes": 2,
+    "model_requests": 12
+  },
+  "confirmed": 6,
+  "pending": 1,
+  "layout_and_history_preserved": true,
+  "assets_match": true,
+  "code_revision": "70e0fa8f6e0d8ccbc6db06f6d07a3ff1f3d276e7",
+  "verified_at": "2026-11-17T16:41:12+08:00",
+  "verification_surface": "Read-only HTTP state, exact layout/history, static files and camera JPEG; no browser clicks or grasp commands on the live scene."
+}

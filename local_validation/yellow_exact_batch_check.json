@@ -1,0 +1,224 @@
+{
+  "check": "exact_six_object_yellow_regression",
+  "recorded_at": "2026-11-17T16:37:28+08:00",
+  "offline_only": true,
+  "online_api_calls": 0,
+  "live_dashboard_touched": false,
+  "fixture": "ws/src/cube_task/test/fixtures/assistant_six_object_scene.json",
+  "baseline": {
+    "yellow_failed_before_fix": true,
+    "elapsed_seconds": 68.36,
+    "stage": "plan",
+    "measured_rejection": "too_wide: yellow has no stable pad contact within finger reach (dome taper 90 deg > 20; widest section 0.046 m, fit 0.090 m, gripper max_width 0.100 m)"
+  },
+  "cases": [
+    {
+      "layout": "initial",
+      "ok": true,
+      "elapsed_seconds": 130.27,
+      "status": "complete",
+      "completed": 6,
+      "total": 6,
+      "items": [
+        {
+          "label": "pear",
+          "status": "succeeded",
+          "checks": {
+            "close": true,
+            "dropped": true,
+            "dropped_in_transit": true,
+            "placement": true
+          },
+          "grasp_width_m": 0.05398487716049685,
+          "verified_zone": "zone_green",
+          "five_neighbor_poses_unchanged": true
+        },
+        {
+          "label": "green",
+          "status": "succeeded",
+          "checks": {
+            "close": true,
+            "dropped": true,
+            "dropped_in_transit": true,
+            "placement": true
+          },
+          "grasp_width_m": 0.050933176056166034,
+          "verified_zone": "zone_green",
+          "five_neighbor_poses_unchanged": true
+        },
+        {
+          "label": "yellow",
+          "status": "succeeded",
+          "checks": {
+            "close": true,
+            "dropped": true,
+            "dropped_in_transit": true,
+            "placement": true
+          },
+          "grasp_width_m": 0.04812465142826189,
+          "verified_zone": "zone_yellow",
+          "five_neighbor_poses_unchanged": true
+        },
+        {
+          "label": "apple",
+          "status": "skipped",
+          "skipped_pose_unchanged": true
+        },
+        {
+          "label": "red",
+          "status": "succeeded",
+          "checks": {
+            "close": true,
+            "dropped": true,
+            "dropped_in_transit": true,
+            "placement": true
+          },
+          "grasp_width_m": 0.05046939212852177,
+          "verified_zone": "zone_red",
+          "five_neighbor_poses_unchanged": true
+        },
+        {
+          "label": "banana",
+          "status": "succeeded",
+          "checks": {
+            "close": true,
+            "dropped": true,
+            "dropped_in_transit": true,
+            "placement": true
+          },
+          "grasp_width_m": 0.041280862467663916,
+          "verified_zone": "zone_yellow",
+          "five_neighbor_poses_unchanged": true
+        }
+      ],
+      "skipped_pose_unchanged": {
+        "apple": true
+      },
+      "final_world_zones": {
+        "yellow": "zone_yellow",
+        "green": "zone_green",
+        "red": "zone_red",
+        "apple": "zone_red",
+        "banana": "zone_yellow",
+        "pear": "zone_green"
+      },
+      "local_intent_calls": 1,
+      "network_attempts": [],
+      "metrics": {
+        "requests": 1,
+        "successes": 1,
+        "model_requests": 1
+      },
+      "source_head": "2d26bdbed1d3a3c00e85d6fd1f254cf3a749cc21",
+      "source_hash_count": 110,
+      "source_hash_set_sha256": "0e6c7801cbf64853159f9c57e3075c0329e4fb0475d39bb005a3a5f123fae3c3",
+      "startup_and_end_sources_identical": true,
+      "same_sources_as_other_case": true,
+      "sources_still_current": true,
+      "all_five_neighbor_poses_unchanged": true,
+      "all_execution_checks_passed": true
+    },
+    {
+      "layout": "yellow_failure",
+      "ok": true,
+      "elapsed_seconds": 52.83,
+      "status": "complete",
+      "completed": 6,
+      "total": 6,
+      "items": [
+        {
+          "label": "pear",
+          "status": "skipped",
+          "skipped_pose_unchanged": true
+        },
+        {
+          "label": "green",
+          "status": "skipped",
+          "skipped_pose_unchanged": true
+        },
+        {
+          "label": "yellow",
+          "status": "succeeded",
+          "checks": {
+            "close": true,
+            "dropped": true,
+            "dropped_in_transit": true,
+            "placement": true
+          },
+          "grasp_width_m": 0.04808506307515581,
+          "verified_zone": "zone_yellow",
+          "five_neighbor_poses_unchanged": true
+        },
+        {
+          "label": "apple",
+          "status": "skipped",
+          "skipped_pose_unchanged": true
+        },
+        {
+          "label": "red",
+          "status": "succeeded",
+          "checks": {
+            "close": true,
+            "dropped": true,
+            "dropped_in_transit": true,
+            "placement": true
+          },
+          "grasp_width_m": 0.05048230207011216,
+          "verified_zone": "zone_red",
+          "five_neighbor_poses_unchanged": true
+        },
+        {
+          "label": "banana",
+          "status": "succeeded",
+          "checks": {
+            "close": true,
+            "dropped": true,
+            "dropped_in_transit": true,
+            "placement": true
+          },
+          "grasp_width_m": 0.04126950700390234,
+          "verified_zone": "zone_yellow",
+          "five_neighbor_poses_unchanged": true
+        }
+      ],
+      "skipped_pose_unchanged": {
+        "pear": true,
+        "green": true,
+        "apple": true
+      },
+      "final_world_zones": {
+        "yellow": "zone_yellow",
+        "green": "zone_green",
+        "red": "zone_red",
+        "apple": "zone_red",
+        "banana": "zone_yellow",
+        "pear": "zone_green"
+      },
+      "local_intent_calls": 1,
+      "network_attempts": [],
+      "metrics": {
+        "requests": 1,
+        "successes": 1,
+        "model_requests": 1
+      },
+      "source_head": "2d26bdbed1d3a3c00e85d6fd1f254cf3a749cc21",
+      "source_hash_count": 110,
+      "source_hash_set_sha256": "0e6c7801cbf64853159f9c57e3075c0329e4fb0475d39bb005a3a5f123fae3c3",
+      "startup_and_end_sources_identical": true,
+      "same_sources_as_other_case": true,
+      "sources_still_current": true,
+      "all_five_neighbor_poses_unchanged": true,
+      "all_execution_checks_passed": true
+    }
+  ],
+  "source_hashes": {
+    "ws/src/cube_task/cube_task/assistant/batch.py": "6494115dcd46350e8057f966104a5ae0052d30a0fa31ad34a96be5ca39762b74",
+    "ws/src/cube_task/cube_task/assistant/observations.py": "6db6cce192828cc031f3e2013f1ed814ccd911f554ea773a3959af0234f58303",
+    "ws/src/cube_task/cube_task/assistant/server.py": "64013cc042fb9481e85458070721b61a4674deeb1591e34061353b2a5c6ae8cf",
+    "ws/src/cube_task/cube_task/assistant/simulation.py": "d6fd3cf5d86db1f8765e3dbbb7cbf3d113801b2ef65010f0cef0b8e17146dfe2",
+    "ws/src/cube_task/cube_task/perception/grasp.py": "836e1f9a7e94132ce67ab96689b0788ac39a7c6cd472b2f9eb71f209d7f03538",
+    "ws/src/cube_task/test/fixtures/assistant_six_object_scene.json": "e6bf417e238a72b07b2d27cfa75bf4974cdd3c30373a2e8425c407667c09fae5"
+  },
+  "ok": true,
+  "tested_code_revision": "70e0fa8f6e0d8ccbc6db06f6d07a3ff1f3d276e7"
+}

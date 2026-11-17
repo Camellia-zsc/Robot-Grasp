@@ -80,10 +80,11 @@ SHIFT_CREST = 0.85
 SHIFT_MIN = 0.008
 #: default grasp.finger_clearance (m): each finger passes the object this far off.
 FINGER_CLEARANCE = 0.005
-#: a grasp above the widest section within reach (neck) needs the section to taper by
-#: at most this half angle over the lower half of the finger pads (deg, friction ~0.36);
+#: a grasp whose widest pad contact is at the lower edge needs the next 10 mm
+#: to taper by at most this half angle (deg, friction ~0.36);
 #: steeper is a dome that slips.
 NECK_MAX_TAPER_DEG = 20.0
+NECK_TAPER_RISE = 0.010
 #: default grasp.min_grasp_height (m): profile grasps keep the TCP this far above the table.
 MIN_GRASP_HEIGHT = 0.008
 #: default place.release_height_flat (m): object bottom above a flat zone (wall_height 0).
@@ -229,7 +230,8 @@ def transit_height(cfg, zones: Iterable[Zone], table_z: float, held_offset: floa
 
 def section_profile(points: np.ndarray, center_xy: Sequence[float], closing: float,
                     table_z: float, half_band: float = SECTION_HALF_BAND,
-                    bin_m: float = PROFILE_BIN) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+                    bin_m: float = PROFILE_BIN, *, with_support: bool = False
+                    ) -> Optional[Tuple[np.ndarray, ...]]:
     """
     Return (z_edges, widths) of an object's cross-section along the closing axis.
 
@@ -242,6 +244,9 @@ def section_profile(points: np.ndarray, center_xy: Sequence[float], closing: flo
     about the grasp point (the far side is hidden from an oblique camera). A bin with
     too few points lies under the object (hidden from the camera) and gets the
     widest measured width above it. None when there are too few points.
+    with_support also returns each bin's measured base-z range and largest
+    gap between observed heights (NaN for a filled bin), so a short real
+    sidewall can be distinguished from isolated thin rims.
     """
     P = np.asarray(points, dtype=np.float64).reshape(-1, 3)
     P = P[np.all(np.isfinite(P), axis=1)]
@@ -260,27 +265,81 @@ def section_profile(points: np.ndarray, center_xy: Sequence[float], closing: flo
     n = max(1, int(math.ceil(top / bin_m)))
     idx = np.clip(np.floor(h / bin_m).astype(int), 0, n - 1)
     widths = np.full(n, np.nan)
+    support = np.full((n, 3), np.nan)
     for i in range(n):
-        sel = along[idx == i]
+        mask = idx == i
+        sel = along[mask]
         if sel.size >= PROFILE_MIN_BIN_POINTS:
             lo, hi = np.percentile(sel, PROFILE_PCT)
             widths[i] = max(hi - lo, 2.0 * max(hi, -lo), 0.0)
+            measured_z = np.unique(h[mask])
+            support[i, :2] = float(table_z) + measured_z[[0, -1]]
+            support[i, 2] = float(np.diff(measured_z).max()) if measured_z.size > 1 else 0.0
     run = 0.0
     for i in range(n - 1, -1, -1):
         if not np.isfinite(widths[i]):
             widths[i] = run
         run = max(run, widths[i])
     edges = float(table_z) + bin_m * np.arange(n + 1)
-    return edges, widths
+    return (edges, widths, support) if with_support else (edges, widths)
 
 
-def section_width(profile: Tuple[np.ndarray, np.ndarray], z_lo: float, z_hi: float) -> float:
+def section_width(profile: Tuple[np.ndarray, ...], z_lo: float, z_hi: float) -> float:
     """Return the widest section (m) of profile between base z z_lo and z_hi (0 if none)."""
-    edges, widths = profile
+    edges, widths = profile[:2]
     sel = (edges[1:] > z_lo + 1e-9) & (edges[:-1] < z_hi - 1e-9)
     if z_hi - z_lo <= 1e-9:
         sel = (edges[1:] >= z_lo) & (edges[:-1] <= z_lo)
     return float(widths[sel].max()) if np.any(sel) else 0.0
+
+
+def _pad_taper_deg(profile: Tuple[np.ndarray, ...], z: float,
+                   pad_half: float) -> Optional[float]:
+    """Local inward taper above a lower pad-contact peak; None for an interior peak.
+
+    Inspect only the candidate's actual pad band. Use the first strict maximum:
+    a later, slightly narrower bulge must not hide a steep shoulder below it.
+    Bin centers give the peak and comparison widths one consistent sampling
+    rule. Check every profile step up to 10 mm, so a short drop cannot
+    disappear into an average when the section widens again before the TCP.
+    """
+    edges, widths = profile[:2]
+    centers = (edges[:-1] + edges[1:]) / 2.0
+    lo, hi = z - pad_half, z + pad_half
+    in_pad = ((edges[1:] > lo + 1e-9) & (edges[:-1] < hi - 1e-9)
+              & np.isfinite(widths) & (widths > 0.0))
+    support = profile[2] if len(profile) > 2 else None
+    if support is not None:
+        in_pad &= (np.all(np.isfinite(support), axis=1)
+                   & (support[:, 1] >= lo) & (support[:, 0] <= hi))
+    contact = np.flatnonzero(in_pad)
+    if not contact.size:
+        return 90.0
+    peak = int(contact[np.argmax(widths[contact])])
+    peak_z = max(lo, float(centers[peak]))
+    first_z = max(lo, float(centers[contact[0]]))
+    if peak_z > first_z + PROFILE_BIN + 1e-9:
+        return None
+    end = peak_z + NECK_TAPER_RISE
+    if end > min(hi, float(edges[-1])) + 1e-9:
+        if support is not None:
+            # A small pad or a short body need not offer 10 mm of contact.
+            # Require measured vertical extent; filled bins and a ring that
+            # merely straddles a bin edge do not establish straight sidewalls.
+            starts = np.maximum(lo, support[contact, 0])
+            ends = np.minimum(hi, support[contact, 1])
+            coverage = np.maximum(0.0, ends - starts).sum()
+            if (coverage >= min(PROFILE_BIN, pad_half) > 0.0
+                    and np.all(starts[1:] - ends[:-1] <= PROFILE_BIN / 5.0)
+                    and np.all(support[contact, 2] <= PROFILE_BIN / 5.0)
+                    and np.ptp(widths[contact]) <= 0.001):
+                return 0.0
+        return 90.0
+    samples = centers[(centers > peak_z + 1e-9) & (centers < end - 1e-9)]
+    samples = np.r_[samples, end]
+    above = np.interp(samples, centers, widths)
+    slopes = np.maximum(0.0, widths[peak] - above) / (2.0 * (samples - peak_z))
+    return math.degrees(math.atan(float(np.max(slopes))))
 
 
 def section_center_shift(points: np.ndarray, center_xy: Sequence[float], closing: float,
@@ -482,7 +541,7 @@ class GraspPlanner:
                 if shift is not None and SHIFT_MIN <= abs(shift) <= 0.5 * width:
                     x += shift * math.cos(closing)
                     y += shift * math.sin(closing)
-            prof = section_profile(pts, (x, y), closing, table_z)
+            prof = section_profile(pts, (x, y), closing, table_z, with_support=True)
         info = {'kind': kind, 'mode': 'footprint' if prof is None else 'profile'}
         if det.label in self.stem_labels:
             info['stem'] = at_stem
@@ -526,14 +585,13 @@ class GraspPlanner:
         Candidates: TCP z in [max(z_floor, table + grasp.min_grasp_height),
         top - min_grasp_depth], at most max_grasp_depth below the top, where
         every section the open fingers pass (z - pad_half up to the top) fits
-        max_width - 2 * finger_clearance. The lowest candidate wins when it is
-        at or below the widest section within finger reach (stable grip below
-        the equator). Above it the shape must narrow gently under the lower
-        half of the finger pads (a neck, at most NECK_MAX_TAPER_DEG half angle): the lowest such
-        candidate wins; a dome (steeper) is too_wide. Returns (z, expected
-        width, open width, reason, info).
+        max_width - 2 * finger_clearance. Each candidate must have its widest
+        contact inside its own pad band, or narrow gently over the first 10 mm
+        above a lower contact peak (a neck, at most NECK_MAX_TAPER_DEG half
+        angle). The lowest stable candidate wins; a dome is too_wide. Returns
+        (z, expected width, open width, reason, info).
         """
-        edges, widths = prof
+        edges, widths = prof[:2]
         top_pts = float(edges[-1])
         fit = self._fit(det.label)
         depth_limit = self._depth_limit(det.label)
@@ -552,37 +610,33 @@ class GraspPlanner:
                       '%.3f m)' % (label, min(passed), fit, depth_limit, widest,
                                    self.max_width))
             return zs[0], min(passed), self.max_width, reason, info
-        centers = (edges[:-1] + edges[1:]) / 2.0
-        reach = (edges[1:] > lo + 1e-9) & (edges[:-1] < top_pts)
-        z_wide = lo
-        if np.any(reach):
-            w_reach = widths[reach].max()
-            z_wide = float(centers[reach][widths[reach] >= w_reach - 0.001].max())
-        pick = ok[0]
+        pick = None
+        taper = 90.0
         reason = ''
-        if zs[pick] > z_wide + PROFILE_BIN / 2.0:
-            pick = None
-            taper = 90.0
-            for i in ok:
+        for i in ok:
+            t = _pad_taper_deg(prof, zs[i], self.pad_half)
+            if t is None:
+                pick = i
+                break
+            taper = min(taper, t)
+            if t <= NECK_MAX_TAPER_DEG:
+                pick = i
+                info['neck_taper_deg'] = round(t, 1)
+                # Hidden low bins may be filled with an upper equator's width.
+                # Still check their taper, but call it a neck only when the
+                # upper half of the contact really is narrower.
                 z = zs[i]
-                # A neck is held where it is widest under the pads (their lower half).
-                w_lo = section_width(prof, z - self.pad_half, z - self.pad_half)
-                w_mid = section_width(prof, z, z)
-                t = math.degrees(math.atan2(max(0.0, w_lo - w_mid) / 2.0,
-                                            max(self.pad_half, 1e-6)))
-                taper = min(taper, t)
-                if t <= NECK_MAX_TAPER_DEG:
-                    pick = i
-                    break
+                if (section_width(prof, z, z + self.pad_half) + 1e-9
+                        < section_width(prof, z - self.pad_half, z + self.pad_half)):
+                    info['neck'] = True
+                break
+        if pick is None:
+            pick = ok[0]
             info['neck_taper_deg'] = round(taper, 1)
-            if pick is None:
-                pick = ok[0]
-                reason = ('too_wide: %s widest section %.3f m > %.3f m (gripper max_width '
-                          '%.3f m) and the narrower part above it is a dome (taper %.0f deg '
-                          '> %.0f)' % (label, section_width(prof, z_wide, z_wide), fit,
-                                       self.max_width, taper, NECK_MAX_TAPER_DEG))
-            else:
-                info['neck'] = True
+            reason = ('too_wide: %s has no stable pad contact within finger reach '
+                      '(dome taper %.0f deg > %.0f; widest section %.3f m, fit %.3f m, '
+                      'gripper max_width %.3f m)' % (label, taper, NECK_MAX_TAPER_DEG,
+                                                   widest, fit, self.max_width))
         z = zs[pick]
         expected = section_width(prof, z - self.pad_half, z + self.pad_half)
         open_w = min(self.max_width, passed[pick] + 2.0 * self.finger_clearance

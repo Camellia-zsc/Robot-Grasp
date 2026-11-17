@@ -28,6 +28,58 @@ def consolidate(*views):
                               partial=lambda d: not d.valid or d.extra.get('incomplete', False))
 
 
+def pear_view(xy, height, count):
+    det = observation('pear', xy, None)
+    det.height = det.top_z = height
+    det.length, det.width = .075, .055
+    det.n_points = count
+    return det
+
+
+def test_pear_neck_visibility_wins_over_a_denser_low_view():
+    low = pear_view([.198, -.011], .102, 19455)
+    whole = pear_view([.197, -.002], .114, 17746)
+    objects, _ = consolidate([low], [whole])
+    assert len(objects) == 1 and objects[0] is whole
+
+
+@pytest.mark.parametrize('case', ['partial', 'invalid', 'tiny_gain', 'narrow', 'different_label', 'missing_height'])
+def test_pear_view_preference_requires_reliable_more_complete_geometry(case):
+    low = pear_view([.198, -.011], .102, 19455)
+    candidate = pear_view([.197, -.002], .114, 17746)
+    if case == 'partial':
+        candidate.extra['incomplete'] = True
+    elif case == 'invalid':
+        candidate.valid = False
+    elif case == 'tiny_gain':
+        candidate.height = candidate.top_z = .105
+    elif case == 'narrow':
+        candidate.width = .033
+    elif case == 'different_label':
+        candidate.label = 'apple'
+    elif case == 'missing_height':
+        candidate.height = None
+    objects, _ = consolidate([low], [candidate])
+    assert len(objects) == 1 and objects[0] is low
+
+
+def test_a_taller_nearby_pear_is_still_a_separate_target():
+    low = pear_view([.198, -.011], .102, 19455)
+    neighbor = pear_view([.27, -.002], .114, 17746)
+    objects, _ = consolidate([low], [neighbor])
+    assert objects == [low, neighbor]
+
+
+def test_a_bridging_view_cannot_replace_two_separate_targets_with_the_same_detection():
+    first = pear_view([.20, 0.], .100, 20000)
+    second = pear_view([.26, 0.], .110, 20000)
+    bridge = pear_view([.23, 0.], .130, 18000)
+    objects, _ = merge_observations(
+        {0: tag_view([first, second], 0), 1: tag_view([bridge], 1)}, dist=.04,
+        partial=lambda d: not d.valid)
+    assert len(objects) == 2 and objects[0] is first and objects[1] is second
+
+
 @pytest.mark.parametrize('reverse', [False, True])
 def test_mixed_candidate_is_explained_by_other_views_not_a_third_object(reverse):
     pear = observation('pear', [.20, 0], box_cloud([.20, 0, .08]))
@@ -144,4 +196,5 @@ def test_actual_six_view_scan_does_not_publish_a_second_pear(tmp_path):
         # The model's selectable table and executor must use the same consolidated set.
         assert len(session._detections) == len(scene['objects'])
         assert sum(d.label == 'pear' for d in session._detections.values()) == 1
-        np.testing.assert_allclose(pears[0]['center_base'][:2], [.198, -.011], atol=.003)
+        assert pears[0]['height'] > .11  # Preserve the more complete neck view.
+        np.testing.assert_allclose(pears[0]['center_base'][:2], [.197, -.002], atol=.003)

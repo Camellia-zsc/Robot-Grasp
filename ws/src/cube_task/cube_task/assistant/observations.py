@@ -20,6 +20,51 @@ _SUPPORT = 0.98
 _RESIDUAL_GAP = 0.006
 
 
+def _prefer_pear_neck_views(merged, views, dist, partial):
+    """A denser close view of the bulb can still hide this library pear's neck."""
+    def geometry(det):
+        try:
+            values = np.asarray([det.height, det.length, det.width], dtype=float)
+            xy = np.asarray(det.center_base, dtype=float)[:2]
+        except (TypeError, ValueError, IndexError):
+            return None
+        if (xy.shape != (2,) or not np.all(np.isfinite(np.r_[values, xy]))
+                or np.any(values <= 0)):
+            return None
+        return values, xy
+
+    # The underlying merge guarantees finite base XYs for these anchors.
+    centers = np.asarray([np.asarray(d.center_base, dtype=float)[:2] for d in merged])
+    preferred = []
+    for det in merged:
+        base = geometry(det) if det.valid and det.label == 'pear' else None
+        best, best_height = det, 0. if base is None else base[0][0]
+        if base is not None:
+            dims, xy = base
+            for items in views.values():
+                for candidate in items:
+                    if (not candidate.valid or candidate.label != det.label
+                            or view_of(candidate) == view_of(det)
+                            or (partial is not None and partial(candidate))):
+                        continue
+                    measured = geometry(candidate)
+                    if measured is None:
+                        continue
+                    size, point = measured
+                    # A view between two targets is not a unique association.
+                    # Reusing it would publish the same measured object twice.
+                    if np.count_nonzero(np.linalg.norm(centers - point, axis=1) <= dist) != 1:
+                        continue
+                    # Require one extra 5 mm profile bin, retaining the bulb's
+                    # footprint. A tall cropped sliver is not a better view.
+                    if (np.linalg.norm(point - xy) <= dist and size[0] >= dims[0] + .005
+                            and size[1] * size[2] >= .9 * dims[1] * dims[2]
+                            and size[0] > best_height):
+                        best, best_height = candidate, size[0]
+        preferred.append(best)
+    return preferred
+
+
 def _cloud(det):
     try:
         points = np.asarray((det.extra or {}).get('_points_base'), dtype=np.float32)
@@ -79,7 +124,8 @@ def merge_observations(views, dist=MERGE_DIST, partial=None):
     are not inputs to the test.
     All views here are fresh captures from one dashboard scan.
     """
-    merged = merge_view_detections(views, dist=dist, partial=partial)
+    merged = _prefer_pear_neck_views(
+        merge_view_detections(views, dist=dist, partial=partial), views, dist, partial)
     anchors = []
     for detections in views.values():
         for det in detections:

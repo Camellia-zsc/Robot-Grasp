@@ -1,0 +1,255 @@
+{
+  "date": "2026-11-17",
+  "feature_checks_passed": true,
+  "source_set_sha256": "56e90506cadd5d7d294fbc1746e0592bac8221e4ab0b869b08996d627d2bb5b7",
+  "source_unchanged_during_acceptance": true,
+  "online_api_called": false,
+  "production_dashboard_touched_by_simulation_tests": false,
+  "protocol_and_queue_tests_passed": 299,
+  "backend_tests_passed": 20,
+  "ui_assertions": {
+    "placement": 42,
+    "previous_batch": 50
+  },
+  "js_syntax_checks_passed": true,
+  "real_browser_interaction_verified": false,
+  "legacy_core_run": {
+    "passed": 127,
+    "failed": 8,
+    "same_eight_failures_confirmed_on_committed_base": "abcedee"
+  },
+  "exact_six_object_layouts": [
+    {
+      "layout": "initial",
+      "fixture_sha256": "e6bf417e238a72b07b2d27cfa75bf4974cdd3c30373a2e8425c407667c09fae5",
+      "completed": 6,
+      "total": 6,
+      "items": [
+        {
+          "label": "pear",
+          "status": "succeeded"
+        },
+        {
+          "label": "green",
+          "status": "succeeded"
+        },
+        {
+          "label": "yellow",
+          "status": "succeeded"
+        },
+        {
+          "label": "apple",
+          "status": "skipped"
+        },
+        {
+          "label": "red",
+          "status": "succeeded"
+        },
+        {
+          "label": "banana",
+          "status": "succeeded"
+        }
+      ],
+      "neighbors_unchanged": true,
+      "source_unchanged": true,
+      "network_attempts": 0,
+      "elapsed_seconds": 408.67
+    },
+    {
+      "layout": "yellow_failure",
+      "fixture_sha256": "e6bf417e238a72b07b2d27cfa75bf4974cdd3c30373a2e8425c407667c09fae5",
+      "completed": 6,
+      "total": 6,
+      "items": [
+        {
+          "label": "pear",
+          "status": "skipped"
+        },
+        {
+          "label": "green",
+          "status": "skipped"
+        },
+        {
+          "label": "yellow",
+          "status": "succeeded"
+        },
+        {
+          "label": "apple",
+          "status": "skipped"
+        },
+        {
+          "label": "red",
+          "status": "succeeded"
+        },
+        {
+          "label": "banana",
+          "status": "succeeded"
+        }
+      ],
+      "neighbors_unchanged": true,
+      "source_unchanged": true,
+      "network_attempts": 0,
+      "elapsed_seconds": 277.49
+    }
+  ],
+  "free_placement_batches": [
+    {
+      "mode": "region",
+      "completed": 2,
+      "total": 2,
+      "executions": [
+        {
+          "label": "apple",
+          "destination": {
+            "type": "region",
+            "name": "pick_area"
+          },
+          "zone_name": null,
+          "controller_ok": true,
+          "independent_placement_ok": true,
+          "neighbors_unchanged": true,
+          "feedback": [
+            {
+              "stage": "close",
+              "ok": true
+            },
+            {
+              "stage": "dropped",
+              "ok": true
+            },
+            {
+              "stage": "dropped_in_transit",
+              "ok": true
+            },
+            {
+              "stage": "placement",
+              "ok": true
+            }
+          ],
+          "valid_labels_after": [
+            "apple",
+            "banana",
+            "green"
+          ]
+        },
+        {
+          "label": "banana",
+          "destination": {
+            "type": "region",
+            "name": "pick_area"
+          },
+          "zone_name": null,
+          "controller_ok": true,
+          "independent_placement_ok": true,
+          "neighbors_unchanged": true,
+          "feedback": [
+            {
+              "stage": "close",
+              "ok": true
+            },
+            {
+              "stage": "dropped",
+              "ok": true
+            },
+            {
+              "stage": "dropped_in_transit",
+              "ok": true
+            },
+            {
+              "stage": "placement",
+              "ok": true
+            }
+          ],
+          "valid_labels_after": [
+            "apple",
+            "banana",
+            "green"
+          ]
+        }
+      ],
+      "elapsed_seconds": 217.09
+    },
+    {
+      "mode": "points",
+      "completed": 2,
+      "total": 2,
+      "executions": [
+        {
+          "label": "banana",
+          "destination": {
+            "type": "point",
+            "xy": [
+              0.33,
+              0.12
+            ]
+          },
+          "zone_name": null,
+          "controller_ok": true,
+          "independent_placement_ok": true,
+          "neighbors_unchanged": true,
+          "feedback": [
+            {
+              "stage": "close",
+              "ok": true
+            },
+            {
+              "stage": "dropped",
+              "ok": true
+            },
+            {
+              "stage": "dropped_in_transit",
+              "ok": true
+            },
+            {
+              "stage": "placement",
+              "ok": true
+            }
+          ],
+          "valid_labels_after": [
+            "apple",
+            "banana",
+            "green"
+          ]
+        },
+        {
+          "label": "apple",
+          "destination": {
+            "type": "point",
+            "xy": [
+              0.3,
+              -0.12
+            ]
+          },
+          "zone_name": null,
+          "controller_ok": true,
+          "independent_placement_ok": true,
+          "neighbors_unchanged": true,
+          "feedback": [
+            {
+              "stage": "close",
+              "ok": true
+            },
+            {
+              "stage": "dropped",
+              "ok": true
+            },
+            {
+              "stage": "dropped_in_transit",
+              "ok": true
+            },
+            {
+              "stage": "placement",
+              "ok": true
+            }
+          ],
+          "valid_labels_after": [
+            "apple",
+            "banana",
+            "green"
+          ]
+        }
+      ],
+      "elapsed_seconds": 173.27
+    }
+  ]
+}

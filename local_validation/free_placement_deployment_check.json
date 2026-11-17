@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "status": "ready",
+  "batch": "idle",
+  "model_configured": true,
+  "objects": 6,
+  "messages": 23,
+  "metrics": {
+    "requests": 9,
+    "successes": 3,
+    "model_requests": 14
+  },
+  "confirmed": 6,
+  "pending": 0,
+  "layout_and_history_preserved": true,
+  "assets_match": true,
+  "placement_metadata_valid": true,
+  "camera_jpeg_valid": true,
+  "online_api_called": false,
+  "interaction_check": "HTTP state and exact static assets; no browser available"
+}

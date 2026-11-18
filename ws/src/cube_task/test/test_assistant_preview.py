@@ -186,6 +186,83 @@ def test_render_failure_marks_preview_unavailable_and_retries_previous_snapshot(
         preview.close()
 
 
+def test_nonvisual_progress_does_not_retrace_the_same_camera_scene(monkeypatch):
+    current = {
+        'objects': [{'id': 'apple', 'transform': np.eye(4).tolist(), 'held': False}],
+        'zones': [], 'table_z': 0., 'tcp_transform': np.eye(4).tolist(),
+        'gripper_width': .04, 'link_frames': [np.eye(4).tolist()],
+        'sim_time': 1., 'stage': 'observing', 'scene_version': 1, 'feedback': {},
+    }
+    camera = SimpleNamespace(
+        intrinsics=lambda: CameraIntrinsics(400, 400, 320, 240, 640, 480),
+        T_flange_camera=np.eye(4))
+    session = SimpleNamespace(camera=camera, snapshot=lambda: copy.deepcopy(current))
+    preview = LivePreview(session)
+    rendered = []
+
+    def render(snapshot):
+        rendered.append(copy.deepcopy(snapshot))
+        return str(snapshot['sim_time']).encode()
+
+    monkeypatch.setattr(preview, '_render', render)
+    try:
+        preview.start()
+        _wait_for(lambda: preview.info()['available'])
+        first_info = preview.info()
+        # Camera averaging and planning update time/diagnostics without moving
+        # anything visible. The cached image retains its actual capture time.
+        current.update(sim_time=2., stage='planning', scene_version=2,
+                       feedback={'message': 'new planning progress'})
+        time.sleep(.42)
+        assert len(rendered) == 1
+        assert preview.info() == first_info
+        assert preview.frame_jpeg() == b'1.0'
+
+        # A manual object move must refresh even if the simulated clock did
+        # not advance; display invalidation follows geometry, not timestamps.
+        current['objects'][0]['transform'][0][3] += .04
+        _wait_for(lambda: len(rendered) == 2)
+        assert preview.info()['sim_time'] == 2.
+        assert preview.frame_jpeg() == b'2.0'
+    finally:
+        preview.close()
+
+
+@pytest.mark.parametrize('field', ['objects', 'zones', 'table_z', 'tcp_transform',
+                                  'gripper_width', 'link_frames'])
+def test_each_visual_input_invalidates_preview_without_a_clock_tick(monkeypatch, field):
+    current = {
+        'objects': [], 'zones': [], 'table_z': 0.,
+        'tcp_transform': np.eye(4).tolist(), 'gripper_width': .04,
+        'link_frames': [np.eye(4).tolist()], 'sim_time': 1.,
+    }
+    camera = SimpleNamespace(
+        intrinsics=lambda: CameraIntrinsics(400, 400, 320, 240, 640, 480),
+        T_flange_camera=np.eye(4))
+    preview = LivePreview(SimpleNamespace(
+        camera=camera, snapshot=lambda: copy.deepcopy(current)))
+    rendered = []
+    monkeypatch.setattr(preview, '_render',
+                        lambda snapshot: rendered.append(copy.deepcopy(snapshot)) or b'frame')
+    try:
+        preview.start()
+        _wait_for(lambda: len(rendered) == 1)
+        if field in ('objects', 'zones'):
+            current[field].append({'visible': 'new geometry'})
+        elif field == 'table_z':
+            current[field] = .01
+        elif field == 'gripper_width':
+            current[field] = .06
+        elif field == 'tcp_transform':
+            current[field][0][3] += .02
+        else:
+            current[field][-1][1][3] += .02
+        _wait_for(lambda: len(rendered) == 2)
+        assert rendered[-1][field] != rendered[0][field]
+    finally:
+        preview.close()
+
+
 @pytest.mark.parametrize('kwargs', [{'fps': 0}, {'fps': float('nan')},
                                     {'width': 0}, {'width': True}])
 def test_invalid_preview_settings_are_rejected(kwargs):

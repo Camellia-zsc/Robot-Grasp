@@ -20,6 +20,8 @@ from ..sim.world import SimObject, SimWorld, SimZone, check_pose
 
 _LOG = logging.getLogger(__name__)
 _MAX_FPS = 3.0
+_VISUAL_FIELDS = ('objects', 'zones', 'table_z', 'tcp_transform',
+                  'gripper_width', 'link_frames')
 
 
 class LivePreview:
@@ -91,7 +93,17 @@ class LivePreview:
             started = time.monotonic()
             try:
                 snapshot = self._session.snapshot()
-                if snapshot and (failed or snapshot != previous) and not self._stop.is_set():
+                # Clock/feedback updates do not change the image. Reuse the
+                # last render while geometry stays fixed, including during
+                # perception averaging; manual moves still invalidate it even
+                # without a clock tick. Minimal snapshot providers retain the
+                # original whole-snapshot comparison.
+                visual_state = (tuple(snapshot[field] for field in _VISUAL_FIELDS)
+                                if snapshot and all(field in snapshot
+                                                    for field in _VISUAL_FIELDS)
+                                else snapshot)
+                if (snapshot and (failed or visual_state != previous)
+                        and not self._stop.is_set()):
                     jpeg = self._render(snapshot)
                     with self._cache_lock:
                         if not self._stop.is_set():
@@ -99,7 +111,7 @@ class LivePreview:
                             self._info.update(available=True,
                                               sim_time=float(snapshot['sim_time']),
                                               updated_at=time.time())
-                    previous = snapshot
+                    previous = visual_state
                     failed = False
             except Exception:
                 with self._cache_lock:

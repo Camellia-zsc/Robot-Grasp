@@ -126,10 +126,13 @@ class _ViewerClock(SimClock):
         remaining = float(dt)
         while remaining > 1e-9:
             step = min(remaining, 0.05)
+            started = time.monotonic()
             if self.on_tick is not None:
                 self.on_tick()
             if self.realtime and self.paced and not self.cancel_event.is_set():
-                self.cancel_event.wait(step / self.speed)
+                delay = step / self.speed - (time.monotonic() - started)
+                if delay > 0:
+                    self.cancel_event.wait(delay)
             super().sleep(step)
             remaining -= step
 
@@ -186,6 +189,7 @@ class SimulationSession:
         self._scan_stats = {'frames': 0, 'full_scans': 0, 'local_scans': 0}
         self._cache_lock = threading.Lock()
         self._snapshot: dict = {}
+        self._last_snapshot_wall = float('-inf')
         self._jpeg: Optional[bytes] = None
         self._observation_views: dict[int, dict] = {}
         self._observation_jpegs: dict[int, bytes] = {}
@@ -273,8 +277,13 @@ class SimulationSession:
                              'message': _STAGE_MESSAGES.get(stage, '正在执行机械臂动作')})
 
     def _tick(self):
+        revision = self._environment_revision
         self._apply_interventions()
-        self._publish_snapshot()
+        # Keep every intervention/control tick, but bound display work in wall
+        # time. Stage/observation publications and human edits remain immediate.
+        if (revision != self._environment_revision or
+                time.monotonic() - self._last_snapshot_wall >= .05):
+            self._publish_snapshot()
 
     def intervene_scene(self, request):
         """Queue an edit; only the simulation owner mutates world geometry."""
@@ -1545,6 +1554,7 @@ class SimulationSession:
                 'class_to_zone': dict(self.runner.class_to_zone)}
         with self._cache_lock:
             self._snapshot = snap
+        self._last_snapshot_wall = time.monotonic()
 
     def close(self) -> None:
         """Stop before disconnecting the simulator and closing its run log."""

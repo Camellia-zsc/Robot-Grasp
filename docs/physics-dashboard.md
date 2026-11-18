@@ -13,6 +13,8 @@ python -m venv --system-site-packages .venv-physics
 
 MuJoCo 版本固定为 **3.3.7**，因为现有机械臂驱动使用 3.x 的惯量矩阵接口。界面启动前会检查版本；缺少依赖或版本不符会明确报错。
 
+首次启动可能需要生成物品识别缓存，准备时间较长；后续启动会复用它。物理依赖只改变仿真，不改变已有在线 API 配置。
+
 运行根目录的“启动智能抓取界面.cmd”会优先使用本项目 `.venv-physics`。也可设置 `MUJOCO_PYTHON`，指定已有物理环境的 Python。直接启动：
 
 ```powershell

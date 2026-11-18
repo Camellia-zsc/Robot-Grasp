@@ -15,7 +15,7 @@
 - [x] Plan release at the measured support top. Permit only intentional target/support contact, retaining full gripper and other-object collision checks. Reobserve before release and verify contact height, stability and specified support after settling.
 - [x] Advance physics while idle. Unexpected physical motion invalidates cached observations/completion evidence. Report slip, fall, rolling and unstable release to bounded recovery.
 - [x] Run offline protocol, conversation, geometry, perception and physical integration regressions, including apple on a red block, removing the support and recovery feedback. Record actual limitations and elapsed times.
-- [ ] Commit by feature, push, save the current scene and dialogue, deploy on port 8767 and verify live camera/model configuration without paid test calls.
+- [x] Commit by feature, push, save the current scene and dialogue, deploy on port 8767 and verify live camera/model configuration without paid test calls.
 
 ## Acceptance boundaries
 

@@ -139,6 +139,10 @@ const base={status:"executing",busy:true,skill_task:task,messages:[],events:[],
   const changed={id:106,kind:"placement_changed",message:"当前测量下无法确认安全放置方案，将保持夹持"};
   placement={...placement,stage:changed.message,events:[...placement.events,changed]};update(placement);
   eq(ui.eventNodes.has("106"),true);has(get("skill-message").textContent,/无法确认安全放置/);
+  const activeView={id:108,kind:"active_observation",message:"保持夹持，正在选择能看清目标区域的安全视角"};
+  update({...placement,events:[...placement.events,activeView],stage:activeView.message});
+  eq(ui.eventNodes.has("108"),true);has(get("stage-message").textContent,/安全视角.*仍夹持香蕉/);
+  has(get("skill-message").textContent,/安全视角/);eq(get("task-result").hidden,true);
 
   // A status-only stop must invalidate the task's UI cache immediately.
   const stopping={...placement,status:"stopping",needs_reset:true,stage:"正在停止当前任务"};

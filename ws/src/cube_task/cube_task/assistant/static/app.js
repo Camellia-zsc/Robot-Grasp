@@ -254,7 +254,7 @@ function renderMessages(state){
   });
   for(const [key,node] of ui.messageNodes)if(!activeKeys.has(key)){node.remove();ui.messageNodes.delete(key);}
   for(const event of Array.isArray(state.events)?state.events:[]){
-    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan","inspect_place","recovery_observation","placement_planning","placement_progress","placement_refined","placement_changed"].includes(event.kind)||!event.message)continue;
+    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan","inspect_place","active_observation","recovery_observation","placement_planning","placement_progress","placement_refined","placement_changed"].includes(event.kind)||!event.message)continue;
     if(["decision","recovery_result"].includes(event.kind)&&messages.some(message=>message.role==="assistant"&&assistantText(message,String(message.content??message.text??""),false)===event.message))continue;
     const key=String(event.id??event.seq??`${event.time}-${event.message}`);
     if(ui.eventNodes.has(key))continue;
@@ -280,7 +280,7 @@ function stoppingMessage(state){
 function placementProgressMessage(state){
   if(!state.busy||!["executing","recovering"].includes(state.status))return "";
   const events=Array.isArray(state.events)?state.events:[],latest=events.at(-1);if(!latest)return "";
-  const messages={inspect_place:"正在局部确认放置区域空位",placement_planning:"正在检查安全放置方案",placement_progress:"正在检查安全放置候选",placement_refined:"已确认放置位置",placement_changed:"无法确认安全放置方案，将保持当前状态"};
+  const messages={inspect_place:"正在局部确认放置区域空位",active_observation:"正在保持夹持并检查局部观察视角",placement_planning:"正在检查安全放置方案",placement_progress:"正在检查安全放置候选",placement_refined:"已确认放置位置",placement_changed:"无法确认安全放置方案，将保持当前状态"};
   let text=messages[latest.kind]?(latest.message||messages[latest.kind]):"";
   if(latest.kind==="recovery_observation"&&state.simulation?.held_object){
     const previous=events.slice(0,-1).findLast(event=>!["grasp_feedback","recovery_observation"].includes(event.kind));

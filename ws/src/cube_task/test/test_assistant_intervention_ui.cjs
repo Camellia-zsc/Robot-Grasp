@@ -4,7 +4,7 @@ const fs=require("fs"),path=require("path"),vm=require("vm"),assert=require("ass
 const staticRoot=path.join(__dirname,"..","cube_task","assistant","static");
 const editorSource=fs.readFileSync(path.join(staticRoot,"editor.js"),"utf8");
 const drawing=[];
-const drawingContext=new Proxy({}, {get:(target,key)=>key in target?target[key]:(...args)=>drawing.push([key,...args]),set:(target,key,value)=>(target[key]=value,true)});
+const drawingContext=new Proxy({}, {get:(target,key)=>key in target?target[key]:(...args)=>drawing.push([key,...args,...(key==="stroke"?[target.strokeStyle]:[])]),set:(target,key,value)=>(target[key]=value,true)});
 
 class Element{
   constructor(tag="div"){
@@ -43,7 +43,7 @@ let state={
   status:"ready",busy:false,needs_reset:false,
   scene:{scene_version:7,objects:[],placement:{
     bounds:{x:[.10,.50],y:[-.20,.20],r_min:.10,r_max:.62},
-    table_bounds:{x:[.10,.50],y:[-.20,.20]},
+    table_bounds:{x:[0,.80],y:[-.30,.30]},
     pick_polygon:[[.20,-.10],[.40,-.10],[.40,.10],[.20,.10]],point_tolerance:.015,margin:.002,
   }},
   simulation:{scene_version:7,held_object:null,zones:[],pick_polygon:[[.20,-.10],[.40,-.10],[.40,.10],[.20,.10]],
@@ -81,6 +81,20 @@ const eq=(actual,expected)=>{assert.equal(actual,expected);checks++;};
 const deep=(actual,expected)=>{assert.deepEqual(copy(actual),copy(expected));checks++;};
 const has=(text,pattern)=>{assert.match(text,pattern);checks++;};
 const update=next=>{state=copy(next);ui.state=state;editor.update(state);};
+function boundary(){
+  let points=[],found;
+  for(const [operation,...values] of drawing){
+    if(operation==="beginPath")points=[];
+    if(operation==="moveTo"||operation==="lineTo")points.push(values);
+    if(operation==="stroke"&&values[0]==="#a7becb")found=copy(points);
+  }
+  assert.ok(found,"the selectable area has a visible boundary");return found;
+}
+function pointerAt(xy,table=state.scene.placement.table_bounds){
+  const points=boundary();
+  return {clientX:points[0][0]+(xy[0]-table.x[0])/(table.x[1]-table.x[0])*(points[1][0]-points[0][0]),
+    clientY:points[0][1]+(xy[1]-table.y[0])/(table.y[1]-table.y[0])*(points[3][1]-points[0][1])};
+}
 (async()=>{
   state.busy=true;state.status="executing";state.events=[];
   state.simulation.editor={...state.simulation.editor,editable:false,intervention_available:true,intervention_pending:0};
@@ -95,18 +109,25 @@ const update=next=>{state=copy(next);ui.state=state;editor.update(state);};
   eq(get("editor-delete").disabled,true);
   eq(get("editor-clear").disabled,true);
   has(get("editor-hint").textContent,/模拟现场变化/);
-  await map.dispatch("pointerdown");
+  // Running interventions must show the whole table, including the part outside
+  // both the pick polygon and the robot's placement workspace.
+  const outline=boundary();
+  eq(outline.every(([x,y])=>x>=0&&x<=420&&y>=0&&y<=280),true);
+  eq(Math.round((outline[1][0]-outline[0][0])/(outline[0][1]-outline[3][1])*1e6),1333333);
+  has(get("editor-hint").textContent,/整个桌面/);
+  await map.dispatch("pointerdown",pointerAt([.30,0]));
   eq(get("editor-yaw").disabled,false);
   // Polling while a task runs must not cancel a live intervention drag.
   update(state);
-  await map.dispatch("pointermove",{clientX:235});
-  await map.dispatch("pointerup",{clientX:235});
+  await map.dispatch("pointermove",pointerAt([.68,.18]));
+  await map.dispatch("pointerup",pointerAt([.68,.18]));
   await new Promise(resolve=>setImmediate(resolve));
   const intervention=copy(requests.find(item=>item.url==="/api/scene-intervene"));
   eq(intervention.payload.action,"move");
   eq(intervention.payload.object_id,"truth-apple");
   eq(intervention.payload.scene_version,7);
-  eq(intervention.payload.xy[0]>.30,true);
+  deep(intervention.payload.xy.map(value=>Math.round(value*1e4)/1e4),[.68,.18]);
+  eq(intervention.payload.xy[0]>state.scene.placement.bounds.x[1],true);
   eq(intervention.payload.yaw,0);
   eq(ui.pending,false); // Stop and command controls do not share a scene-edit worker.
   eq(get("editor-mode-intervene").disabled,true);
@@ -126,16 +147,16 @@ const update=next=>{state=copy(next);ui.state=state;editor.update(state);};
 
   // Holding one object still permits interference with the other objects only.
   update({...state,simulation:{...state.simulation,held_object:"truth-apple",objects:state.simulation.objects.map(item=>({...item,held:true}))}});
-  await map.dispatch("pointerdown");
-  await map.dispatch("pointermove",{clientX:235});
-  await map.dispatch("pointerup",{clientX:235});
+  await map.dispatch("pointerdown",pointerAt([.30,0]));
+  await map.dispatch("pointermove",pointerAt([.35,0]));
+  await map.dispatch("pointerup",pointerAt([.35,0]));
   await get("editor-yaw").dispatch("change",{target:{value:45}});
   eq(requests.filter(item=>item.url==="/api/scene-intervene").length,1);
   eq(get("editor-yaw").disabled,true);
   has(get("editor-error").textContent,/夹持中的物品不能移动/);
 
   update({...state,simulation:{...state.simulation,held_object:null,objects:state.simulation.objects.map(item=>({...item,held:false}))}});
-  await map.dispatch("pointerdown");
+  await map.dispatch("pointerdown",pointerAt([.30,0]));
   await get("editor-yaw").dispatch("change",{target:{value:45}});
   await new Promise(resolve=>setImmediate(resolve));
   const rotation=requests.filter(item=>item.url==="/api/scene-intervene").at(-1);
@@ -150,5 +171,17 @@ const update=next=>{state=copy(next);ui.state=state;editor.update(state);};
   update({...state,needs_reset:true});
   eq(get("editor-mode-intervene").disabled,true);
   eq(map.attributes["aria-disabled"],"true");
+
+  // Returning to ordinary editing/robot point selection keeps the original
+  // work-area viewport and reach constraints instead of inheriting the table.
+  update({...state,needs_reset:false,busy:false,status:"ready",
+    simulation:{...state.simulation,editor:{...state.simulation.editor,editable:true}}});
+  await get("editor-mode-edit").dispatch("click");
+  const editOutline=boundary();
+  eq(Math.round((editOutline[1][0]-editOutline[0][0])/(editOutline[0][1]-editOutline[3][1])*1e6),1000000);
+  await get("editor-mode-place").dispatch("click");
+  await map.dispatch("pointerdown",pointerAt([.55,0],state.scene.placement.bounds));
+  eq(editor.selection(),null);
+  has(get("editor-error").textContent,/超出可选桌面范围/);
   console.log("Intervention UI real listeners: "+checks+" assertions passed.");
 })().catch(error=>{console.error(error);process.exitCode=1;});

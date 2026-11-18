@@ -46,7 +46,7 @@ window.SceneEditor=(()=>{
   function chooseMode(mode){
     if(!(mode==="intervene"?canIntervene():canEdit())||(mode==="place"&&!placement().bounds))return;
     editor.mode=mode;editor.selected=null;editor.chosen=null;editor.drag=null;editor.ghost=null;editor.placeHover=null;editor.yawEditing=false;
-    setError("");setHint(mode==="intervene"?"拖动或旋转未夹持物品，模拟现场变化。操作将在仿真步间生效，机械臂随后通过相机确认；不改变原任务。":mode==="place"?"点击桌面选择落点，再发送“把苹果放到选定位置”等指令。点选不会直接移动物品。":"编辑模式会直接更新摆场。抓放搬运请使用选择放置点和语言指令。");controls();draw();
+    setError("");setHint(mode==="intervene"?"可在整个桌面拖动或旋转未夹持物品，模拟现场变化。物品须完整留在桌内并与其他物品保持间隙；操作将在仿真步间生效，机械臂随后通过相机确认。":mode==="place"?"点击桌面选择落点，再发送“把苹果放到选定位置”等指令。点选不会直接移动物品。":"编辑模式会直接更新摆场。抓放搬运请使用选择放置点和语言指令。");controls();draw();
   }
   function controls(){
     const available=canEdit(),editing=editor.mode==="edit",intervening=editor.mode==="intervene",operable=canOperate(),object=selected();
@@ -159,7 +159,9 @@ window.SceneEditor=(()=>{
     const sim=editor.state?.simulation||{},pick=config().pick_polygon||sim.pick_polygon||[];
     const zones=Array.isArray(sim.zones)?sim.zones:[];
     const points=pick.map(p=>[safeNumber(p[0]),safeNumber(p[1])]);
-    const bounds=usableBounds();
+    // Human interventions use the full supporting table. Robot point selection
+    // still uses usableBounds()/pointAllowed() and its reach constraints.
+    const intervening=editor.mode==="intervene",bounds=intervening?placement().table_bounds:usableBounds();
     if(bounds?.x?.length===2&&bounds?.y?.length===2)points.push([bounds.x[0],bounds.y[0]],[bounds.x[1],bounds.y[1]]);
     for(const zone of zones){const center=zone.center||[0,0],size=zone.size||[.2,.2];points.push([center[0]-size[0]/2,center[1]-size[1]/2],[center[0]+size[0]/2,center[1]+size[1]/2]);}
     if(points.length){const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs)-.045,maxX=Math.max(...xs)+.045,minY=Math.min(...ys)-.045,maxY=Math.max(...ys)+.045;editor.center=[(minX+maxX)/2,(minY+maxY)/2];editor.scale=Math.min((editor.width-22)/(maxX-minX),(editor.height-32)/(maxY-minY));}
@@ -167,10 +169,10 @@ window.SceneEditor=(()=>{
     ctx.strokeStyle="#dfe9e5";ctx.lineWidth=.5;
     for(let x=Math.ceil(lo[0]/.05)*.05;x<hi[0];x+=.05){const a=project([x,lo[1]]),b=project([x,hi[1]]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();}
     for(let y=Math.ceil(lo[1]/.05)*.05;y<hi[1];y+=.05){const a=project([lo[0],y]),b=project([hi[0],y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();}
-    if(bounds?.x?.length===2&&bounds?.y?.length===2){polygon([[bounds.x[0],bounds.y[0]],[bounds.x[1],bounds.y[0]],[bounds.x[1],bounds.y[1]],[bounds.x[0],bounds.y[1]]],"#72a0be05","#a7becb",.7,[3,4]);}
+    if(bounds?.x?.length===2&&bounds?.y?.length===2){polygon([[bounds.x[0],bounds.y[0]],[bounds.x[1],bounds.y[0]],[bounds.x[1],bounds.y[1]],[bounds.x[0],bounds.y[1]]],"#72a0be05","#a7becb",.7,[3,4]);if(intervening){const p=project([bounds.x[0]+.01,bounds.y[1]-.018]);ctx.font='9px "Microsoft YaHei",sans-serif';ctx.fillStyle="#7898aa";ctx.textAlign="left";ctx.fillText("整个桌面 · 干预范围",p[0],p[1]);}}
     for(const zone of zones){const [x,y]=zone.center||[0,0],[sx,sy]=zone.size||[.2,.2],yaw=safeNumber(zone.yaw),c=Math.cos(yaw),s=Math.sin(yaw),corners=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b])=>[x+a*sx/2*c-b*sy/2*s,y+a*sx/2*s+b*sy/2*c]);const color=palette[colorKey(zone.name)]||"#9cafad";polygon(corners,color+"12",color+"80",.8);const p=project([x,y]);ctx.fillStyle=color;ctx.font='9px "Microsoft YaHei",sans-serif';ctx.textAlign="center";ctx.fillText(({zone_red:"红区",zone_green:"绿区",zone_yellow:"黄区"})[zone.name]||zone.name,p[0],p[1]);}
     polygon(pick,"#60ab920a","#7dad9d",1,[5,4]);
-    if(pick.length){const p=project([Math.min(...pick.map(p=>p[0]))+.01,Math.max(...pick.map(p=>p[1]))-.018]);ctx.font='9px "Microsoft YaHei",sans-serif';ctx.fillStyle="#7b9e90";ctx.textAlign="left";ctx.fillText("抓取区 · 拖入此处",p[0],p[1]);}
+    if(pick.length){const p=project([Math.min(...pick.map(p=>p[0]))+.01,Math.max(...pick.map(p=>p[1]))-.018]);ctx.font='9px "Microsoft YaHei",sans-serif';ctx.fillStyle="#7b9e90";ctx.textAlign="left";ctx.fillText(intervening?"抓取区":"抓取区 · 拖入此处",p[0],p[1]);}
     for(const object of objects()){
       if(editor.drag?.objectId===String(object.id))continue;
       drawObject(object);

@@ -114,10 +114,16 @@ class SkillOrchestrator:
                 with ctl._lock:
                     reply['content'] += text
 
-        plan = ctl._client.plan_skills(instruction, context, on_delta,
-                                       cancel_event=ctl._cancel)
-        self._check_stop()
-        plan = validate_skill_plan(plan, context)
+        try:
+            plan = ctl._client.plan_skills(instruction, context, on_delta,
+                                           cancel_event=ctl._cancel)
+            self._check_stop()
+            plan = validate_skill_plan(plan, context)
+        except ValueError as exc:
+            with ctl._lock:
+                reply.update(status='error', error=str(exc)[:1000])
+                ctl._last_usage = copy.deepcopy(getattr(ctl._client, 'last_usage', {}))
+            raise
         with ctl._lock:
             reply.update(status='complete', decision=copy.deepcopy(plan))
             ctl._last_usage = copy.deepcopy(getattr(ctl._client, 'last_usage', {}))
@@ -330,7 +336,23 @@ class SkillOrchestrator:
                     break
                 self._publish(status='thinking' if number == 1 else 'replanning', plan_number=number)
                 context, revision = self._context(memory, failure, executor), self._revision()
-                plan = self._request(instruction, context, number)
+                try:
+                    plan = self._request(instruction, context, number)
+                except ValueError as exc:
+                    self._check_stop()
+                    # A rejected model plan has sent no robot commands. Keep
+                    # the physical failure and immutable goals, and let the
+                    # model correct its plan within the existing finite budget.
+                    failure = dict(ok=False, stage='plan_validation', error='invalid_skill_plan',
+                                   message='方案未通过执行前检查：'+str(exc)[:1000],
+                                   holding=bool(self.session.snapshot().get('held_object')))
+                    memory['stagnation'] += 1
+                    self._publish(stagnation=memory['stagnation'])
+                    ctl._event('skill_replan', dict(message=failure['message'], failure=failure))
+                    if memory['stagnation'] >= MAX_STAGNATION:
+                        return self._finish(False, '连续三轮方案未产生进展，已保留现场和未完成事项',
+                                            memory, dict(failure, error='planning_stagnation'))
+                    continue
                 if revision != self._revision() or self._pending_interventions():
                     failure = dict(ok=False, stage='plan', error='scene_changed', message='模型规划期间现场发生变化，旧计划未执行')
                     executor.execute(dict(id='refresh', skill='observe'), memory['goals'], cancel_event=ctl._cancel)

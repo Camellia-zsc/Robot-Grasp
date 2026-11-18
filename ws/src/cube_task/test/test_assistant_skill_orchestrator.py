@@ -397,3 +397,39 @@ def test_resume_keeps_original_action_diagnostics_after_observe_only_plan(create
     retry = client.contexts[1]
     assert retry['failure']['error'] == 'goal_not_finished'
     assert retry['last_action_failure'] == (newer if memory_kind == 'recorded' else original)
+
+
+def test_rejected_recovery_plan_is_returned_to_model_without_losing_held_failure(create):
+    def compose(c, n):
+        if n == 1:
+            return [step(1, 'pick', 'apple'),
+                    step(2, 'place', 'apple', {'type': 'goal', 'index': 0})]
+        if n == 2:
+            return [step(3, 'unsupported_skill', 'apple')]
+        return [step(4, 'place', 'apple', {'type': 'goal', 'index': 0}), step(5, 'finish')]
+    ctl, session, client = create(compose)
+    session.fail_place = True
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    assert ctl.snapshot()['last_result']['ok'], ctl.snapshot()['last_result']
+    assert len(client.contexts) == 3
+    corrected = client.contexts[2]
+    assert corrected['failure']['error'] == 'invalid_skill_plan'
+    assert corrected['failure']['stage'] == 'plan_validation'
+    assert corrected['last_action_failure']['error'] == 'occupied'
+    assert corrected['held_label'] == 'apple' and corrected['goals'] == GOALS
+    assert [s['skill'] for s in session.calls] == ['pick', 'place', 'place', 'verify']
+    assert ctl.snapshot()['skill_task']['executed'] == 4
+    assert any(m.get('status') == 'error' for m in ctl.snapshot()['messages'])
+
+
+def test_repeated_invalid_model_plans_stop_with_no_robot_commands(create):
+    ctl, session, client = create(lambda c, n: [step(n, 'unsupported_skill', 'apple')])
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert len(client.contexts) == 3
+    assert session.calls == [] and state['skill_task']['executed'] == 0
+    assert not state['last_result']['ok']
+    assert state['last_result']['error'] == 'planning_stagnation'
+    assert state['metrics']['successes'] == 0

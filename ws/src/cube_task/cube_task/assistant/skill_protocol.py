@@ -48,7 +48,8 @@ goals 每项为 {"label":"唯一实测类别","zone_name":"已有区域名或nul
 {"type":"goal","index":从0开始的goals序号}；
 {"type":"zone","name":"已有区域名"}；
 {"type":"region","name":"pick_area"}；
-{"type":"auto_free"}（本地按实测寻找暂放空位，可带 away_from:["实测类别",...]）；
+{"type":"auto_free"}（本地按实测寻找暂放空位，可带 away_from:["已配置或曾实测类别",...]）；
+away_from 只是避让偏好，不是待抓取目标；不要求这些类别当前完整可见，执行器只使用实际测到的邻居判断几何。
 {"type":"original","label":"originals中的唯一类别"}（引用任务开始相机记录的位置和朝向）。
 place/move 步骤绝不能输出坐标、姿态、轨迹或高度；固定点只能引用 goal。
 observe 的 destination 只允许 goal/zone/region/original，不能用 auto_free 或直接 point/坐标。
@@ -320,9 +321,12 @@ def _unique_label(label, visible, *, held=False):
     return label
 
 
-def _known_label(label, visible):
+def _known_label(label, visible, *, include_originals=False):
     label = _text(label, '观测目标类别', 100)
     labels = {o.get('label') for o in visible['scene']['objects']}
+    if include_originals:
+        labels.update(o.get('label') for o in visible['originals']
+                      if o.get('valid') is True and 'center_base' in o)
     if (label not in labels and label not in visible['scene']['class_to_zone']
             and label != visible['held_label']):
         raise ValueError('不能发明未配置或未观测的物品类别。')
@@ -359,7 +363,9 @@ def _step_destination(value, goals, visible):
             if not isinstance(labels, list) or len(labels) > 100:
                 raise ValueError('暂放避让物品列表无效。')
             for label in labels:
-                _unique_label(label, visible, held=True)
+                # A preference must not require a fresh grasp identity. The
+                # executor scores only measured neighbors and checks all motion.
+                _known_label(label, visible, include_originals=True)
     else:
         raise ValueError('技能只能引用已有目的地，不能编写坐标或轨迹。')
     return copy.deepcopy(value)

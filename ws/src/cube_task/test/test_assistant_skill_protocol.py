@@ -76,6 +76,43 @@ def test_held_target_can_be_staged_even_when_not_currently_visible(context):
     assert validate_skill_plan(raw, context) == raw
 
 
+@pytest.mark.parametrize('observation', ['missing', 'cropped', 'ambiguous', 'original_only'])
+def test_held_staging_avoidance_is_a_semantic_preference_not_a_motion_target(context, observation):
+    context.update(holding=True, held_label='apple')
+    banana = next(o for o in context['scene']['objects'] if o['label'] == 'banana')
+    if observation in ('missing', 'original_only'):
+        context['scene']['objects'].remove(banana)
+    elif observation == 'cropped':
+        banana.update(valid=False, reject_reason='touches_image_border')
+    else:
+        context['scene']['objects'].append(deepcopy(banana))
+    if observation == 'original_only':
+        del context['scene']['class_to_zone']['banana']
+    raw = plan(context, [
+        step(1, 'ask', question='允许先暂放苹果吗？', affected_goals=[0]),
+        step(2, 'place', 'apple', {'type': 'auto_free', 'away_from': ['banana']}),
+    ])
+    assert validate_skill_plan(raw, context) == raw
+
+
+def test_avoidance_preference_does_not_allow_grasping_an_unmeasured_object(context):
+    context.update(holding=True, held_label='apple')
+    context['scene']['objects'] = [o for o in context['scene']['objects'] if o['label'] != 'banana']
+    raw = plan(context, [
+        step(1, 'place', 'apple', {'type': 'auto_free', 'away_from': ['banana']}),
+        step(2, 'move', 'banana', {'type': 'auto_free'}),
+    ])
+    with pytest.raises(ValueError, match='唯一且有效'):
+        validate_skill_plan(raw, context)
+
+
+def test_avoidance_cannot_use_an_unconfigured_invalid_original_fragment(context):
+    context['originals'].append({'label': 'invented', 'valid': False, 'center_base': [.3, .1, .04]})
+    raw = plan(context, [step(1, 'move', 'apple', {'type': 'auto_free', 'away_from': ['invented']})])
+    with pytest.raises(ValueError):
+        validate_skill_plan(raw, context)
+
+
 def test_human_question_can_pause_between_steps_and_affect_no_final_goal(context):
     raw = plan(context, [step(1, 'observe'),
                          step(2, 'ask', question='可以暂时搬开香蕉并在任务后复位吗？', affected_goals=[]),

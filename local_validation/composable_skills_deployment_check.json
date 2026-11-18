@@ -1,0 +1,45 @@
+{
+  "check": "passed",
+  "object_count": 5,
+  "scene_version": 54,
+  "physical_state_preserved": true,
+  "history_preserved": true,
+  "recorded_measurement_count": 0,
+  "raw_depth_cache_reconstructed": false,
+  "resolved_idle_editor_error_cleared": true,
+  "stop_semantics_preserved": true,
+  "live_preview_available": true,
+  "http_methods_used": [
+    "GET"
+  ],
+  "ok": true,
+  "url": "http://127.0.0.1:8767",
+  "code_commit": "1f9bc119243aea91d28e075a50556b84626da34b",
+  "status": "ready",
+  "busy": false,
+  "messages": 24,
+  "metrics": {
+    "requests": 8,
+    "successes": 3,
+    "model_requests": 16
+  },
+  "speed": 4.0,
+  "gripper_width": 0.07134689709120952,
+  "sim_time": 193.51776926315847,
+  "source_files_checked": 120,
+  "production_content_matches_tested_source": true,
+  "line_endings_normalized_for_source_comparison": true,
+  "static_assets_match": true,
+  "asset_sha256": {
+    "index.html": "b07b35f196be11543beae9b0e1037a46bcba2a2dc28297ba7b18ea948bd42dd8",
+    "app.js": "5486b7711b5eea1ea90455fb71a9a37e841a807f068a3de8c88c6e6f5d193f02",
+    "editor.js": "25bf8e6143f5588795096e28bc58f6bad682074a72b0b0aa03e34233f7ed8b72",
+    "style.css": "71fcbb13e4732e29720c5b5ca5727b42b33ae5fe5678b25ab6c35f9ed9ac61d0"
+  },
+  "model_configured": true,
+  "skill_task_status": "idle",
+  "intervention_available": true,
+  "online_api_called": false,
+  "user_approval_submitted": false,
+  "interaction_check": "HTTP state and exact static assets; UI listeners tested in an independent DOM"
+}

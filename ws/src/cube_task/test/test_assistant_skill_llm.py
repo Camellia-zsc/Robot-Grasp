@@ -48,6 +48,45 @@ def test_both_streaming_apis_receive_composable_skills_and_preserved_goals(monke
     assert 'private-thought' not in ''.join(deltas)
 
 
+@pytest.mark.parametrize('style', ['responses', 'chat_completions'])
+def test_streamed_held_replan_receives_active_observation_capability_and_remaining_budget(monkeypatch, context, style):
+    context.update(holding=True, held_label='apple')
+    context['capabilities'] = {
+        'observe_modes': ['stationary', 'active'], 'holding_allowed_skills': ['observe', 'place', 'ask'],
+        'active_observe_requires_geometry': True, 'multi_object_rearrangement': True,
+        'private': {'truth': 'hidden-capability-sentinel'},
+    }
+    context['planning_budget'] = {'plan_number': 6, 'max_plans': 8, 'remaining_plans': 2,
+                                  'remaining_steps': 11, 'stagnation': 1}
+    context['last_action_failure'] = {
+        'stage': 'place', 'error': 'placement_infeasible', 'diagnostics': '目标区被遮挡',
+        'truth': 'hidden-action-sentinel',
+    }
+    context['history'] = [{'skill': 'observe', 'ok': True, 'changed': False,
+                           'reason': 'no_information_gain', 'observation_mode': 'stationary'}]
+    decision = plan(context, [step(1, 'observe', destination={'type': 'goal', 'index': 0}, mode='active'),
+                              step(2, 'place', 'apple', {'type': 'goal', 'index': 0})])
+    text = json.dumps(decision, ensure_ascii=False)
+    raw = (completed(text) if style == 'responses' else
+           sse({'choices': [{'index': 0, 'delta': {'content': text}}]})
+           + sse({'choices': [{'index': 0, 'delta': {}, 'finish_reason': 'stop'}]})
+           + b'data: [DONE]\n\n')
+    requests = install_stream(monkeypatch, FakeStream([raw]))
+    assert llm.ModelClient(settings(style)).plan_skills('安全换视角后继续原任务', context, lambda _: None) == decision
+    assert len(requests) == 1
+    body = json.loads(requests[0][0].data)
+    visible = json.loads(body['input'] if style == 'responses' else body['messages'][1]['content'])['context']
+    prompt = body['instructions'] if style == 'responses' else body['messages'][0]['content']
+    assert visible['capabilities']['active_observe_requires_geometry'] is True
+    assert visible['planning_budget'] == context['planning_budget']
+    assert visible['last_action_failure']['error'] == 'placement_infeasible'
+    assert visible['history'][0]['changed'] is False
+    assert '安全视角搜索' in prompt and '信息增量' in prompt and 'observe-only' in prompt
+    assert 'pick/move/verify' in prompt
+    assert all(s not in requests[0][0].data.decode() for s in
+               ('hidden-capability-sentinel', 'hidden-action-sentinel'))
+
+
 def test_cancelled_plan_does_not_make_any_network_request(monkeypatch, context):
     event = threading.Event()
     event.set()

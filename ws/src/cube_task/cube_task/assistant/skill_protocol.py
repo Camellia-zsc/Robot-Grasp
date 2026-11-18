@@ -27,12 +27,19 @@ goals 表示用户最终要求，不是当前临时落点。context.goals 非空
 不能因失败换目标或目的地。protected_goals 也是不可损害的既有最终约束。
 pending_obligations 列出尚未履行的非目标物品原位复位义务：必须用 original 引用恢复，
 不能把这些义务改写成用户goals或偷偷放弃；finish前必须完成，否则控制器不会判为成功。
-history 和 failure 是真实逐步执行反馈；失败后结合新观测重新规划，不能假定旧步骤成功。
+history、failure 和 last_action_failure 是真实逐步执行反馈；观察成功不代表上次动作失败已解决。
+失败后结合新观测重新规划，不能假定旧步骤成功。capabilities 是当前执行器能力，按能力组合技能，
+可依次腾挪多件物品、暂放当前持物、再搬开障碍并恢复原位，不必拘泥于单物品固定套路。
 不要无限重复失败技能；没有实测依据时先观察，需人工决策时询问，无法推进时 stop。
-holding=true 时 held_label 已夹持，不能再次 pick/move；只能观察、place、verify 或询问。
+holding=true 时 held_label 已夹持，不能再次 pick/move/verify；可以观察、place 或询问。
 pick 只抓起保持；place 只安全放下当前持物；move 是完整抓起并放置，需要空夹爪。
 同一计划里的持物状态必须前后相容。每一步都由本地几何、支撑、碰撞、可达性检查决定是否执行。
-observe 在空夹爪时可重新扫描，持物时只进行安全局部观测；可用 label 指定观察目标。
+observe 可用 label 指定观察目标，destination 指定观察已有目标或区域。
+mode 可选 stationary 或 active；省略时沿用原观察行为，持物时保持不动观察。
+active 是由本地执行器检查持物几何、碰撞与可达性后的安全视角搜索；模型不能指定相机坐标、
+机器人姿态或轨迹，检查失败就不移动。持物也可请求 active，能否移动由几何门决定。
+每次观察应带来信息增量；history.changed=false 或 reason 表示没有新信息时，应改变观察意图、
+组合其他可行技能或说明无法推进，不要反复同视角 observe。
 goals 每项为 {"label":"唯一实测类别","zone_name":"已有区域名或null"}，
 也可在 zone_name=null 时带 destination={"type":"region","name":"pick_area"}，
 或用户明确给出的/scene.selected_destination 原样选定的 {"type":"point","xy":[x,y]}。
@@ -44,18 +51,22 @@ goals 每项为 {"label":"唯一实测类别","zone_name":"已有区域名或nul
 {"type":"auto_free"}（本地按实测寻找暂放空位，可带 away_from:["实测类别",...]）；
 {"type":"original","label":"originals中的唯一类别"}（引用任务开始相机记录的位置和朝向）。
 place/move 步骤绝不能输出坐标、姿态、轨迹或高度；固定点只能引用 goal。
+observe 的 destination 只允许 goal/zone/region/original，不能用 auto_free 或直接 point/坐标。
 改变非目标物品或临时改变目标目的地会由控制器请求人工确认，不能自行假定已获同意。
 ask 的 affected_goals 列出可能受影响的goals序号，question 明确问题；可放在计划中间，
 程序收到人工明确同意后才继续后续步骤，拒绝后停止。模型回复不代表人工同意。
 verify 通过相机检查最终目标；可用 goal_index 指定一项，省略则检查全部。
 finish 只能出现在末尾，须空夹爪，且只是请求本地最终核验，不能直接宣告成功。
 可以只给局部计划，执行器逐步反馈后再规划。remaining_steps 是整个任务剩余预算，不能超限。
+planning_budget 给出当前 plan_number、max_plans、remaining_plans、remaining_steps 和 stagnation。
+临近预算时优先组成有实质推进的可行计划；不要用 observe-only 计划耗完剩余重规划次数。
 位置、数量、存在性等只读问题只能 answer；不清楚的要求 clarify；用户取消时 stop。
 只输出一个 JSON 对象，尽量先输出 message，使公开中文回复尽早显示：
 {"message":"简短中文说明","scene_version":scene.scene_version,"action":"plan|answer|clarify|stop",
 "goals":[上述目标],"steps":[技能步骤]}。
 非plan响应 steps 必须为空；已有固定goals仍须保持。plan 至少包含一步，至多 max_steps/remaining_steps。
-步骤字段严格为：observe={"id":"唯一编号","skill":"observe",可选"label":"实测类别"}；
+步骤字段严格为：observe={"id":"唯一编号","skill":"observe",可选"label":"已配置或实测类别",
+可选"mode":"stationary或active",可选"destination":上述观察语义引用}；
 pick={"id":"唯一编号","skill":"pick","label":"实测类别"}；
 place/move={"id":"唯一编号","skill":"place或move","label":"实测类别","destination":上述引用}；
 verify={"id":"唯一编号","skill":"verify",可选"goal_index":目标序号}；
@@ -134,6 +145,37 @@ def _destination_summary(value):
     if isinstance(away, list) and len(away) <= 100 and all(isinstance(v, str) for v in away):
         result['away_from'] = [v[:100] for v in away]
     return result
+
+
+def _failure_summary(value):
+    if not isinstance(value, dict):
+        raise ValueError('技能执行失败反馈无效。')
+    return _fields(value,
+                   strings=('stage', 'error', 'message', 'diagnostics', 'observation_error'),
+                   flags=('holding', 'fault', 'aborted', 'controller_ok', 'ok', 'progress'),
+                   numbers=('duration',))
+
+
+def _capabilities(value):
+    if not isinstance(value, dict):
+        raise ValueError('技能执行能力无效。')
+    result = _fields(value, flags=('active_observe_requires_geometry',
+                                  'multi_object_rearrangement', 'restores_original_pose'))
+    for key in ('skills', 'observe_modes', 'observe_destination_types',
+                'destination_types', 'holding_allowed_skills'):
+        items = value.get(key)
+        if (isinstance(items, list) and len(items) <= 100 and
+                all(isinstance(item, str) and 0 < len(item) <= 100 for item in items)):
+            result[key] = list(items)
+    return result
+
+
+def _planning_budget(value):
+    if not isinstance(value, dict):
+        raise ValueError('技能重规划预算无效。')
+    return {key: value[key] for key in ('plan_number', 'max_plans', 'remaining_plans',
+                                       'remaining_steps', 'stagnation')
+            if type(value.get(key)) is int and value[key] >= 0 and _finite(value[key])}
 
 
 def _goals(value, scene, *, selected=False):
@@ -226,11 +268,14 @@ def model_skill_context(context: dict) -> dict:
         'originals': _observations(context.get('originals', [])),
         'holding': holding, 'held_label': held_label,
         'max_steps': maximum, 'remaining_steps': remaining,
-        'failure': _fields(failure,
-                           strings=('stage', 'error', 'message', 'diagnostics', 'observation_error'),
-                           flags=('holding', 'fault', 'aborted', 'controller_ok', 'ok', 'progress'),
-                           numbers=('duration',)),
+        'failure': _failure_summary(failure),
     }
+    if 'capabilities' in context:
+        visible['capabilities'] = _capabilities(context['capabilities'])
+    if 'planning_budget' in context:
+        visible['planning_budget'] = _planning_budget(context['planning_budget'])
+    if 'last_action_failure' in context:
+        visible['last_action_failure'] = _failure_summary(context['last_action_failure'])
     obligations = context.get('pending_obligations', [])
     if not isinstance(obligations, list) or len(obligations) > 100:
         raise ValueError('待复位义务列表无效。')
@@ -253,8 +298,8 @@ def model_skill_context(context: dict) -> dict:
             raise ValueError('技能规划历史记录无效。')
         record = _fields(
             item, strings=('id', 'step_id', 'skill', 'label', 'action', 'stage', 'error',
-                           'message', 'diagnostics', 'held_label', 'observation_mode'),
-            flags=('ok', 'holding', 'progress', 'camera_verified', 'aborted', 'approved'),
+                           'message', 'diagnostics', 'held_label', 'observation_mode', 'reason'),
+            flags=('ok', 'holding', 'progress', 'camera_verified', 'aborted', 'approved', 'changed'),
             numbers=('attempt', 'scene_version', 'duration'))
         destination = _destination_summary(item.get('destination'))
         if destination is not None:
@@ -361,7 +406,9 @@ def validate_skill_plan(plan: dict, context: dict) -> dict:
         skill = step.get('skill')
         base = {'id', 'skill'}
         expected = {
-            'observe': (base, base | {'label'}),
+            'observe': tuple(base | extras for extras in (
+                set(), {'label'}, {'mode'}, {'destination'}, {'label', 'mode'},
+                {'label', 'destination'}, {'mode', 'destination'}, {'label', 'mode', 'destination'})),
             'pick': (base | {'label'},),
             'place': (base | {'label', 'destination'},),
             'move': (base | {'label', 'destination'},),
@@ -372,8 +419,17 @@ def validate_skill_plan(plan: dict, context: dict) -> dict:
         if not isinstance(skill, str) or skill not in expected or set(step) not in expected[skill]:
             raise ValueError('技能类型或步骤字段不符合约定。')
         item = dict(step, id=step_id)
-        if skill == 'observe' and 'label' in step:
-            item['label'] = _known_label(step['label'], visible)
+        if skill == 'observe':
+            if 'label' in step:
+                item['label'] = _known_label(step['label'], visible)
+            if 'mode' in step and (not isinstance(step['mode'], str) or
+                                   step['mode'] not in ('stationary', 'active')):
+                raise ValueError('技能观察模式无效。')
+            if 'destination' in step:
+                destination = _step_destination(step['destination'], goals, visible)
+                if destination['type'] not in ('goal', 'zone', 'region', 'original'):
+                    raise ValueError('观察只能引用已有目标、区域或原始观测。')
+                item['destination'] = destination
         elif skill in ('pick', 'place', 'move'):
             item['label'] = _unique_label(step['label'], visible, held=True)
             if not goals:
@@ -399,6 +455,8 @@ def validate_skill_plan(plan: dict, context: dict) -> dict:
                 raise ValueError('原位复位只能引用同一物品的原始观测。')
             held_label = None
         elif skill == 'verify':
+            if held_label is not None:
+                raise ValueError('夹爪持物时不能核验最终目标，请先安全放置。')
             if 'goal_index' in step:
                 _index(step['goal_index'], goals)
         elif skill == 'ask':

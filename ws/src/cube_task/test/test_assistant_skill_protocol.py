@@ -250,3 +250,104 @@ def test_replanning_sees_pending_restorations_and_semantic_step_destinations(con
     assert 'private-sentinel' not in str(visible)
     visible['history'][0]['destination']['away_from'].clear()
     assert context['history'][0]['destination']['away_from'] == ['apple']
+
+
+@pytest.mark.parametrize('holding', [False, True])
+@pytest.mark.parametrize('destination', [
+    {'type': 'goal', 'index': 0}, {'type': 'zone', 'name': 'zone_green'},
+    {'type': 'region', 'name': 'pick_area'}, {'type': 'original', 'label': 'banana'},
+])
+def test_active_observe_can_search_semantic_destinations_with_or_without_a_held_object(context, holding, destination):
+    context.update(holding=holding, held_label='apple' if holding else None)
+    raw = plan(context, [step(1, 'observe', 'banana', destination, mode='active')])
+    assert validate_skill_plan(raw, context) == raw
+    raw['steps'][0].pop('label')
+    assert validate_skill_plan(raw, context) == raw
+
+
+def test_stationary_observe_and_legacy_observe_remain_compatible(context):
+    raw = plan(context, [step(1, 'observe'), step(2, 'observe', mode='stationary')])
+    assert validate_skill_plan(raw, context) == raw
+
+
+@pytest.mark.parametrize('extra', [
+    {'mode': 'teleport'}, {'mode': None}, {'mode': []},
+    {'destination': {'type': 'auto_free'}},
+    {'destination': {'type': 'point', 'xy': [.3, 0]}},
+    {'destination': {'type': 'goal', 'index': True}},
+    {'destination': {'type': 'zone', 'name': 'invented'}},
+    {'destination': {'type': 'original', 'label': 'invented'}},
+    {'destination': {'type': 'region', 'name': 'pick_area', 'xy': [.3, 0]}},
+    {'xy': [.3, 0]}, {'trajectory': [[0, 0, 0]]},
+])
+def test_observe_cannot_invent_modes_destinations_or_geometry(context, extra):
+    with pytest.raises(ValueError):
+        validate_skill_plan(plan(context, [step(1, 'observe', **extra)]), context)
+
+
+@pytest.mark.parametrize('steps', [
+    [step(1, 'verify')], [step(1, 'verify', goal_index=0)],
+])
+def test_held_object_must_be_placed_before_any_verification(context, steps):
+    context.update(holding=True, held_label='apple')
+    with pytest.raises(ValueError, match='持物'):
+        validate_skill_plan(plan(context, steps), context)
+    context.update(holding=False, held_label=None)
+    with pytest.raises(ValueError, match='持物'):
+        validate_skill_plan(plan(context, [step(0, 'pick', 'apple'), *steps]), context)
+
+
+def test_model_context_exposes_capabilities_budget_and_action_failure_without_private_data(context):
+    context['capabilities'] = {
+        'skills': ['observe', 'pick', 'place', 'move', 'verify', 'ask', 'finish'],
+        'observe_modes': ['stationary', 'active'],
+        'observe_destination_types': ['goal', 'zone', 'region', 'original'],
+        'destination_types': ['goal', 'zone', 'region', 'original', 'auto_free'],
+        'holding_allowed_skills': ['observe', 'place', 'ask'],
+        'active_observe_requires_geometry': True,
+        'multi_object_rearrangement': True, 'restores_original_pose': True,
+        'scene': {'truth': 'private-sentinel'}, 'private': 'private-sentinel',
+    }
+    context['planning_budget'] = {
+        'plan_number': 3, 'max_plans': 8, 'remaining_plans': 5,
+        'remaining_steps': 19, 'stagnation': 2, 'private': 'private-sentinel',
+    }
+    context['last_action_failure'] = {
+        'stage': 'place', 'error': 'placement_infeasible', 'message': '没有安全空位',
+        'diagnostics': '遮挡仍在', 'holding': True, 'duration': 1.5,
+        'scene': {'objects': ['private-sentinel']}, 'truth': 'private-sentinel',
+    }
+    context['history'] = [{
+        'skill': 'observe', 'diagnostics': '新视角仍遮挡', 'observation_mode': 'active',
+        'changed': False, 'reason': 'no_information_gain',
+        'scene': {'truth': 'private-sentinel'}, 'private': 'private-sentinel',
+    }]
+    visible = model_skill_context(context)
+    assert visible['capabilities'] == {k: v for k, v in context['capabilities'].items()
+                                       if k not in ('scene', 'private')}
+    assert visible['planning_budget'] == {k: v for k, v in context['planning_budget'].items() if k != 'private'}
+    assert visible['last_action_failure']['error'] == 'placement_infeasible'
+    assert visible['last_action_failure']['duration'] == 1.5
+    assert visible['history'][0]['changed'] is False
+    assert visible['history'][0]['reason'] == 'no_information_gain'
+    assert visible['history'][0]['observation_mode'] == 'active'
+    assert 'private-sentinel' not in str(visible)
+    visible['capabilities']['skills'].clear()
+    assert context['capabilities']['skills'][0] == 'observe'
+
+
+@pytest.mark.parametrize('value', [True, False, -1, 1.5, float('inf'), float('nan'), '3', None])
+def test_planning_budget_does_not_coerce_nonfinite_or_noninteger_values(context, value):
+    context['planning_budget'] = {key: value for key in
+                                  ('plan_number', 'max_plans', 'remaining_plans', 'remaining_steps', 'stagnation')}
+    assert model_skill_context(context)['planning_budget'] == {}
+
+
+def test_capabilities_do_not_forward_nested_or_mistyped_values(context):
+    context['capabilities'] = {
+        'skills': [{'truth': 'private-sentinel'}], 'observe_modes': 'active',
+        'holding_allowed_skills': ['observe', {'truth': 'private-sentinel'}],
+        'multi_object_rearrangement': 'true', 'restores_original_pose': 1,
+        'active_observe_requires_geometry': None,
+    }
+    assert model_skill_context(context)['capabilities'] == {}

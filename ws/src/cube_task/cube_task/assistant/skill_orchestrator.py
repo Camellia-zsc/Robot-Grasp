@@ -11,8 +11,10 @@ from contextlib import nullcontext
 
 from .skill_protocol import MAX_SKILL_STEPS, validate_skill_plan
 
-MAX_PLANS = 5
+MIN_PLANS = 8
+MAX_PLANS = 16
 MAX_EXECUTED = 64
+MAX_STAGNATION = 3
 NAMES = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块',
          'apple': '苹果', 'banana': '香蕉', 'pear': '梨'}
 SKILLS = {'observe': '观察', 'pick': '抓取并保持', 'place': '放置',
@@ -20,9 +22,14 @@ SKILLS = {'observe': '观察', 'pick': '抓取并保持', 'place': '放置',
 
 
 def idle_skill_task():
-    return dict(status='idle', plan_number=0, max_plans=MAX_PLANS,
+    return dict(status='idle', plan_number=0, max_plans=MIN_PLANS, stagnation=0,
                 executed=0, max_executed=MAX_EXECUTED, current_index=None,
                 goals=[], steps=[], history=[], message='')
+
+
+def plan_limit(goals, initial_steps=()):
+    """Allow bounded recovery room proportional to the original task size."""
+    return min(MAX_PLANS, max(MIN_PLANS, 2*len(goals)+4, len(initial_steps)//2+4))
 
 
 class SkillOrchestrator:
@@ -63,20 +70,33 @@ class SkillOrchestrator:
             return context['det'].label
         return None
 
-    def _context(self, memory, failure):
+    def _context(self, memory, failure, executor=None):
         snap = self.session.snapshot()
         scene = self.session.scene
         scene['scene_version'] = snap.get('scene_version', scene['scene_version'])
         if memory.get('selected_destination') is not None:
             scene['selected_destination'] = copy.deepcopy(memory['selected_destination'])
+        capability_fn = getattr(executor, 'capabilities', None)
+        capabilities = (capability_fn() if callable(capability_fn) else
+                        dict(skills=list(SKILLS), observe_modes=['stationary'],
+                             holding_allowed_skills=['observe', 'place', 'ask']))
+        if not isinstance(capabilities, dict):
+            raise ValueError('执行器能力说明无效')
+        task = self.ctl._skill_task
+        remaining = MAX_EXECUTED-task['executed']
+        budget = dict(plan_number=task['plan_number'], max_plans=task['max_plans'],
+                      remaining_plans=max(0, task['max_plans']-task['plan_number']),
+                      remaining_steps=max(0, remaining), stagnation=memory['stagnation'])
         return dict(scene=scene, goals=copy.deepcopy(memory['goals']),
                     originals=copy.deepcopy(memory['originals']),
                     protected_goals=copy.deepcopy(memory['protected_goals']),
                     holding=bool(snap.get('held_object')), held_label=self._held_label(),
                     history=copy.deepcopy(self.ctl._skill_task['history'][-MAX_EXECUTED:]),
                     pending_obligations=list(memory['obligations']),
+                    capabilities=copy.deepcopy(capabilities), planning_budget=budget,
+                    last_action_failure=copy.deepcopy(memory.get('last_action_failure', {})),
                     failure=copy.deepcopy(failure), max_steps=MAX_SKILL_STEPS,
-                    remaining_steps=min(MAX_SKILL_STEPS, MAX_EXECUTED-self.ctl._skill_task['executed']))
+                    remaining_steps=min(MAX_SKILL_STEPS, remaining))
 
     def _request(self, instruction, context, number):
         ctl = self.ctl
@@ -127,6 +147,8 @@ class SkillOrchestrator:
     def _describe(step):
         text = '%s%s' % (SKILLS[step['skill']],
                         '：'+NAMES.get(step['label'], step['label']) if step.get('label') else '')
+        if step['skill'] == 'observe' and step.get('mode') == 'active':
+            text += '（经安全检查调整视角）'
         dest = step.get('destination') or {}
         if dest.get('type') == 'goal':
             text += ' → 原定目标 %d' % (dest['index']+1)
@@ -159,6 +181,12 @@ class SkillOrchestrator:
                      ok=bool(result.get('ok')), stage=result.get('stage', ''),
                      error=result.get('error', ''), message=result.get('message', ''),
                      holding=bool(self.session.snapshot().get('held_object')))
+        for name in ('diagnostics', 'observation_mode', 'reason'):
+            if isinstance(result.get(name), str):
+                entry[name] = result[name][:1000]
+        for name in ('changed', 'progress'):
+            if type(result.get(name)) is bool:
+                entry[name] = result[name]
         with self.ctl._lock:
             self.ctl._skill_task['history'].append(entry)
             self.ctl._last_result = copy.deepcopy(result)
@@ -272,9 +300,20 @@ class SkillOrchestrator:
                           originals=originals, obligations={}, restorations=[],
                           selected_destination=copy.deepcopy(selected_destination))
         memory.setdefault('restorations', [])
+        initial_failure = failure if isinstance(failure, dict) else {}
+        action_failed = initial_failure.get('ok') is not True and (
+            initial_failure.get('skill') in ('pick', 'place', 'move')
+            or initial_failure.get('stage') in ('pick', 'place', 'move', 'inspect_place',
+                                               'release', 'transit')
+            or initial_failure.get('error') in ('placement_changed', 'placement_infeasible',
+                                               'placement_planning_budget_exceeded')
+            or (initial_failure.get('holding') is True and bool(initial_failure.get('diagnostics'))))
+        memory.setdefault('last_action_failure', copy.deepcopy(initial_failure) if action_failed else {})
+        memory['stagnation'] = 0
         ctl._skill_memory = memory
         ctl._skill_task = idle_skill_task()
-        self._publish(goals=memory['goals'])
+        self._publish(goals=memory['goals'],
+                      max_plans=plan_limit(memory['goals'], memory.get('initial_steps', ())))
         executor = self.executor_factory(self.session, originals=memory['originals'])
         try:
             self._check_stop()
@@ -282,13 +321,15 @@ class SkillOrchestrator:
                 self.session.observe()
                 memory['originals'] = [copy.deepcopy(o) for o in self.session.scene.get('objects', []) if o.get('valid')]
                 executor.originals = copy.deepcopy(memory['originals'])
-            for number in range(1, MAX_PLANS+1):
+            number = 0
+            while number < ctl._skill_task['max_plans']:
+                number += 1
                 self._check_stop()
                 remaining = MAX_EXECUTED-ctl._skill_task['executed']
                 if remaining <= 0:
                     break
                 self._publish(status='thinking' if number == 1 else 'replanning', plan_number=number)
-                context, revision = self._context(memory, failure), self._revision()
+                context, revision = self._context(memory, failure, executor), self._revision()
                 plan = self._request(instruction, context, number)
                 if revision != self._revision() or self._pending_interventions():
                     failure = dict(ok=False, stage='plan', error='scene_changed', message='模型规划期间现场发生变化，旧计划未执行')
@@ -303,9 +344,11 @@ class SkillOrchestrator:
                 if not memory['goals']:
                     memory['goals'] = copy.deepcopy(plan['goals'])
                 steps = copy.deepcopy(plan['steps'])
+                memory.setdefault('initial_steps', copy.deepcopy(steps))
                 for step in steps:
                     step.update(status='pending', message='等待执行')
-                self._publish(goals=memory['goals'], steps=steps, current_index=None)
+                self._publish(goals=memory['goals'], steps=steps, current_index=None,
+                              max_plans=plan_limit(memory['goals'], memory['initial_steps']))
                 ctl._event('skill_plan', dict(message=plan['message'], steps=steps, plan_number=number))
                 if self._risk(steps, memory['goals']):
                     question = ('此方案会暂放目标或移动其他物品。列出原位复位步骤的物品会要求复位；'
@@ -314,6 +357,7 @@ class SkillOrchestrator:
                         return self._finish(False, '未获同意，已保留现场并停止本次方案', memory)
                 verified = None
                 finished = False
+                round_progress = False
                 for index, step in enumerate(steps):
                     self._check_stop()
                     if revision != self._revision() or self._pending_interventions():
@@ -333,6 +377,7 @@ class SkillOrchestrator:
                     # Register physical obligations before a skill can move.
                     # Stop/driver exceptions must not erase an unpaid restore.
                     self._obligations(step, dict(ok=False), memory, steps)
+                    held_before = bool(self.session.snapshot().get('held_object'))
                     if step['skill'] == 'ask':
                         accepted = self._approve(steps[index:], step['question'])
                         result = dict(ok=accepted, message='已获同意' if accepted else '人工拒绝，未继续执行')
@@ -344,6 +389,13 @@ class SkillOrchestrator:
                             protected_goals=memory['protected_goals'], cancel_event=ctl._cancel,
                             expected_revision=revision)
                     self._feedback(step, result, number)
+                    physical = step['skill'] in ('pick', 'place', 'move')
+                    if physical and not result.get('ok'):
+                        memory['last_action_failure'] = copy.deepcopy(result)
+                    if ((physical and result.get('ok'))
+                            or (step['skill'] == 'observe' and result.get('changed') is True)
+                            or held_before != bool(self.session.snapshot().get('held_object'))):
+                        round_progress = True
                     self._obligations(step, result, memory, steps)
                     step.update(status='succeeded' if result.get('ok') else 'failed', message=result.get('message', ''))
                     self._publish(steps=steps)
@@ -368,13 +420,19 @@ class SkillOrchestrator:
                         if result.get('ok'):
                             return self._finish(True, '全部原始目标已通过核验', memory, result)
                         failure = result
-                        continue
-                    failure = dict(ok=False, stage='partial_plan', error='goal_not_finished',
-                                   message='局部技能已执行，原始目标尚需继续规划')
+                    else:
+                        failure = dict(ok=False, stage='partial_plan', error='goal_not_finished',
+                                       message='局部技能已执行，原始目标尚需继续规划')
                 for step in steps:
                     if step['status'] == 'pending':
                         step.update(status='cancelled', message='旧计划停止，等待新计划')
                 self._publish(steps=steps)
+                memory['stagnation'] = 0 if round_progress else memory['stagnation']+1
+                self._publish(stagnation=memory['stagnation'])
+                if memory['stagnation'] >= MAX_STAGNATION:
+                    message = '连续三轮没有新的执行进展或观测信息，已保留持物和未完成事项'
+                    return self._finish(False, message, memory,
+                        dict(failure or {}, error='planning_stagnation', message=message))
                 if failure.get('error') == 'scene_changed' and not self.session.snapshot().get('held_object'):
                     label = memory['goals'][0]['label'] if memory['goals'] else None
                     executor.execute(dict(id='refresh', skill='observe', **({'label': label} if label else {})), memory['goals'], cancel_event=ctl._cancel)

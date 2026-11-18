@@ -250,7 +250,7 @@ def test_failed_final_verification_never_counts_success(create):
     assert ctl.wait_idle(3)
     state = ctl.snapshot()
     assert not state['last_result']['ok'] and state['metrics']['successes'] == 0
-    assert len(client.contexts) == 5 and state['can_resume_recovery']
+    assert len(client.contexts) == state['skill_task']['max_plans'] and state['can_resume_recovery']
 
 
 def test_completed_task_cannot_be_replayed_through_resume_endpoint(create):
@@ -259,3 +259,141 @@ def test_completed_task_cannot_be_replayed_through_resume_endpoint(create):
     assert ctl.wait_idle(3)
     with pytest.raises(ValueError):
         ctl.resume_recovery()
+
+
+def test_model_receives_actual_executor_capabilities_and_remaining_plan_budget(create, monkeypatch):
+    capabilities = dict(skills=['observe', 'pick', 'place', 'move', 'verify', 'ask', 'finish'],
+                        observe_modes=['stationary', 'active'],
+                        observe_destination_types=['goal', 'zone', 'region', 'original'],
+                        holding_allowed_skills=['observe', 'place', 'ask'],
+                        active_observe_requires_geometry=True)
+    monkeypatch.setattr(Executor, 'capabilities', lambda self: copy.deepcopy(capabilities), raising=False)
+    ctl, _session, client = create(normal)
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    first = client.contexts[0]
+    assert first['capabilities'] == capabilities
+    assert first['planning_budget'] == dict(plan_number=1, max_plans=8,
+        remaining_plans=7, remaining_steps=64, stagnation=0)
+    assert ctl.snapshot()['last_result']['ok']
+
+
+def test_action_failure_diagnostics_survive_observe_only_replanning(create, monkeypatch):
+    original = Executor.execute
+    def execute(self, action, *args, **kwargs):
+        result = original(self, action, *args, **kwargs)
+        if action['skill'] == 'place' and not result['ok']:
+            result['diagnostics'] = 'placement_planning_budget_exceeded'
+        if action['skill'] == 'observe':
+            result.update(observation_mode='stationary_with_last_scan', changed=False,
+                          reason='same_view_no_new_coverage')
+        return result
+    monkeypatch.setattr(Executor, 'execute', execute)
+    def compose(c, n):
+        if n == 1:
+            return [step(1, 'pick', 'apple'), step(2, 'place', 'apple', {'type': 'goal', 'index': 0})]
+        if n == 2:
+            return [step(3, 'observe')]
+        return [step(4, 'place', 'apple', {'type': 'goal', 'index': 0}), step(5, 'finish')]
+    ctl, session, client = create(compose)
+    session.fail_place = True
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    assert ctl.snapshot()['last_result']['ok']
+    last = client.contexts[2]
+    assert last['failure']['error'] == 'goal_not_finished'
+    assert last['last_action_failure']['error'] == 'occupied'
+    assert last['last_action_failure']['diagnostics'] == 'placement_planning_budget_exceeded'
+    assert last['history'][-2]['diagnostics'] == 'placement_planning_budget_exceeded'
+    assert last['history'][-1]['observation_mode'] == 'stationary_with_last_scan'
+    assert last['history'][-1]['changed'] is False
+    assert last['history'][-1]['reason'] == 'same_view_no_new_coverage'
+    assert last['planning_budget']['stagnation'] == 1
+
+
+def test_three_observe_only_rounds_without_information_stop_and_preserve_hold(create):
+    ctl, session, client = create(lambda c, n: [step(n, 'pick', 'apple')] if n == 1 else [step(n, 'observe')])
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert len(client.contexts) == 4
+    assert [c['planning_budget']['stagnation'] for c in client.contexts] == [0, 0, 1, 2]
+    assert state['last_result']['error'] == 'planning_stagnation'
+    assert state['last_result']['holding'] and session.holding == 'apple'
+    assert state['metrics']['successes'] == 0 and state['can_resume_recovery']
+
+
+def test_actual_observation_information_resets_stagnation(create, monkeypatch):
+    original, observed = Executor.execute, []
+    def execute(self, action, *args, **kwargs):
+        result = original(self, action, *args, **kwargs)
+        if action['skill'] == 'observe':
+            observed.append(True)
+            result.update(changed=len(observed) == 2, observation_mode='target_search')
+        return result
+    monkeypatch.setattr(Executor, 'execute', execute)
+    ctl, _session, client = create(lambda c, n: [step(n, 'observe')])
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    assert len(client.contexts) == 5
+    assert [c['planning_budget']['stagnation'] for c in client.contexts] == [0, 1, 0, 1, 2]
+    assert ctl.snapshot()['last_result']['error'] == 'planning_stagnation'
+
+
+def test_plan_limit_scales_with_goals_and_initial_steps_but_remains_finite():
+    from cube_task.assistant.skill_orchestrator import plan_limit
+    assert plan_limit([GOALS[0]]) == 8
+    assert plan_limit([GOALS[0]] * 6) == 16
+    assert plan_limit([GOALS[0]], [None] * 24) == 16
+    assert plan_limit([GOALS[0]] * 100, [None] * 100) == 16
+
+
+def test_actual_run_adapts_budget_after_first_plan_fixes_task_size(create, monkeypatch):
+    goals = [dict(label=label, zone_name=zone) for label, zone in
+             (('apple', 'zone_red'), ('banana', 'zone_green'), ('pear', 'zone_green'))]
+    original = Executor.execute
+    def execute(self, action, *args, **kwargs):
+        return dict(original(self, action, *args, **kwargs), changed=True)
+    monkeypatch.setattr(Executor, 'execute', execute)
+    ctl, _session, client = create(lambda c, n: [step(n, 'observe')])
+    original_plan = client.plan_skills
+    def plan(*args, **kwargs):
+        return dict(original_plan(*args, **kwargs), goals=copy.deepcopy(goals))
+    client.plan_skills = plan
+    ctl.submit('把三个物品放入各自区域')
+    assert ctl.wait_idle(3)
+    assert len(client.contexts) == 10
+    assert client.contexts[0]['planning_budget']['max_plans'] == 8
+    assert [c['planning_budget']['max_plans'] for c in client.contexts[1:]] == [10] * 9
+    assert client.contexts[-1]['planning_budget']['remaining_plans'] == 0
+    assert ctl.snapshot()['skill_task']['max_plans'] == 10
+    assert not ctl.snapshot()['last_result']['ok']
+
+
+@pytest.mark.parametrize('memory_kind', ['legacy', 'old', 'recorded'])
+def test_resume_keeps_original_action_diagnostics_after_observe_only_plan(create, memory_kind):
+    def compose(c, n):
+        return ([step(1, 'observe')] if n == 1 else
+                [step(2, 'place', 'apple', {'type': 'goal', 'index': 0}), step(3, 'finish')])
+    ctl, session, client = create(compose)
+    session.holding = 'apple'
+    session.runner._held_recovery_context = dict(det=SimpleNamespace(label='apple'))
+    session.runner.has_held_recovery = True
+    session._recovery_goal = copy.deepcopy(GOALS[0])
+    original = dict(ok=False, holding=True, stage='inspect_place', error='placement_changed',
+                    diagnostics='placement_planning_budget_exceeded', message='仍保持夹持')
+    newer = dict(original, diagnostics='newer_measured_placement_failure')
+    ctl._last_result = copy.deepcopy(original)
+    if memory_kind != 'legacy':
+        ctl._skill_memory = dict(instruction='把苹果放红区', goals=copy.deepcopy(GOALS),
+            protected_goals=[], originals=session.scene['objects'], obligations={}, restorations=[])
+        ctl._skill_task['status'] = 'failed'
+        if memory_kind == 'recorded':
+            ctl._skill_memory['last_action_failure'] = copy.deepcopy(newer)
+    ctl.resume_recovery()
+    assert ctl.wait_idle(3)
+    assert ctl.snapshot()['last_result']['ok']
+    assert len(client.contexts) == 2
+    retry = client.contexts[1]
+    assert retry['failure']['error'] == 'goal_not_finished'
+    assert retry['last_action_failure'] == (newer if memory_kind == 'recorded' else original)

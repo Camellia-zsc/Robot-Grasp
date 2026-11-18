@@ -76,6 +76,25 @@ def test_forgetting_picked_target_does_not_delete_same_class_elsewhere():
                                   lambda d: False, forget=[original]) == [neighbor, close_other]
 
 
+def test_confirmed_singleton_rebind_removes_distant_ghost_but_keeps_other_obstacles():
+    upright = det('pear', (.30, -.12))
+    fallen = det('pear', (.35, -.20), valid=False)
+    fallen.reject_reason = 'stable_grasp_not_observed'
+    neighbor = det('yellow', (.2, .1))
+    # Caller has complete fresh camera evidence of this one-per-class object.
+    assert merge_local_detections([upright, neighbor], [fallen], lambda d: False,
+        singleton_labels={'pear'}) == [neighbor, fallen]
+
+
+def test_singleton_rebind_requires_one_unambiguous_fresh_measurement():
+    old = det('pear', (.1, .1))
+    a, b = det('pear', (.3, .1)), det('pear', (.4, .1))
+    assert merge_local_detections([old], [a, b], lambda d: False,
+        singleton_labels={'pear'}) == [old, a, b]
+    assert merge_local_detections([old], [], lambda d: False,
+        singleton_labels={'pear'}) == [old]
+
+
 @pytest.mark.parametrize('case', ['occluded', 'depth_hole', 'zero', 'cropped', 'behind', 'no_depth'])
 def test_unobserved_old_object_remains_an_obstacle(case):
     target, image, T = det(), frame(), camera()

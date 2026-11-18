@@ -49,6 +49,10 @@ goals 每项为 {"label":"唯一实测类别","zone_name":"已有区域名或nul
 叠放目标用 zone_name=null、destination={"type":"on_object","label":"实测支撑物类别"}。
 红色方块是物品 red，红色区域是 zone_red，二者不能互换；用户要求放在方块上面时不得偷偷改成区域。
 capabilities.stacking=true 时可以规划叠放；本地会检查实测支撑顶面、碰撞、可达性以及释放后重力接触落稳。
+resting_pose 是相机测量姿态：梨子优先 upright 直立，side 为侧倒；香蕉 flat 是正常平放。
+梨子侧倒在目标区里仍未完成直立放置。automatic_righting=false 表示当前抓放只能调整水平朝向，
+不能自动将侧倒梨扶正；不得反复调用相同 move 假装扶正，应 ask 请求人工在摆场中拖动梨子重新摆正，
+获答后重新观察确认。人工拖动会重摆为模型默认姿态，不是一次机械臂扶正执行。
 不能假设任意曲面都可靠支撑。重心投影落在支撑范围内也不保证圆形物体不会滚动，必须等待实际落稳核验。
 叠放成功必须同时通过新相机与实际支撑核验；若滑落、倾倒、底座移动或目标丢失，先观察并根据失败反馈恢复，
 不能把物体仍在同一颜色区域当作叠放成功，也不能反复盲抓。已有叠放goal在底座遮挡时仍保留，先observe再规划动作。
@@ -132,7 +136,7 @@ def _observations(items):
         if not isinstance(item, dict):
             raise ValueError('技能规划观测项目无效。')
         record = _fields(
-            item, strings=('object_id', 'label', 'score_kind', 'reject_reason', 'zone'),
+            item, strings=('object_id', 'label', 'score_kind', 'reject_reason', 'zone', 'resting_pose'),
             flags=('valid', 'in_zone'),
             numbers=('score', 'top_z', 'height', 'yaw', 'length', 'width',
                      'n_points', 'track_id', 'view'),
@@ -187,7 +191,7 @@ def _capabilities(value):
         raise ValueError('技能执行能力无效。')
     result = _fields(value, strings=('physics_backend',),
                      flags=('active_observe_requires_geometry', 'multi_object_rearrangement',
-                            'restores_original_pose', 'stacking', 'gravity_contacts'))
+                            'restores_original_pose', 'stacking', 'gravity_contacts', 'automatic_righting'))
     for key in ('skills', 'observe_modes', 'observe_destination_types',
                 'destination_types', 'holding_allowed_skills'):
         items = value.get(key)

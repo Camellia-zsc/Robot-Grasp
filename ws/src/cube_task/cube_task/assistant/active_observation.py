@@ -134,8 +134,13 @@ def inspect_held(session, xy, polygon, stationary, check_current):
                         error='held_feedback_changed', fault=True,
                         reason=feedback_why or 'measured_opening_changed',
                         message='夹持反馈发生变化，已停止尚未执行的观察路径并保留现场')
-                session.runner.skill._move(result, 'inspect_place', waypoint, True)
-                session.runner.skill._verify_held(result, 'dropped_in_transit')
+                move_inspection = getattr(session, '_move_inspection_waypoint', None)
+                if move_inspection is not None:
+                    if not move_inspection(result, waypoint):
+                        break
+                else:
+                    session.runner.skill._move(result, 'inspect_place', waypoint, True)
+                    session.runner.skill._verify_held(result, 'dropped_in_transit')
             neighbors = budget.run(stationary)
             check_current()
             remember_inspection(session, grasp, session.arm.get_tcp_pose().value)

@@ -71,6 +71,16 @@ def test_release_opens_past_a_held_width_wider_than_planned():
     assert g.open_width == arm.max_width                   # L1 grasps open fully
 
 
+def test_pick_retains_post_lift_measured_width_when_object_seats_in_pads():
+    _cfg, _clock, _world, arm, log, skill, grasp, _place = _setup()
+    arm.width_fn = lambda current: .025 if current.n_motion >= 3 else current.width
+    result = skill.pick_only(grasp)
+    assert result.ok and result.detail['holding']
+    assert result.grasp_width == .025
+    closed = next(event for event in log.kinds('skill_step') if event['stage'] == 'close')
+    assert closed['width'] == .03
+
+
 def test_grasp_miss_opens_and_retreats_without_transit():
     cfg, clock, world, arm, log, skill, g, p = _setup()
     world.miss_next = 1

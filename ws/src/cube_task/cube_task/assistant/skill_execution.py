@@ -40,6 +40,7 @@ class SkillExecutor:
             holding_allowed_skills=['observe', 'place', 'ask'],
             active_observe_requires_geometry=True, multi_object_rearrangement=True,
             restores_original_pose=True, stacking=physical, physical_stacking=physical,
+            automatic_righting=False,
             gravity_contacts=physical, physics_backend='mujoco' if physical else 'sim')
 
     def _stopped(self, cancel):
@@ -153,10 +154,15 @@ class SkillExecutor:
                         if evaluation is not None:
                             if goal.get('destination') is not None:
                                 truth = session._verify_destination(evaluation, goal['destination'])
+                            elif hasattr(session, '_verify_zone'):
+                                truth = session._verify_zone(evaluation, goal['zone_name'])
                             else:
                                 zone = session.world.zone_of(evaluation)
                                 truth = bool(evaluation is not session.world.held and zone is not None
                                              and zone.name == goal.get('zone_name'))
+                                verify_zone = getattr(session, '_verify_zone', None)
+                                if verify_zone is not None:
+                                    truth = bool(verify_zone(evaluation, goal['zone_name']))
                         item['truth'] = {'success': truth}
                         item['ok'] = bool(item['ok'] and truth is True)
                     items = result.get('items', ())
@@ -529,8 +535,14 @@ class SkillExecutor:
                 truth = bool(evaluation is not session.world.held and zone is not None
                              and zone.name == destination['name']
                              and abs(evaluation.bottom_z() - floor) <= .01)
+                verify_zone = getattr(session, '_verify_zone', None)
+                if verify_zone is not None:
+                    truth = bool(verify_zone(evaluation, destination['name']))
             else:
                 truth = bool(session._verify_destination(evaluation, destination))
+            physics = getattr(session, '_physics', None)
+            if physics is not None:
+                truth = truth and physics.resting_status(evaluation.name)['success']
         self._check_plan()
         if self._stopped(cancel):
             return self._failure(step, 'aborted', '任务已停止')

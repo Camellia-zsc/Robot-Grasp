@@ -706,12 +706,30 @@ class DashboardController:
                 if whole_footprint_at_goal(target, scene, item):
                     last_result = {'ok': True, 'skipped': True, 'observed_in_zone': True,
                                    'message': '实测完整足迹已满足指定目标，无需搬运'}
+                    physics = getattr(self._session, '_physics', None)
+                    if physics is not None:
+                        from .observation_policy import unique_target
+                        measured = unique_target(self._session._last_fresh, target['label'])
+                        evaluation = (self._session._evaluation_object(measured)
+                                      if measured is not None else None)
+                        resting = (physics.resting_status(evaluation.name) if evaluation is not None
+                                   else dict(success=False, reason='object_identity_unconfirmed'))
+                        truth = bool(resting['success'])
+                        if truth:
+                            truth = (self._session._verify_destination(evaluation, item['destination'])
+                                     if item.get('destination') is not None else
+                                     self._session._verify_zone(evaluation, item['zone_name']))
+                        last_result['truth'] = {'success': bool(truth), 'resting': resting}
+                        if not truth:
+                            last_result.update(ok=False,
+                                error=resting.get('reason') or 'completion_not_verified',
+                                message='相机显示目标已到位，但物理位置、姿态或落稳未通过核验，已保留现场')
                     if getattr(self._session, 'targeted_observation', False):
                         last_result['verified_revision'] = self._session._observation_revision
                     if item.get('destination') is not None:
                         last_result['destination'] = copy.deepcopy(item['destination'])
                     need_scan = False
-                    final_status = 'skipped'
+                    final_status = 'skipped' if last_result['ok'] else 'failed'
                 else:
                     with self._lock:
                         item.update(status='executing', message='正在抓取并放到指定区域')

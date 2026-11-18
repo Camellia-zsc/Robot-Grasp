@@ -51,8 +51,10 @@ RELEASE_FULL_OPEN_TOL = 0.002
 OPENING_SHORT = 'opening stopped'
 #: AGX gripper force range (N); a configured force above it is clamped.
 MAX_GRIPPER_FORCE = 3.0
-#: default tasks.<T>.gripper_force (N): light foam cubes (L1), 40-100 g models (L2).
-TASK_GRIPPER_FORCE = {'L1': 1.5, 'L2': 2.5}
+#: Light foam cubes use L1 force; mixed rigid fruit use the model task's
+#: 40-100 g force budget. The interactive task must not inherit the foam-only
+#: robot default, which lets a tapered neck slip during a real contact lift.
+TASK_GRIPPER_FORCE = {'L1': 1.5, 'L2': 2.5, 'Sandbox': 2.5}
 #: stages whose target is a free-space pose (may lean up to max_tilt_free_deg).
 FREE_STAGES = ('pre', 'lift', 'transit', 'retreat', 'recover_retreat', 'recover_up',
                'putback_lift', 'putback_retreat', 'up', 'retry_lift', 'inspect_lift', 'inspect_place')
@@ -404,7 +406,7 @@ class PickPlaceSkill:
             raise _StepFailed(stage, 'gripper_not_open',
                               'measured %.4f m < needed %.4f m' % (w, need))
 
-    def _verify_held(self, r: PickResult, stage: str) -> None:
+    def _verify_held(self, r: PickResult, stage: str) -> Optional[float]:
         if not self.verify:
             return
         w = self._read_width()
@@ -416,6 +418,7 @@ class PickPlaceSkill:
                               fault=True)
         if w < self.empty_width:
             raise _Lost(stage, w)
+        return w
 
     # -------------------------------------------------------------------- flow
     def _pick_to_lift(self, g: GraspPlan, r: PickResult, require_feedback=False) -> None:
@@ -441,13 +444,18 @@ class PickPlaceSkill:
             _LOG.warning('held width %.4f m differs from expected %.4f m', w, g.expected_width)
         r.detail['holding'] = True
         self._move(r, 'lift', g.T_lift, self.linear_moves)
-        self._verify_held(r, 'dropped')
+        held_width = self._verify_held(r, 'dropped')
         if require_feedback and not self.verify:
-            width = self._read_width()
-            if width is None:
+            held_width = self._read_width()
+            if held_width is None:
                 raise _StepFailed('verify_dropped', 'no_gripper_feedback', 'while holding', fault=True)
-            if width < self.empty_width:
-                raise _Lost('dropped', width)
+            if held_width < self.empty_width:
+                raise _Lost('dropped', held_width)
+        if held_width is not None:
+            # A curved object can seat deeper between the pads while lifting.
+            # Carry/release planning must use that measured grip, rather than
+            # retaining the larger width that was read while still supported.
+            r.grasp_width = held_width
 
     def _pick_place(self, g: GraspPlan, p: PlacePlan, r: PickResult) -> None:
         try:

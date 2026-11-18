@@ -62,6 +62,36 @@ def test_centered_apple_has_real_support_contact_without_rigid_attachment(build)
                    for t in physics.mujoco_world.model.eq_type)
 
 
+def test_pear_success_requires_actual_upright_supported_rest(build):
+    physics, _base, pear, _events = build(upper='pear')
+    physics.settle(1.2)
+    assert physics.resting_status(pear.name)['success']
+    assert physics.support_status(pear.name, 'red')['success']
+
+    # Explicitly lay it sideways. A stationary fallen pear is not a successful
+    # upright placement even when it has physical support in the destination.
+    from cube_task.core.transforms import rot_y
+    transform = pear.T_base_obj.copy()
+    transform[:3, :3] = rot_y(np.pi / 2)
+    transform[:3, 3] = [.45, -.2, 0.]
+    pear.T_base_obj = transform
+    transform[2, 3] -= pear.bottom_z()
+    pear.T_base_obj = transform
+    physics.apply_scene_changes()
+    physics.settle(2.)
+    resting = physics.resting_status(pear.name)
+    assert resting['stable'] and resting['contact'], resting
+    assert not resting['success'] and not resting['posture_ok'], resting
+    assert resting['reason'] == 'pear_not_upright'
+
+
+def test_flat_banana_is_a_successful_natural_resting_pose(build):
+    physics, _base, banana, _events = build(upper='banana')
+    physics.settle(1.5)
+    resting = physics.resting_status(banana.name)
+    assert resting['success'] and resting['posture_ok'], resting
+
+
 def test_unsupported_off_center_apple_physically_falls_and_rolls(build):
     physics, _base, apple, events = build(offset=.043)
     before = apple.T_base_obj.copy()

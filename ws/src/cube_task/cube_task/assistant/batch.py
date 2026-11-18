@@ -104,6 +104,10 @@ def bind_item(item, scene, completed_zones=(), completed_positions=()):
 
 
 def whole_footprint_at_goal(target, scene, item):
+    # Camera-confirmed side pears remain selectable for recovery, but have not
+    # fulfilled the requested upright placement even when their XY is correct.
+    if target.get('label') == 'pear' and target.get('resting_pose') in ('side', 'uncertain'):
+        return False
     if item.get('destination') is not None:
         from .destinations import whole_footprint_at_destination
         return whole_footprint_at_destination(target, scene, item['destination'])
@@ -131,6 +135,9 @@ def whole_footprint_in_zone(target, scene, zone_name):
     """Conservative measured-footprint check; a center in a zone is insufficient."""
     from .catalog import catalog_entries
 
+    if target.get('label') == 'pear' and target.get('resting_pose') in ('side', 'uncertain'):
+        return False
+
     zones = [z for z in scene.get('zones', []) if z.get('name') == zone_name]
     if len(zones) != 1:
         return False
@@ -152,9 +159,8 @@ def whole_footprint_in_zone(target, scene, zone_name):
             return False
         length = max(length, max(nominal[:2]))
         width = max(width, min(nominal[:2]))
-        local = np.array([[-1, -1], [-1, 1], [1, -1], [1, 1]]) * [length / 2, width / 2]
-        rotation = np.array([[math.cos(yaw), -math.sin(yaw)], [math.sin(yaw), math.cos(yaw)]])
-        corners = local @ rotation.T + center[:2]
+        from .destinations import completion_outline
+        corners = completion_outline(target, length, width, yaw)
         zrotation = np.array([[math.cos(zyaw), -math.sin(zyaw)], [math.sin(zyaw), math.cos(zyaw)]])
         in_zone = (corners - zcenter[:2]) @ zrotation
         return bool(np.all(np.abs(in_zone) <= zsize / 2 - .005))

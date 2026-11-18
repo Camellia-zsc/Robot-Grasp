@@ -339,12 +339,41 @@ class DashboardPhysics:
         stable = bool(speed < .01 and angular < .2 and base_speed < .01 and base_angular < .2)
         contact = any(r['object'] == object_id and r['support'] == support.name
                       for r in self._supports)
-        success = bool(contact and stable and object_id not in held and support.name not in held)
+        resting = self.resting_status(object_id)
+        success = bool(contact and stable and resting['success']
+                       and object_id not in held and support.name not in held)
         return dict(success=success, stable=stable, contact=contact,
                     object=object_id, support=support.name, support_label=support_label,
                     linear_speed=speed, angular_speed=angular,
                     support_linear_speed=base_speed, support_angular_speed=base_angular,
-                    reason='' if success else 'support_contact_or_stability_unconfirmed')
+                    resting=resting,
+                    reason='' if success else (resting['reason'] or
+                        'support_contact_or_stability_unconfirmed'))
+
+    def resting_status(self, object_id):
+        """Audit a released body's posture and motion, never a planning input.
+
+        The pear's designed resting pose is upright. A banana's geometry is
+        already horizontal in its nominal frame and is not a toppled pear.
+        A stationary body on its side is not proof of successful pear placement.
+        """
+        self.sync()
+        mw = self.mujoco_world
+        record = next((o for o in mw.objects if o.name == object_id), None)
+        if record is None:
+            return dict(success=False, stable=False, reason='object_identity_unconfirmed')
+        speed, angular = mw.object_speed(object_id)
+        stable = bool(speed < .01 and angular < .2)
+        tilt = float(np.degrees(np.arccos(np.clip(mw.object_pose(object_id)[2, 2], -1., 1.))))
+        posture_ok = record.label != 'pear' or tilt <= 10.
+        contact = any(r['object'] == object_id for r in self._supports)
+        released = object_id not in set(mw.held_objects())
+        success = bool(stable and posture_ok and contact and released)
+        reason = ('' if success else 'pear_not_upright' if not posture_ok else
+                  'object_motion_or_support_unconfirmed')
+        return dict(success=success, stable=stable, contact=contact, released=released,
+                    posture_ok=posture_ok, tilt_deg=round(tilt, 2),
+                    linear_speed=speed, angular_speed=angular, reason=reason)
 
     def close(self):
         if self._closed:

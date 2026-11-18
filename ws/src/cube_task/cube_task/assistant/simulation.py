@@ -451,6 +451,36 @@ class SimulationSession:
                     'reason': reason})
             return None
 
+    def _move_inspection_waypoint(self, result, waypoint):
+        """Use the actual held-camera pose after a stopped simulation motion.
+
+        MuJoCo's driver holds its measured joints on timeout/stall. The desired
+        inspection pose is not a release target: a fresh image may already have
+        sufficient coverage. Never claim that the waypoint was reached, or
+        continue its unexecuted route. All subsequent moves are replanned.
+        """
+        from ..task.skills import _StepFailed
+        reached = True
+        try:
+            self.runner.skill._move(result, 'inspect_place', waypoint, True)
+        except _StepFailed as exc:
+            if self._physics is None or exc.fault or exc.error not in ('timeout', 'stalled'):
+                raise
+            self.runner.skill._check_abort('inspect_place')
+            if not self.runner.skill._healthy():
+                raise
+            pose = self.arm.get_tcp_pose()
+            if (pose is None or pose.value is None or
+                    self.clock.now() - float(pose.stamp) > self.runner.skill.feedback_max_age):
+                raise
+            reached = False
+            self._emit('inspection_motion_incomplete', {
+                'message': '观察移动已停在实际位置，将先读取这里的相机画面再重新规划',
+                'error': exc.error, 'diagnostics': exc.detail,
+                'actual_tcp': np.asarray(pose.value)[:3, 3].tolist()})
+        self.runner.skill._verify_held(result, 'dropped_in_transit')
+        return reached
+
     def _refine_release(self, grasp, place, width, result, budget):
         """At the destination hover, measure occupancy before choosing a final slot."""
         target, destination, zone_name, options = self._active_placement
@@ -593,8 +623,8 @@ class SimulationSession:
                         self._apply_interventions()
                         if self._environment_revision != route_revision:
                             break
-                        self.runner.skill._move(result, 'inspect_place', waypoint, True)
-                        self.runner.skill._verify_held(result, 'dropped_in_transit')
+                        if not self._move_inspection_waypoint(result, waypoint):
+                            break
                     self._on_stage('placement_planning')
                     updated, why, revision = budget.run(measure)
                     if updated is not None or why == 'scene_changed' or observed_views >= 4:
@@ -783,9 +813,10 @@ class SimulationSession:
                     label = target.get('label')
                     measured = unique_target(views[view], label,
                         partial=lambda d: self._target_partial(d, target)) if label else None
-                    # A pear's low bulb view is valid but insufficient for neck grasping.
-                    reliable = measured is not None and (label != 'pear' or
-                                float(measured.height or 0) >= float(target.get('height', 0) or 0) - .007)
+                    # Current completeness includes a separate, cloud-proven
+                    # lying-pear pose. A fall must not be compared to the old
+                    # upright height, which would prevent every fresh rebind.
+                    reliable = measured is not None
                     geometry_ready = (label not in ('banana', 'pear') or
                                       self._stable_cloud(measured, revision) is not None or
                                       sum(any(d.valid and d.label == label for d in ds)
@@ -843,7 +874,9 @@ class SimulationSession:
                 detections = merge_local_detections(
                     self._observed_detections, fresh,
                     lambda d: any(measurement_visible(d, f, p) for f, p in coverage),
-                    forget=forget)
+                    forget=forget,
+                    singleton_labels={d.label for d in fresh
+                                      if d.extra.get('catalog_complete')})
             self._last_fresh = fresh
             self._observation_revision = revision
             self._last_observation_purpose = purpose
@@ -1197,8 +1230,29 @@ class SimulationSession:
                 self._destination_views = {key: view}
                 return view
 
+    def _verify_zone(self, obj, zone_name):
+        """Independent full-zone and stable-posture audit after execution."""
+        if obj is None or obj is self.world.held:
+            return False
+        zone = self.runner.zones[zone_name]
+        if abs(obj.bottom_z() - float(zone.center[2])) > .01:
+            return False
+        if self._physics is not None and not self._physics.resting_status(obj.name)['success']:
+            return False
+        c, s = math.cos(zone.yaw), math.sin(zone.yaw)
+        for axis, span in ((np.array([c, s, 0.]), zone.size[0]),
+                           (np.array([-s, c, 0.]), zone.size[1])):
+            origin = float(np.asarray(zone.center) @ axis)
+            limit = float(span) / 2 - .002
+            if obj.support(axis) - origin > limit or obj.support(-axis) + origin > limit:
+                return False
+        return True
+
     def _verify_destination(self, obj, destination):
         """Independent truth check, after execution only; never supplies a plan."""
+        if self._physics is not None and (obj is None or not
+                self._physics.resting_status(obj.name)['success']):
+            return False
         if destination['type'] == 'on_object':
             from .stacking import audit
             return bool(audit(self, obj, destination).get('success'))
@@ -1245,9 +1299,17 @@ class SimulationSession:
                         obj = self._evaluation_object(upper) if upper is not None else None
                         return bool(camera_confirmed(self, goal['label'], goal['destination']) and
                                     audit(self, obj, goal['destination']).get('success'))
+                    def physically_settled(d):
+                        obj = self._evaluation_object(d)
+                        if self._physics is None:
+                            return True
+                        if goal.get('destination') is None:
+                            return self._verify_zone(obj, goal['zone_name'])
+                        return obj is not None and self._verify_destination(obj, goal['destination'])
                     return (self._observation_revision == self._environment_revision and any(
                         d.valid and d.label == goal['label'] and
-                        whole_footprint_at_goal(d.summary(), scene, goal) for d in fresh))
+                        whole_footprint_at_goal(d.summary(), scene, goal) and
+                        physically_settled(d) for d in fresh))
                 if not confirmed():
                     scene = self.observe(target={'xy': xy, 'label': goal['label']}, purpose='verify_place')
                     fresh = list(self._last_fresh)
@@ -1312,16 +1374,20 @@ class SimulationSession:
         summary['scene'] = copy.deepcopy(self._scene)
         summary['score'] = self.world.score(self.runner.class_to_zone)
         actual_zone = None if evaluation_object is None else self.world.zone_of(evaluation_object)
-        truth_success = bool(evaluation_object is not None
-                             and evaluation_object is not self.world.held
-                             and actual_zone is not None and actual_zone.name == zone_name)
+        truth_success = self._verify_zone(evaluation_object, zone_name) if destination is None else False
         if destination is not None:
             truth_success = self._verify_destination(evaluation_object, destination)
+        resting = (self._physics.resting_status(evaluation_object.name)
+                   if self._physics is not None and evaluation_object is not None else None)
+        if resting is not None:
+            truth_success = truth_success and resting['success']
         summary['controller_ok'] = bool(summary['ok'])
         summary['truth'] = {'success': truth_success,
                             'object_name': None if evaluation_object is None else evaluation_object.name,
                             'expected_zone': zone_name,
                             'actual_zone': None if actual_zone is None else actual_zone.name}
+        if resting is not None:
+            summary['truth']['resting'] = resting
         if destination is not None:
             summary['truth']['expected_destination'] = copy.deepcopy(destination)
             summary['truth']['expected_zone'] = None
@@ -1346,7 +1412,8 @@ class SimulationSession:
         summary['camera_verified'] = camera_success
         summary['ok'] = summary['controller_ok'] and truth_success and camera_success
         if summary['controller_ok'] and not truth_success:
-            summary['error'] = ('stack_unstable_or_fallen' if destination is not None and
+            summary['error'] = ('pear_not_upright' if resting is not None and
+                not resting['posture_ok'] else 'stack_unstable_or_fallen' if destination is not None and
                 destination['type'] == 'on_object' else 'placement_not_verified')
         elif summary['controller_ok'] and not camera_success:
             summary['error'] = 'placement_not_observed'
@@ -1362,7 +1429,9 @@ class SimulationSession:
                 names.get(det.label, det.label), destination_label(destination) if destination else
                 colors.get(zone_label, zone_label or zone_name) + '区域')
         elif summary['controller_ok']:
-            summary['message'] = ('叠放未通过支撑与落稳核验，物品可能滑落、倾倒或支撑已移动'
+            summary['message'] = ('梨子已放下但未保持直立，需要重新观察并调整放置姿态'
+                                  if summary['error'] == 'pear_not_upright' else
+                                  '叠放未通过支撑与落稳核验，物品可能滑落、倾倒或支撑已移动'
                                   if destination is not None and destination['type'] == 'on_object' and not truth_success else
                                   '抓放动作已结束，但无法唯一核对目标物品'
                                   if evaluation_object is None else

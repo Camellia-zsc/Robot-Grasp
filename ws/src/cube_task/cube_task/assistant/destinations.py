@@ -132,9 +132,24 @@ def footprint_in_destination(corners, scene, destination):
     return True
 
 
+def completion_outline(target, length, width, yaw):
+    """Conservative nominal outline without inventing corners on round fruit."""
+    center = np.asarray(target['center_base'], float)[:2]
+    if target.get('label') in ('apple', 'pear'):
+        # A circumscribed polygon encloses the disk at every angle. PCA yaw of
+        # a near-circular belly is unstable and must not rotate an 85 mm square
+        # into a fictitious 120 mm obstacle at verification time.
+        angles = np.arange(32) * (2 * math.pi / 32)
+        radius = max(length, width) / (2 * math.cos(math.pi / 32))
+        return center + radius * np.column_stack([np.cos(angles), np.sin(angles)])
+    return footprint_corners(center, length, width, yaw)
+
+
 def whole_footprint_at_destination(target, scene, destination):
     """Conservative camera-only completion predicate for sequential queues."""
     from .catalog import catalog_entries
+    if target.get('label') == 'pear' and target.get('resting_pose') in ('side', 'uncertain'):
+        return False
     try:
         destination = validate_destination(destination, scene)
         if destination['type'] == 'on_object':
@@ -145,7 +160,7 @@ def whole_footprint_at_destination(target, scene, destination):
             return False
         nominal = next(e['dimensions'] for e in catalog_entries() if e['label'] == target['label'])
         length, width = max(length, max(nominal[:2])), max(width, min(nominal[:2]))
-        corners = footprint_corners(center[:2], length, width, yaw)
+        corners = completion_outline(target, length, width, yaw)
         if destination['type'] == 'point' and np.linalg.norm(center[:2] - destination['xy']) > scene['placement'].get('point_tolerance', POINT_TOLERANCE):
             return False
         return footprint_in_destination(corners, scene, destination)

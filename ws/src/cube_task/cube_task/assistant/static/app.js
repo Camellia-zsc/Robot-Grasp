@@ -481,7 +481,8 @@ function renderObservations(state){
     const position=document.createElement("td");position.className="position";position.textContent=Array.isArray(object.center_base)?object.center_base.slice(0,3).map(n=>number(n).toFixed(3)).join(", "):"—";
     const status=document.createElement("td");const tag=document.createElement("span");tag.className="object-status";
     const isSelected=!uncertain&&String(object.object_id??object.id)===selected;
-    const statusText=uncertain?`${rejectionNames[object.reject_reason]||"轮廓未确认"} · 待确认`:isSelected?"已选择":"可搬运";
+    const poseText=object.label==="pear"?({upright:"直立",side:"侧倒，需人工摆正",uncertain:"姿态待确认"}[object.resting_pose]||""):object.label==="banana"&&object.resting_pose==="flat"?"正常平放":"";
+    const statusText=(uncertain?`${rejectionNames[object.reject_reason]||"轮廓未确认"} · 待确认`:isSelected?"已选择":"可搬运")+(poseText?` · ${poseText}`:"");
     if(uncertain)tag.title="尚未确认这是独立物体，不参与抓取。可切换相机视角查看原始轮廓。";
     if(object.in_zone){
       const zone=object.zone_name||object.zone||object.placed_zone;

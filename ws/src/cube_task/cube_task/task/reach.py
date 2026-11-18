@@ -214,6 +214,15 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
             return False, '%s: %s' % (name, why), tilts
         new[name] = (obj, attr, T2)
         tilts[name] = round(tilt, 1)
+    target = getattr(grasp, 'target', None)
+    if (getattr(target, 'label', None) == 'pear' and
+            (getattr(target, 'extra', None) or {}).get('resting_pose') == 'upright'):
+        grasp_R = grasp.T_grasp[:3, :3] if held_only else new['grasp'][2][:3, :3]
+        up = new['release'][2][:3, :3] @ grasp_R.T @ np.array([0., 0., 1.])
+        # The planar base tolerates gentle lean; do not deliberately release a
+        # known upright fruit beyond its measured physical recovery envelope.
+        if float(up[2]) < math.cos(math.radians(15.)):
+            return False, 'release: upright_pear_tilt_exceeds_15_deg', tilts
     joined = {'pre_grasp': ('grasp', grasp, 'T_pre'), 'lift': ('grasp', grasp, 'T_lift'),
               'pre_place': ('release', place, 'T_pre'),
               'retreat': ('release', place, 'T_retreat')}

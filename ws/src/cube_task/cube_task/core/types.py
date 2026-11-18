@@ -113,7 +113,7 @@ class Detection:
     def summary(self) -> Dict[str, Any]:
         """Return a JSON-friendly summary without the mask."""
         c = None if self.center_base is None else [round(float(v), 4) for v in self.center_base]
-        return {'label': self.label, 'score': round(float(self.score), 3),
+        result = {'label': self.label, 'score': round(float(self.score), 3),
                 'score_kind': self.score_kind, 'bbox': [int(v) for v in self.bbox],
                 'center_base': c,
                 'top_z': None if self.top_z is None else round(float(self.top_z), 4),
@@ -123,6 +123,10 @@ class Detection:
                 'width': None if self.width is None else round(float(self.width), 4),
                 'n_points': int(self.n_points), 'valid': bool(self.valid),
                 'reject_reason': self.reject_reason, 'track_id': int(self.track_id)}
+        resting_pose = self.extra.get('resting_pose')
+        if resting_pose in ('upright', 'side', 'flat', 'uncertain'):
+            result['resting_pose'] = resting_pose
+        return result
 
 
 @dataclass

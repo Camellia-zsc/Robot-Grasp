@@ -6,13 +6,14 @@ import pytest
 
 from cube_task.assistant.catalog import make_catalog_object
 from cube_task.assistant.catalog_perception import (completeness, configure_sandbox,
-                                                    make_sandbox_perception)
+                                                    make_sandbox_perception,
+                                                    _center_round_fruit)
 from cube_task.core.config import load_config
 from cube_task.core.transforms import pose6_to_T
 from cube_task.core.types import CameraIntrinsics, Detection, Frame
 from cube_task.perception.grasp import GraspPlanner
 from cube_task.sim.render import render_rgbd
-from cube_task.sim.scenarios import layout_intrinsics, official_wrist_views, piper_fk
+from cube_task.sim.scenarios import layout_intrinsics, look_at, official_wrist_views, piper_fk
 from cube_task.sim.world import SimWorld
 from cube_task.task.views import merge_view_detections, tag_view
 
@@ -72,6 +73,10 @@ def test_actual_noisy_rgbd_classifies_each_unseen_catalog_object(sandbox, label)
     assert best.extra['grasp']['mode'] == 'profile'
     if label in ('apple', 'banana', 'pear'):
         assert best.extra['grasp']['kind'] != 'square'
+    if label == 'banana':
+        assert best.summary()['resting_pose'] == 'flat'
+    elif label == 'pear':
+        assert best.summary()['resting_pose'] == 'upright'
 
 
 def test_cropped_pear_and_unknown_shapes_are_not_called_complete():
@@ -86,6 +91,88 @@ def test_cropped_pear_and_unknown_shapes_are_not_called_complete():
 def test_a_merged_pear_and_apple_cannot_pass_as_one_executable_pear():
     merged = Detection('pear', 0.99, length=0.145, width=0.069, height=0.111)
     assert not completeness(merged)
+
+
+def fallen_pear():
+    """Replay the incident rotation; world semantics deliberately disagree."""
+    obj = make_catalog_object('pear', 'fallen-camera-replay', [.35, -.20])
+    pose = np.array([
+        [.5535739493, -.7386684130, .3846100081, .3346393778],
+        [-.1508933966, -.5431475409, -.8259672704, -.1509646834],
+        [.8190159129, .3991988534, -.4121325151, .0598858815],
+        [0., 0., 0., 1.]])
+    obj.T_base_obj = pose
+    obj.label = 'not-a-pear-in-world-metadata'
+    return obj
+
+
+def test_complete_sideways_pear_is_recognized_from_rgbd_but_hidden_neck_is_not(sandbox):
+    _cfg, pipeline = sandbox
+    intr = CameraIntrinsics.from_dict(layout_intrinsics('A'))
+    world = SimWorld(objects=[fallen_pear()])
+    # The old wrist view sees only the bulb. A new calibrated view reveals
+    # the whole body and neck, even though its height decreased after a fall.
+    hidden = np.asarray(official_wrist_views('A')[0][1])
+    complete = look_at([.25, -.20, .5], [.35, -.20, .03])
+    results = []
+    for index, pose in enumerate((hidden, complete)):
+        color, depth = render_rgbd(world, intr, pose, gripper=False,
+            rng=901 + index, noise_std=.0008, dropout=.002)
+        frame = Frame(color, depth, intr, 1000. + index, source='sim')
+        results.append(pipeline.process(frame, pose, {}).detections)
+    assert not any(d.valid and d.label == 'pear' for d in results[0])
+    valid = [d for d in results[1] if d.valid and d.label == 'pear']
+    assert len(valid) == 1, [(d.label, d.reject_reason, d.length, d.width, d.height)
+                             for d in results[1]]
+    assert valid[0].height < .095
+    assert valid[0].extra['resting_pose'] == 'side'
+    assert valid[0].extra['catalog_complete'] is True
+    assert valid[0].summary()['resting_pose'] == 'side'
+
+
+def test_short_pear_geometry_without_complete_camera_cloud_stays_incomplete():
+    bulb_only = Detection('pear', .99, length=.076, width=.055, height=.082)
+    assert not completeness(bulb_only)
+    # A plausibly large rectangle alone does not prove a complete lying pear.
+    bulb_only.length, bulb_only.width = .098, .075
+    assert not completeness(bulb_only)
+
+
+@pytest.mark.parametrize('label', ['pear', 'apple'])
+def test_upright_round_fruit_center_uses_visible_top_cap_without_world_metadata(sandbox, label):
+    _cfg, pipeline = sandbox
+    obj = make_catalog_object(label, 'cap-center-camera-test', [.31, -.127])
+    obj.label = 'deliberately-wrong-world-label'
+    intr = CameraIntrinsics.from_dict(layout_intrinsics('A'))
+    _q, pose = official_wrist_views('A')[1]
+    color, depth = render_rgbd(SimWorld(objects=[obj]), intr, pose, gripper=False,
+        rng=413, noise_std=.0008, dropout=.002)
+    result = pipeline.process(Frame(color, depth, intr, 1300., source='sim'), pose, {})
+    valid = [d for d in result.detections if d.valid and d.label == label]
+    assert len(valid) == 1
+    target = valid[0]
+    assert np.allclose(target.center_base[:2], target.extra['cap_center_xy'])
+    assert np.linalg.norm(target.center_base[:2] - [.31, -.127]) < .010
+    assert 'visible_footprint_center_xy' in target.extra
+    assert np.linalg.norm(np.asarray(target.extra['visible_footprint_center_xy'])
+                          - [.31, -.127]) > np.linalg.norm(target.center_base[:2] - [.31, -.127])
+
+
+@pytest.mark.parametrize('case', ['crop', 'side', 'distant_cap', 'nonfinite_cap'])
+def test_round_axis_center_does_not_correct_unreliable_or_sideways_views(case):
+    target = Detection('pear', .99, center_base=np.array([.3, -.1, .113]),
+        length=.075, width=.045, height=.113, extra={'cap_center_xy': [.31, -.1]})
+    if case == 'crop':
+        target.valid = False
+    elif case == 'side':
+        target.height = .083
+    elif case == 'distant_cap':
+        target.extra['cap_center_xy'] = [.34, -.1]
+    elif case == 'nonfinite_cap':
+        target.extra['cap_center_xy'] = [np.nan, -.1]
+    before = target.center_base.copy()
+    assert not _center_round_fruit(target)
+    np.testing.assert_array_equal(target.center_base, before)
 
 
 def test_a_single_pear_neck_and_bulb_stay_one_instance_in_the_actual_wrist_view(sandbox):

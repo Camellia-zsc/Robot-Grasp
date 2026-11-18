@@ -226,11 +226,11 @@ def test_region_retries_another_center_after_final_pose_clearance_failure(tmp_pa
         original = sim.runner._adjust_strict_release
         centers = []
 
-        def reject_first(det, gp, pp, neighbors, polygon, desired_xy, held):
+        def reject_first(det, gp, pp, neighbors, polygon, desired_xy, held, **kwargs):
             centers.append(list(desired_xy))
             if len(centers) == 1:
                 return False, 'injected final leaned clearance rejection'
-            return original(det, gp, pp, neighbors, polygon, desired_xy, held)
+            return original(det, gp, pp, neighbors, polygon, desired_xy, held, **kwargs)
 
         monkeypatch.setattr(sim.runner, '_adjust_strict_release', reject_first)
         result = sim.execute(decision(sim, 'red', destination={'type': 'region', 'name': 'pick_area'}))

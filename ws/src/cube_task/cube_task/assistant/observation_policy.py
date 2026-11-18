@@ -73,7 +73,7 @@ def unique_target(detections, label, reference_xy=None, max_distance=.065, parti
 
 
 def merge_local_detections(previous, fresh, visible, association_dist=.04,
-                           forget=()):
+                           forget=(), singleton_labels=()):
     """Replace measured visible space; preserve the unobserved cached scene.
 
     ``fresh`` must already be consolidated across this local scan. ``visible``
@@ -82,15 +82,23 @@ def merge_local_detections(previous, fresh, visible, association_dist=.04,
     ``forget`` contains previous detections deliberately picked from that space.
     A close new measurement supersedes old geometry regardless of label; class
     disagreement must not leave two selectable versions of one silhouette.
+    ``singleton_labels`` may explicitly rebind a one-per-class catalog object
+    after a complete fresh camera measurement, even when it moved beyond the
+    ordinary association radius. Ambiguous same-class fresh instances never
+    trigger this override. A fresh ungraspable object still replaces its ghost.
     Inputs are returned by reference and are never mutated.
     """
     fresh = list(fresh)
     fresh_xy = [p for d in fresh if (p := _xy(d)) is not None]
+    rebound = {label for label in singleton_labels
+               if sum(d.label == label and _xy(d) is not None for d in fresh) == 1}
     forgotten_xy = [(d.label, p) for d in forget if (p := _xy(d)) is not None]
     kept = []
     for det in previous:
         xy = _xy(det)
         if xy is None:
+            continue
+        if det.label in rebound:
             continue
         if any(det.label == label and np.linalg.norm(xy - p) <= association_dist
                for label, p in forgotten_xy):

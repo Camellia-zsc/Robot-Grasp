@@ -243,6 +243,97 @@ def test_complete_footprint_already_in_destination_is_skipped_without_grasping()
         ctl.close()
 
 
+@pytest.mark.parametrize('audit', ['upright', 'fallen', 'moving', 'missing',
+                                   'outside', 'outside_point', 'outside_region'])
+def test_physical_batch_completion_skip_requires_released_supported_rest(audit):
+    """Camera geometry alone cannot complete a physically unsettled pear."""
+    from cube_task.core.types import Detection
+    import numpy as np
+
+    class PhysicalAlreadyThere(BatchSession):
+        targeted_observation = True
+
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self._environment_revision = self._observation_revision = 0
+            self.audits = []
+            self.geometry_audits = []
+            self._physics = SimpleNamespace(resting_status=self.resting_status)
+            self.scene['placement'] = {
+                'bounds': {'x': [.08, .6], 'y': [-.4, .4], 'r_min': .1, 'r_max': .7},
+                'table_bounds': {'x': [-.3, .9], 'y': [-.7, .7]},
+                'pick_polygon': [[.05, -.5], [.55, -.5], [.55, .5], [.05, .5]],
+                'point_tolerance': .015, 'margin': .002}
+            for target in self.scene['objects']:
+                zone = next(z for z in self.scene['zones']
+                            if z['name'] == self.scene['class_to_zone'][target['label']])
+                target['center_base'][:2] = zone['center'][:2]
+                if target['label'] == 'pear':
+                    target['resting_pose'] = 'upright'
+
+        def observe(self, **kwargs):
+            observed = super().observe()
+            self._last_fresh = [Detection(target['label'], .99,
+                center_base=np.asarray(target['center_base'], float))
+                for target in observed['objects']]
+            return observed
+
+        def _evaluation_object(self, measured):
+            return (None if measured.label == 'pear' and audit == 'missing' else
+                    SimpleNamespace(name=measured.label))
+
+        def resting_status(self, name):
+            self.audits.append(name)
+            success = name != 'pear' or audit == 'upright' or audit.startswith('outside')
+            return dict(success=success, stable=audit != 'moving',
+                        posture_ok=audit != 'fallen',
+                        reason='pear_not_upright' if audit == 'fallen' else
+                               'object_motion_or_support_unconfirmed' if not success else '')
+
+        def _verify_zone(self, obj, zone_name):
+            self.geometry_audits.append((obj.name, zone_name))
+            return obj.name != 'pear' or audit != 'outside'
+
+        def _verify_destination(self, obj, destination):
+            self.geometry_audits.append((obj.name, destination['type']))
+            return False
+
+    class PhysicalClient(BatchClient):
+        def decide(self, instruction, observed, on_delta, cancel_event=None):
+            decision = super().decide(instruction, observed, on_delta, cancel_event)
+            if audit == 'outside_point':
+                decision['items'][1].update(zone_name=None,
+                    destination=dict(type='point', xy=observed['objects'][1]['center_base'][:2]))
+            elif audit == 'outside_region':
+                decision['items'][1].update(zone_name=None,
+                    destination=dict(type='region', name='pick_area'))
+            return decision
+
+    ctl = create(PhysicalAlreadyThere, client=PhysicalClient())
+    try:
+        ctl.submit('依次抓苹果和梨')
+        assert ctl.wait_idle(3)
+        state = ctl.snapshot()
+        assert not ctl._session.executions
+        assert state['batch']['items'][0]['status'] == 'skipped'
+        if audit == 'upright':
+            assert state['status'] == 'complete'
+            assert state['last_result']['ok']
+            assert ctl._session.audits == ['apple', 'pear']
+            assert ctl._session.geometry_audits == [('apple', 'zone_red'), ('pear', 'zone_green')]
+        else:
+            assert state['status'] == 'error'
+            assert not state['last_result']['ok']
+            assert state['batch']['items'][1]['status'] == 'failed'
+            assert state['batch']['completed'] == 1
+            assert state['metrics']['successes'] == 0
+            if audit.startswith('outside'):
+                assert ctl._session.geometry_audits[-1] == (
+                    'pear', audit.removeprefix('outside_') if '_' in audit else 'zone_green')
+    finally:
+        ctl.close()
+
+
 def test_a_malformed_last_item_prevents_any_execution():
     class BadClient(BatchClient):
         def decide(self, instruction, observed, on_delta, cancel_event=None):

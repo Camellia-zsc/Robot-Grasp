@@ -100,6 +100,72 @@ def test_initially_completed_goal_sends_no_grasp_or_extra_observation():
     assert not session.commands and not session.observations
 
 
+@pytest.mark.parametrize('destination,xy', [
+    ({'type': 'named_region', 'name': 'zone_green'}, [.17, .35]),
+    ({'type': 'region', 'name': 'pick_area'}, [.26, .10]),
+    ({'type': 'point', 'xy': [.30, .12]}, [.30, .12]),
+])
+def test_side_pear_in_destination_is_recoverable_not_already_completed(destination, xy):
+    measured = make_det('pear', *xy, size=.085)
+    measured.extra['resting_pose'] = 'side'
+    session = CameraSession(measured)
+    assert not SkillExecutor(session)._at_destination(measured, destination, None)
+    measured.extra['resting_pose'] = 'upright'
+    assert SkillExecutor(session)._at_destination(measured, destination, None)
+
+
+def test_named_zone_completion_cannot_skip_physical_pear_posture_audit():
+    measured = make_det('pear', .17, .35, size=.085)
+    measured.extra['resting_pose'] = 'upright'
+    session = CameraSession(measured)
+    audited = []
+    session._physics = SimpleNamespace(resting_status=lambda name:
+        (audited.append(name) or {'success': False, 'reason': 'pear_not_upright'}))
+    result = SkillExecutor(session).check_completed(
+        dict(id='pear', skill='move', label='pear',
+             destination={'type': 'zone', 'name': 'zone_green'}),
+        [{'label': 'pear', 'zone_name': 'zone_green'}])
+    assert audited == ['independent-object']
+    assert result['skipped'] and not result['ok']
+    assert result['error'] == 'completion_not_verified'
+
+
+def test_upright_round_pear_at_zone_edge_has_no_fictitious_rotated_square_corners():
+    from cube_task.assistant.batch import whole_footprint_in_zone
+    measured = make_det('pear', .1586, .3067, size=.085, yaw=-.5648)
+    measured.extra['resting_pose'] = 'upright'
+    session = CameraSession(measured)
+    assert whole_footprint_in_zone(measured.summary(), session.scene, 'zone_green')
+    # The complete circular belly, including clearance, still has to fit.
+    measured.center_base[1] = .285
+    assert not whole_footprint_in_zone(measured.summary(), session.scene, 'zone_green')
+
+
+def test_independent_zone_audit_rejects_actual_far_side_outside_even_if_camera_center_is_inside():
+    from cube_task.assistant.catalog import make_catalog_object
+    from cube_task.assistant.simulation import SimulationSession
+    pear = make_catalog_object('pear', 'audit-pear', [.3044, -.1197])
+    zone = Zone('narrow', np.array([.274116, -.1197, 0.]), (.12, .20))
+    session = SimpleNamespace(world=SimpleNamespace(held=None),
+        runner=SimpleNamespace(zones={'narrow': zone}),
+        _physics=SimpleNamespace(resting_status=lambda name: {'success': True}))
+    assert not SimulationSession._verify_zone(session, pear, 'narrow')
+    pear.place_upright(.274116, -.1197, 0., 0.)
+    assert SimulationSession._verify_zone(session, pear, 'narrow')
+
+
+def test_verify_wrapper_keeps_analytic_round_fruit_zone_audit():
+    measured = make_det('pear', .17, .35, size=.085)
+    session = CameraSession(measured)
+    goal = {'label': 'pear', 'zone_name': 'zone_green'}
+    session.verify_goals = lambda goals: {'ok': True, 'items': [
+        {'ok': True, 'goal': goal, 'verified_revision': 0}]}
+    session.world.zone_of = lambda obj: None
+    session._verify_zone = lambda obj, name: name == 'zone_green'
+    result = SkillExecutor(session).execute({'id': 'verify', 'skill': 'verify'}, [goal])
+    assert result['ok'] and result['truth']['success']
+
+
 def test_intervention_completed_target_is_observed_at_destination_without_grasp_planning():
     session = CameraSession(make_det('red', .3, 0., size=.05))
     session._environment_revision = 1

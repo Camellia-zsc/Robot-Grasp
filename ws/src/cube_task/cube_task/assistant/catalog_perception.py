@@ -18,13 +18,14 @@ import numpy as np
 from .catalog import catalog_entries, make_catalog_object
 from ..core.config import load_config
 from ..core.types import Frame
+from ..core.transforms import make_T, rpy_to_rot
 from ..perception.classify_knn import KnnClassifier
 from ..perception.classify_color import ColorClassifier
 from ..perception.features import feature_vector
 from ..perception.pipeline import Perception
 from ..perception.visualize import draw_result
 from ..sim.render import render_rgbd
-from ..sim.scenarios import layout_intrinsics, official_wrist_views
+from ..sim.scenarios import layout_intrinsics, look_at, official_wrist_views
 from ..sim.world import SimWorld
 from ..core.types import CameraIntrinsics
 
@@ -100,8 +101,74 @@ def completeness(det) -> bool:
         measured = np.asarray([det.length, det.width, det.height], dtype=float)
     except (TypeError, ValueError):
         return False
-    return bool(np.all(np.isfinite(measured)) and np.all(measured >= minimum)
-                and np.all(measured <= _MAX_GEOMETRY[det.label]))
+    if not np.all(np.isfinite(measured)):
+        return False
+    if (np.all(measured >= minimum)
+            and np.all(measured <= _MAX_GEOMETRY[det.label])):
+        return True
+    return det.label == 'pear' and pear_pose(det) == 'side'
+
+
+def pear_pose(det) -> str:
+    """Conservative resting pose from measured RGB-D, never the body transform.
+
+    A low bulb alone cannot prove a sideways pear. Require the full long neck
+    and broad body in the measured 3-D cloud as well as plausible extents.
+    This preserves the existing cropped/occluded-instance rejection upstream.
+    """
+    try:
+        size = np.asarray([det.length, det.width, det.height], dtype=float)
+        if not np.all(np.isfinite(size)):
+            return 'uncertain'
+        if (np.all(size >= _MIN_GEOMETRY['pear'])
+                and np.all(size <= _MAX_GEOMETRY['pear'])):
+            return 'upright'
+        if not (np.all(size >= [.085, .050, .060])
+                and np.all(size <= [.135, .110, .095])):
+            return 'uncertain'
+        cloud = np.asarray(det.extra.get('_points_base', []), dtype=float)
+        if cloud.ndim != 2 or cloud.shape[1] != 3:
+            return 'uncertain'
+        cloud = cloud[np.all(np.isfinite(cloud), axis=1)]
+        if len(cloud) < 40:
+            return 'uncertain'
+        centered = cloud - cloud.mean(axis=0)
+        _values, axes = np.linalg.eigh(centered.T @ centered)
+        axes = axes[:, ::-1]
+        projected = centered @ axes
+        low, high = np.percentile(projected, [.5, 99.5], axis=0)
+        extents = high - low
+        if (extents[0] >= .105 and extents[1] >= .060
+                and abs(axes[2, 0]) <= .65):
+            return 'side'
+    except (AttributeError, TypeError, ValueError, np.linalg.LinAlgError):
+        pass
+    return 'uncertain'
+
+
+def _center_round_fruit(det) -> bool:
+    """Use a measured top cap for a complete upright round fruit's axis.
+
+    The rectangle of an obliquely visible curved surface is biased toward the
+    camera. Its top cap is a better axis estimate, already used by grasping.
+    Do not apply this to a fallen pear, a crop, or a distant/noisy cap.
+    """
+    if (not det.valid or det.label not in ('pear', 'apple') or not completeness(det)
+            or (det.label == 'pear' and pear_pose(det) != 'upright')):
+        return False
+    try:
+        center = np.asarray(det.center_base, dtype=float)
+        cap = np.asarray(det.extra.get('cap_center_xy'), dtype=float)
+        if (center.shape != (3,) or cap.shape != (2,)
+                or not np.all(np.isfinite(np.r_[center, cap]))
+                or np.linalg.norm(cap - center[:2]) > .5 * float(det.width)):
+            return False
+        det.extra['visible_footprint_center_xy'] = center[:2].tolist()
+        det.center_base = center.copy()
+        det.center_base[:2] = cap
+        return True
+    except (TypeError, ValueError):
+        return False
 
 
 def _cache_path() -> Path:
@@ -128,15 +195,31 @@ def _training_samples():
     intr = CameraIntrinsics.from_dict(layout_intrinsics('A'))
     poses = [np.asarray(T) for _q, T in official_wrist_views('A')]
     # Deliberately vary pose/texture/noise instead of training only on the
-    # displayed initial scene. Six yaw/position examples per class, 3 views.
+    # displayed initial scene. Pears also need side poses after a real fall;
+    # teaching only upright examples makes their new height out of distribution.
     placements = [(0.27, -0.08, 0.0), (0.28, 0.0, 0.5), (0.30, 0.08, 1.2),
                   (0.24, -0.03, 2.2), (0.32, 0.04, -0.5), (0.27, 0.0, -1.1)]
     rows, labels, names = [], [], None
     for entry in catalog_entries():
         label = entry['label']
         count_before = len(labels)
-        for index, (x, y, yaw) in enumerate(placements):
+        examples = [(x, y, yaw, 0., 0.) for x, y, yaw in placements]
+        if label == 'pear':
+            examples += [(x, y, yaw, roll, pitch)
+                         for (x, y, yaw), (roll, pitch) in zip(placements,
+                             [(1.3, 0.), (1.57, 0.), (1.8, 0.),
+                              (0., 1.3), (0., 1.57), (0., 1.8)])]
+        for index, (x, y, yaw, roll, pitch) in enumerate(examples):
             obj = make_catalog_object(label, 'teach-%s-%d' % (label, index), [x, y], yaw)
+            sample_poses = poses
+            if roll or pitch:
+                pose = make_T(rpy_to_rot(roll, pitch, yaw), [x, y, 0.])
+                obj.T_base_obj = pose
+                floor, _top = obj.aabb()
+                pose[2, 3] -= floor[2]
+                obj.T_base_obj = pose
+                sample_poses = poses + [look_at([x - .10, y, .5], [x, y, .03]),
+                                        look_at([x + .10, y, .4], [x, y, .03])]
             # Small, deterministic illumination/color variation includes both
             # sides of the circular red hue boundary (0 and 179 in OpenCV).
             # The L1 blocks already vary by a few BGR levels; teaching only one
@@ -144,9 +227,9 @@ def _training_samples():
             color_offsets = ((0, 0, 0), (7, 0, 0), (0, 7, 0),
                              (-7, 0, 0), (0, -7, 0), (4, -4, 3))
             obj.color_bgr = tuple(int(v) for v in np.clip(
-                np.asarray(obj.color_bgr, dtype=int) + color_offsets[index], 0, 255))
+                np.asarray(obj.color_bgr, dtype=int) + color_offsets[index % len(color_offsets)], 0, 255))
             world = SimWorld(objects=[obj], seed=index)
-            for view, pose in enumerate(poses):
+            for view, pose in enumerate(sample_poses):
                 color, depth = render_rgbd(world, intr, pose, gripper=False,
                                            rng=200 + 11 * index + view,
                                            noise_std=0.0008, dropout=0.002)
@@ -231,7 +314,15 @@ class SandboxPerception(Perception):
         result = super().process(frame, T_base_camera, zones)
         from .stack_perception import refine_supported_objects
         changed = refine_supported_objects(frame, T_base_camera, zones, result, self, completeness)
+        centered = False
         for det in result.detections:
+            det.extra['catalog_complete'] = bool(det.valid and completeness(det))
+            if det.label == 'pear':
+                det.extra['resting_pose'] = pear_pose(det)
+            elif det.label == 'banana':
+                det.extra['resting_pose'] = 'flat' if completeness(det) else 'uncertain'
+            if _center_round_fruit(det):
+                centered = True
             if det.valid and det.label != 'unknown' and not completeness(det):
                 det.valid = False
                 det.reject_reason = 'partial_object'
@@ -239,10 +330,10 @@ class SandboxPerception(Perception):
                 changed = True
         if changed:
             result.warnings.append('partial_object')
-            if self.draw:
-                result.debug_image = draw_result(frame, result, T_base_camera,
-                                                self.default_zones if zones is None else zones,
-                                                self.pick_polygon)
+        if (changed or centered) and self.draw:
+            result.debug_image = draw_result(frame, result, T_base_camera,
+                                            self.default_zones if zones is None else zones,
+                                            self.pick_polygon)
         return result
 
 

@@ -254,6 +254,48 @@ class PickPlaceSkill:
                     continuation=True)
         return r
 
+    def pick_only(self, grasp: GraspPlan) -> PickResult:
+        """Grasp, lift, and retain the object for a later explicit placement.
+
+        A successful pick is a measured held grasp, not a completed placement.
+        Recoverable failures after closing retain the grasp; a later controller
+        step must choose what to do with it. No release destination is needed.
+        """
+        t0 = self.clock.now()
+        r = PickResult(False, stage='start', label=grasp.target.label,
+                       detail={'fault': False, 'holding': False, 'steps': [],
+                               'pick_only': True})
+        if not grasp.feasible:
+            r.stage, r.error = 'plan', 'infeasible: %s' % grasp.reason
+        else:
+            try:
+                self._pick_to_lift(grasp, r, require_feedback=True)
+                if r.detail['holding']:
+                    r.ok, r.stage = True, 'holding'
+            except _Lost as exc:
+                r.detail['holding'] = False
+                r.stage = r.error = exc.stage
+                r.detail['lost_width'] = exc.width
+            except _StepFailed as exc:
+                r.stage, r.error = exc.stage, exc.error
+                r.detail.update(fault=bool(exc.fault), reason=exc.detail)
+                if not exc.fault and not r.detail['holding'] and exc.stage in ('descend', 'close'):
+                    self._retreat_empty(r, grasp, exc.error)
+            except Exception as exc:  # noqa: B902
+                _LOG.exception('pick-only raised')
+                r.error = 'exception: %s' % exc
+                r.detail['fault'] = True
+                try:
+                    self.arm.stop()
+                except Exception:  # noqa: B902
+                    _LOG.exception('arm.stop() raised during pick-only')
+        r.duration = self.clock.now() - t0
+        self._event('pick_result', ok=r.ok, stage=r.stage, error=r.error, label=r.label,
+                    zone=r.zone, duration=round(r.duration, 3), grasp_width=r.grasp_width,
+                    fault=r.detail.get('fault', False), holding=r.detail.get('holding', False),
+                    pick_only=True)
+        return r
+
     # -------------------------------------------------------------- primitives
     def _event(self, kind: str, **fields: Any) -> None:
         if self.logger is None:
@@ -376,31 +418,44 @@ class PickPlaceSkill:
             raise _Lost(stage, w)
 
     # -------------------------------------------------------------------- flow
+    def _pick_to_lift(self, g: GraspPlan, r: PickResult, require_feedback=False) -> None:
+        """Shared checked opening, descent, closing, lift and held feedback."""
+        self._open(r, 'open', g.open_width, need=g.expected_width + OPEN_CLEARANCE)
+        self._move(r, 'pre', g.T_pre, False)
+        self._guard('descend')
+        self._move(r, 'descend', g.T_grasp, self.linear_descent)
+        self._guard('close')
+        w = self._gripper(r, 'close', g.close_width)
+        r.grasp_width = w
+        if w is None and (self.verify or require_feedback):
+            if require_feedback:
+                # Closure happened but its result is unknown. Treat the grip
+                # conservatively as occupied; no later pick may reopen it.
+                r.detail['holding'] = True
+            raise _StepFailed('close', 'no_gripper_feedback', 'after closing', fault=True)
+        if (self.verify or require_feedback) and w < self.empty_width:
+            r.stage = r.error = 'grasp_miss'
+            self._retreat_empty(r, g, 'grasp_miss')
+            return
+        if w is not None and abs(w - g.expected_width) > self.width_tolerance:
+            _LOG.warning('held width %.4f m differs from expected %.4f m', w, g.expected_width)
+        r.detail['holding'] = True
+        self._move(r, 'lift', g.T_lift, self.linear_moves)
+        self._verify_held(r, 'dropped')
+        if require_feedback and not self.verify:
+            width = self._read_width()
+            if width is None:
+                raise _StepFailed('verify_dropped', 'no_gripper_feedback', 'while holding', fault=True)
+            if width < self.empty_width:
+                raise _Lost('dropped', width)
+
     def _pick_place(self, g: GraspPlan, p: PlacePlan, r: PickResult) -> None:
-        holding = False
         try:
-            self._open(r, 'open', g.open_width, need=g.expected_width + OPEN_CLEARANCE)
-            self._move(r, 'pre', g.T_pre, False)
-            self._guard('descend')
-            self._move(r, 'descend', g.T_grasp, self.linear_descent)
-            self._guard('close')
-            w = self._gripper(r, 'close', g.close_width)
-            r.grasp_width = w
-            if w is None and self.verify:
-                raise _StepFailed('close', 'no_gripper_feedback', 'after closing', fault=True)
-            if self.verify and w < self.empty_width:
-                r.stage = r.error = 'grasp_miss'
-                self._retreat_empty(r, g, 'grasp_miss')
+            self._pick_to_lift(g, r)
+            if not r.detail['holding']:
                 return
-            if w is not None and abs(w - g.expected_width) > self.width_tolerance:
-                _LOG.warning('held width %.4f m differs from expected %.4f m', w,
-                             g.expected_width)
-            holding = True
-            r.detail['holding'] = True
-            for stage, T, lin in (('lift', g.T_lift, self.linear_moves),
-                                  ('transit', p.T_pre, False)):
-                self._move(r, stage, T, lin)
-                self._verify_held(r, 'dropped' if stage == 'lift' else 'dropped_in_transit')
+            self._move(r, 'transit', p.T_pre, False)
+            self._verify_held(r, 'dropped_in_transit')
             self._inspect_release(r, g, p)
             self._guard('release')
             self._move(r, 'release', p.T_release, self.linear_moves)
@@ -416,7 +471,7 @@ class PickPlaceSkill:
             if e.fault:
                 r.detail['fault'] = True
                 return
-            if not holding:
+            if not r.detail['holding']:
                 if e.stage in ('descend', 'close'):
                     self._retreat_empty(r, g, e.error)
                 return

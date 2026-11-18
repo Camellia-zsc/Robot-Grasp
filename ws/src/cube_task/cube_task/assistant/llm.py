@@ -441,8 +441,14 @@ class ModelClient:
         return self._request_decision(instruction, context, on_delta, cancel_event,
                                       recovery=True)
 
+    def plan_skills(self, instruction: str, context: dict, on_delta: Callable[[str], None],
+                    cancel_event=None) -> dict:
+        """Compose observed-scene skills and preserve already fixed final goals."""
+        return self._request_decision(instruction, context, on_delta, cancel_event,
+                                      skills=True)
+
     def _request_decision(self, instruction, scene, on_delta, cancel_event=None,
-                          recovery=False):
+                          recovery=False, skills=False):
         self.last_usage = {}
         started = time.monotonic()
 
@@ -457,7 +463,11 @@ class ModelClient:
             raise LLMError('invalid_instruction', '请输入一条不超过 4000 字的指令。')
         if not self.settings.configured:
             raise LLMError('not_configured', '尚未配置可用的模型接口和密钥。')
-        if recovery:
+        if skills:
+            from .skill_protocol import SKILL_PROMPT, model_skill_context
+            visible_scene = model_skill_context(scene)
+            system_prompt = SKILL_PROMPT
+        elif recovery:
             from .recovery import RECOVERY_PROMPT, model_recovery_context
             visible_scene = model_recovery_context(scene)
             system_prompt = RECOVERY_PROMPT
@@ -487,6 +497,7 @@ class ModelClient:
                     raise LLMError('invalid_scene', '选定放置点无效，请重新选择。') from None
         try:
             user_text = json.dumps({'instruction': instruction,
+                                    'context' if skills else
                                     'recovery' if recovery else 'scene': visible_scene},
                                    ensure_ascii=False, allow_nan=False)
         except (ValueError, TypeError):
@@ -495,9 +506,9 @@ class ModelClient:
         if self.settings.api_style == 'responses':
             endpoint = 'responses'
             payload.update(instructions=system_prompt, input=user_text,
-                           max_output_tokens=800, store=False)
+                           max_output_tokens=4096 if skills else 800, store=False)
             if re.match(r'^(?:gpt-[5-9]|o[134])', self.settings.model):
-                payload.update(max_output_tokens=2048,
+                payload.update(max_output_tokens=8192 if skills else 2048,
                                reasoning={'effort': self.settings.reasoning_effort})
         else:
             endpoint = 'chat/completions'
@@ -505,7 +516,7 @@ class ModelClient:
                                    {'role': 'user', 'content': user_text}]
             token_key = ('max_completion_tokens' if re.match(
                 r'^(?:gpt-[5-9]|o[134])', self.settings.model) else 'max_tokens')
-            payload[token_key] = 800
+            payload[token_key] = 4096 if skills else 800
         base = self.settings.base_url.rstrip('/')
         url = base if base.endswith('/' + endpoint) else base + '/' + endpoint
         request = urllib.request.Request(
@@ -523,7 +534,7 @@ class ModelClient:
                 raise LLMError('invalid_output', '模型流式回复格式无效。')
             if delta:
                 output_length += len(delta)
-                if output_length > 12000:
+                if output_length > (24000 if skills else 12000):
                     raise LLMError('invalid_output', '模型回复超过允许长度。')
                 fragments.append(delta)
                 on_delta(delta)
@@ -608,6 +619,9 @@ class ModelClient:
         if not fragments or not ''.join(fragments).strip():
             raise LLMError('empty_output', '模型未返回可用决策，本次不会执行。')
         decision = _json_object(''.join(fragments))
+        if skills:
+            from .skill_protocol import validate_skill_plan
+            return validate_skill_plan(decision, scene)
         if recovery:
             from .recovery import validate_recovery_decision
             return validate_recovery_decision(decision, scene)

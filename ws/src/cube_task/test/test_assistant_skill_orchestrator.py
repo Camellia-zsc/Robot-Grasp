@@ -1,0 +1,261 @@
+"""Composition, feedback and approval boundaries; never call an online model."""
+import copy
+import threading
+import time
+from types import SimpleNamespace
+
+import pytest
+
+from cube_task.assistant.server import DashboardController
+from cube_task.assistant.skill_orchestrator import SkillOrchestrator
+from test_assistant_server import Settings
+from test_assistant_skill_protocol import context, step
+
+GOALS = [dict(label='apple', zone_name='zone_red')]
+
+
+class Session:
+    def __init__(self, observed):
+        self._scene = copy.deepcopy(observed)
+        self.cancel_event = threading.Event()
+        self._environment_revision = 0
+        self.runner = SimpleNamespace(_held_recovery_context=None, has_held_recovery=False)
+        self.calls, self.holding = [], None
+        self.hook = None
+        self.fail_place = False
+        self.bad_verification = False
+
+    @property
+    def scene(self):
+        return copy.deepcopy(self._scene)
+
+    def snapshot(self):
+        return dict(scene_version=self._scene['scene_version'], held_object=self.holding,
+                    objects=[], sim_time=0, editor={})
+
+    def prepare(self):
+        return self.scene
+
+    def observe(self):
+        return self.scene
+
+    def set_speed(self, speed):
+        pass
+
+    def stop(self):
+        self.cancel_event.set()
+
+    def close(self):
+        pass
+
+
+class Executor:
+    def __init__(self, session, originals=()):
+        self.session, self.originals = session, copy.deepcopy(originals)
+
+    def execute(self, action, goals, protected_goals=(), cancel_event=None, expected_revision=None):
+        s = self.session
+        s.calls.append(copy.deepcopy(action))
+        skill, label = action['skill'], action.get('label')
+        result = dict(ok=True, camera_verified=True, truth={'success': True},
+                      verified_revision=s._environment_revision, message='实测步骤通过')
+        if skill == 'pick':
+            s.holding = label
+            s.runner._held_recovery_context = dict(det=SimpleNamespace(label=label))
+            s.runner.has_held_recovery = True
+        elif skill in ('place', 'move'):
+            if s.fail_place and skill == 'place':
+                s.fail_place = False
+                return dict(ok=False, stage='place', holding=True, error='occupied', message='落点发生占用')
+            target = next(o for o in s._scene['objects'] if o['label'] == label)
+            destination = action['destination']
+            if destination['type'] == 'original':
+                original = next(o for o in self.originals if o['label'] == label)
+                target.update(center_base=copy.deepcopy(original['center_base']), yaw=original['yaw'])
+            elif destination['type'] == 'goal':
+                target['zone'] = goals[destination['index']]['zone_name']
+            else:
+                target['center_base'][0] += .04
+            s.holding = None
+            s.runner._held_recovery_context = None
+            s.runner.has_held_recovery = False
+        elif skill == 'verify':
+            items = []
+            for goal in goals:
+                target = next(o for o in s._scene['objects'] if o['label'] == goal['label'])
+                if goal.get('destination'):
+                    ok = all(abs(a-b) < .015 for a, b in zip(target['center_base'], goal['destination']['xy']))
+                else:
+                    ok = target.get('zone') == goal['zone_name']
+                items.append(dict(goal=goal, ok=ok, truth={'success': ok}))
+            ok = bool(items) and all(i['ok'] for i in items) and not s.bad_verification
+            result.update(ok=ok, items=items, truth={'success': ok}, camera_verified=ok)
+        if s.hook:
+            s.hook(action, result)
+        return dict(result, holding=bool(s.holding))
+
+
+class Client:
+    def __init__(self, fn):
+        self.fn, self.contexts = fn, []
+
+    def plan_skills(self, instruction, context, on_delta, cancel_event=None):
+        self.contexts.append(copy.deepcopy(context))
+        on_delta('{"message":"模型实际步骤"}')
+        return dict(scene_version=context['scene']['scene_version'], action='plan', message='模型实际步骤',
+                    goals=copy.deepcopy(context['goals'] or GOALS), steps=self.fn(context, len(self.contexts)))
+
+    def decide(self, *args, **kwargs):
+        raise AssertionError('default dashboard must not use old macro/decision route')
+
+
+@pytest.fixture
+def create(context, monkeypatch):
+    from cube_task.assistant import skill_execution
+    monkeypatch.setattr(skill_execution, 'SkillExecutor', Executor)
+    controllers = []
+
+    def factory(fn):
+        s, c = Session(context['scene']), Client(fn)
+        ctl = DashboardController(session_factory=lambda **kwargs: s, client=c, settings=Settings())
+        assert ctl.wait_idle(2)
+        controllers.append(ctl)
+        return ctl, s, c
+
+    yield factory
+    for ctl in controllers:
+        ctl.close()
+
+
+def pending(ctl):
+    deadline = time.monotonic()+3
+    while time.monotonic() < deadline:
+        state = ctl.snapshot()
+        if state['recovery_approval']['status'] == 'pending':
+            return state['recovery_approval']
+        if not state['busy']:
+            pytest.fail(str(state['last_result']))
+        threading.Event().wait(.01)
+    pytest.fail('no explicit approval request')
+
+
+def approve(ctl, yes=True):
+    p = pending(ctl)
+    ctl.approve_recovery(dict(request_id=p['request_id'], scene_version=p['scene_version'], approved=yes))
+
+
+def normal(_context, _number):
+    return [step(1, 'move', 'apple', {'type': 'goal', 'index': 0}), step(2, 'verify'), step(3, 'finish')]
+
+
+def test_default_planner_executes_composed_skills_and_verifies_once(create):
+    ctl, session, client = create(normal)
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert state['status'] == 'complete', state['last_result']
+    assert [s['skill'] for s in session.calls] == ['move', 'verify']
+    assert len(client.contexts) == 1 and state['metrics']['successes'] == 1
+    assert state['skill_task']['executed'] == 3
+
+
+def test_arbitrary_two_obstacles_and_repeated_object_require_real_approval(create):
+    def compose(_context, _number):
+        return [step(1, 'move', 'banana', {'type': 'auto_free'}),
+                step(2, 'move', 'pear', {'type': 'auto_free'}),
+                step(3, 'pick', 'apple'), step(4, 'place', 'apple', {'type': 'goal', 'index': 0}),
+                step(5, 'move', 'pear', {'type': 'original', 'label': 'pear'}),
+                step(6, 'move', 'banana', {'type': 'original', 'label': 'banana'}), step(7, 'finish')]
+    ctl, session, client = create(compose)
+    before = session.scene
+    ctl.submit('苹果放红区，允许先询问再处理多个障碍')
+    pending(ctl)
+    assert session.calls == [] and session.scene == before
+    approve(ctl)
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert state['last_result']['ok'], state['last_result']
+    assert not state['last_result']['pending_obligations']
+    assert [s['label'] for s in session.calls if s['skill'] == 'move'] == ['banana', 'pear', 'pear', 'banana']
+    assert len(client.contexts) == 1
+
+
+def test_decline_preserves_scene_and_resume_does_not_imply_approval(create):
+    ctl, session, client = create(lambda c, n: [step(1, 'move', 'banana', {'type': 'auto_free'})])
+    ctl.submit('苹果放红区')
+    approve(ctl, False)
+    assert ctl.wait_idle(3) and not session.calls
+    assert ctl.snapshot()['can_resume_recovery']
+    ctl.resume_recovery()
+    pending(ctl)
+    assert not session.calls and len(client.contexts) == 2
+    approve(ctl, False)
+    assert ctl.wait_idle(3)
+
+
+def test_model_can_ask_mid_plan_and_continue_after_button_answer(create):
+    def ask(c, n):
+        return [step(1, 'observe', 'apple'), step(2, 'ask', question='是否继续本次操作？', affected_goals=[0])] + normal(c, n)
+    # IDs must be unique even when plans combine fragments.
+    def numbered(c, n):
+        return [dict(s, id=str(i)) for i, s in enumerate(ask(c, n))]
+    ctl, session, client = create(numbered)
+    ctl.submit('苹果放红区')
+    pending(ctl)
+    assert [s['skill'] for s in session.calls] == ['observe']
+    approve(ctl)
+    assert ctl.wait_idle(3) and ctl.snapshot()['last_result']['ok']
+
+
+def test_failed_place_replans_with_real_holding_and_unchanged_final_goal(create):
+    def compose(c, n):
+        return ([step(1, 'pick', 'apple')] if n == 1 else []) + [
+            step(2, 'place', 'apple', {'type': 'goal', 'index': 0}), step(3, 'verify'), step(4, 'finish')]
+    ctl, session, client = create(compose)
+    session.fail_place = True
+    ctl.submit('苹果放红区')
+    assert ctl.wait_idle(3)
+    assert ctl.snapshot()['last_result']['ok'], ctl.snapshot()['last_result']
+    assert len(client.contexts) == 2
+    retry = client.contexts[1]
+    assert retry['holding'] and retry['held_label'] == 'apple' and retry['goals'] == GOALS
+    assert retry['failure']['error'] == 'occupied' and retry['history'][-1]['ok'] is False
+    assert [s['skill'] for s in session.calls].count('pick') == 1
+
+
+def test_stop_during_first_obstacle_move_keeps_feedback_and_restore_obligation(create):
+    ctl, session, _ = create(lambda c, n: [
+        step(1, 'move', 'banana', {'type': 'auto_free'}),
+        step(2, 'move', 'banana', {'type': 'original', 'label': 'banana'}), step(3, 'finish')])
+    def stop(action, result):
+        ctl.stop()
+        result.update(ok=False, aborted=True, message='运动中停止')
+    session.hook = stop
+    ctl.submit('苹果放红区')
+    approve(ctl)
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert state['status'] == 'stopped' and len(session.calls) == 1
+    assert state['last_result']['pending_obligations'] == {'banana': 'pending'}
+    assert state['skill_task']['history'][0]['ok'] is False
+    assert not state['can_resume_recovery']
+    with pytest.raises(ValueError):
+        ctl.resume_recovery()
+
+
+def test_failed_final_verification_never_counts_success(create):
+    ctl, session, client = create(normal)
+    session.bad_verification = True
+    ctl.submit('苹果放红区')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert not state['last_result']['ok'] and state['metrics']['successes'] == 0
+    assert len(client.contexts) == 5 and state['can_resume_recovery']
+
+
+def test_completed_task_cannot_be_replayed_through_resume_endpoint(create):
+    ctl, _, _ = create(normal)
+    ctl.submit('苹果放红区')
+    assert ctl.wait_idle(3)
+    with pytest.raises(ValueError):
+        ctl.resume_recovery()

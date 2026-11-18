@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 import numpy as np
 
 from ..core.transforms import pose6_to_T
-from ..core.types import Detection, PerceptionResult, PickResult, TaskReport
+from ..core.types import Detection, PerceptionResult, PickResult, PlacePlan, TaskReport
 from ..core.zones import parse_zones
 from ..perception.grasp import (CAPSULE_RATIO, expected_table_z, GraspPlanner, LONG_ZONE_RATIO,
                                 PlacePlanner, detection_table_z, held_offset_of,
@@ -1023,11 +1023,13 @@ class TaskRunner:
         return self._held_recovery_context is not None
 
     def _save_held_recovery(self, det, gp, pp, result) -> None:
-        """Remember only recoverable motion failures of a verified held grasp."""
+        """Remember a measured pick-only grasp or a recoverable held failure."""
         errors = [s.get('error') for s in result.detail.get('steps', ()) if s.get('error')]
         allowed = ('rejected', 'unreachable', 'timeout', 'stalled', 'scene_changed', 'placement_changed')
         width = result.grasp_width
-        if (not result.detail.get('holding') or result.error not in allowed + ('holding_object',)
+        picked = result.ok and result.detail.get('pick_only') and not result.error
+        if (not result.detail.get('holding')
+                or (not picked and result.error not in allowed + ('holding_object',))
                 or any(error not in allowed for error in errors)
                 or width is None or not math.isfinite(float(width))
                 or width < self.skill.empty_width):
@@ -1448,6 +1450,89 @@ class TaskRunner:
             return None, 'stopped before moving: %s' % stop
         reason = str(self._tracks[-1].get('reason', '')) if self._tracks else ''
         return None, reason or 'not attempted (measure again)'
+
+    def pick_only_detection(self, det: Detection, neighbors: Sequence[Detection] = (),
+                            budget_s: float = 3600.0) -> Tuple[Optional[PickResult], str]:
+        """Plan one measured grasp and lift, retaining it for a later place step.
+
+        This deliberately requires no destination capacity. The complete supplied
+        neighborhood constrains the grasp and lift; the ordinary reach and
+        SafeArm checks remain active. Success neither reserves a place nor marks
+        any sorting goal complete.
+        """
+        from .reach import reach_adjust, reach_lowered
+
+        if self.dry_run:
+            return None, 'pick-only requires measured gripper feedback, not dry-run'
+        if self.has_held_recovery:
+            return None, 'an object is already held; place it before another pick'
+        if not math.isfinite(self._deadline):
+            self._deadline = self.clock.now() + float(budget_s)
+        stop = self._stop_check()
+        if stop is not None:
+            return None, 'stopped before moving: %s' % stop
+        if not det.valid or not _has_xy(det):
+            return None, 'target has no valid measured geometry'
+        target = copy.deepcopy(det)
+        others = [target] + [copy.deepcopy(d) for d in neighbors
+                            if d is not det]
+        self._neighbors = others
+        from ..perception.grasp import annotate_grasp_neighbors
+        annotate_grasp_neighbors(target, others)
+        gp = self.planner.plan(target)
+        if not gp.feasible:
+            return None, 'grasp infeasible: %s' % gp.reason
+        held = held_offset_of(gp)
+        tops = [float(d.top_z) for d in others if d is not target and d.top_z is not None
+                and math.isfinite(float(d.top_z))]
+        transit = transit_height(self.cfg, list(self.zones.values()), detection_table_z(target),
+                                 held, max(tops) if tops else None)
+        gp.T_lift[2, 3] = max(float(gp.T_lift[2, 3]), float(transit))
+        top = float(target.top_z if target.top_z is not None else target.center_base[2])
+        floors = {'pre': top + self.min_approach,
+                  'lift': max(float(gp.T_grasp[2, 3]) + self.min_approach, float(transit))}
+        grasp, _tilt, why = reach_adjust(self.arm, gp.T_grasp)
+        if grasp is None:
+            return None, 'grasp: %s' % why
+        adjusted = {'T_grasp': grasp}
+        for stage, attribute in (('pre', 'T_pre'), ('lift', 'T_lift')):
+            pose, _tilt, _lowered, why = reach_lowered(
+                self.arm, getattr(gp, attribute), floors[stage], self.free_tilt,
+                keep_R=grasp[:3, :3], vertical_first=stage == 'lift')
+            if pose is None:
+                return None, '%s: %s' % (stage, why)
+            adjusted[attribute] = pose
+        for attribute, pose in adjusted.items():
+            setattr(gp, attribute, pose)
+        stop = self._stop_check()
+        if stop is not None:
+            return None, 'stopped before moving: %s' % stop
+        self._event('decision', action='pick_only', label=target.label,
+                    target=target.summary(), observed_neighbors=len(others) - 1,
+                    expected_width=float(gp.expected_width))
+        watcher = self._live_watcher(target)
+        self._live_dets = []
+        self._live_mark += 1
+        if watcher is not None:
+            self.skill.on_stage = watcher.stage
+        try:
+            result = self.skill.pick_only(gp)
+        finally:
+            if watcher is not None:
+                self.skill.on_stage = None
+                self._live_dets = watcher.finish()
+        # The saved anchor describes the measured grasp, not the object's later
+        # wrist-camera appearance. A placeholder supplies no release authority.
+        placeholder = PlacePlan('held', gp.T_lift.copy(), gp.T_grasp.copy(),
+                                gp.T_lift.copy(), open_width=gp.open_width)
+        self._save_held_recovery(target, gp, placeholder, result)
+        self._at_observe = False
+        if result.detail.get('fault'):
+            self.fault_detail = 'pick %s at stage %s: %s' % (
+                result.label, result.stage, result.error)
+        elif result.ok:
+            self.fault_detail = ''
+        return result, ''
 
     def _live_watcher(self, det: Detection):
         """Return a task.live.LiveWatcher for this pick, None when live watching is off."""

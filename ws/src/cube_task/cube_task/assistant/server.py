@@ -53,6 +53,9 @@ class DashboardController:
         self._events = deque(maxlen=160)
         self._next_id = 0
         self._last_result = None
+        from .skill_orchestrator import idle_skill_task
+        self._skill_task = idle_skill_task()
+        self._skill_memory = None
         self._approval_event = threading.Event()
         self._recovery_approval = {'status': 'none'}
         self._batch = idle_batch()
@@ -99,6 +102,7 @@ class DashboardController:
         snapshot = self._session.snapshot()
         current = snapshot.get('scene_version', self._session.scene.get('scene_version'))
         return (current == version and
+                not getattr(self._session, '_interventions', ()) and
                 not snapshot.get('editor', {}).get('intervention_pending', 0))
 
     def approve_recovery(self, request):
@@ -154,6 +158,8 @@ class DashboardController:
 
     def resume_recovery(self):
         """Explicitly continue a recoverable held failure, preserving its goal."""
+        if hasattr(self._client, 'plan_skills'):
+            return self._resume_skills()
         with self._lock:
             session = self._session
             if (self._busy or self._closed or self._cancel.is_set() or session is None
@@ -226,7 +232,38 @@ class DashboardController:
                 self._event('result', {'message': self._stage, 'result': self._last_result})
             self._launch(run, 'observing', '继续核对当前持物，保留原任务与现场')
 
+    def _resume_skills(self):
+        from .skill_orchestrator import SkillOrchestrator
+        with self._lock:
+            session = self._session
+            saved = self._skill_memory
+            if saved and self._skill_task.get('status') not in ('failed', 'declined'):
+                raise ValueError('当前技能任务无需继续；请等待完成或发送新指令')
+            legacy_held = bool(session is not None and session.snapshot().get('held_object')
+                and getattr(getattr(session, 'runner', None), 'has_held_recovery', False))
+            if (self._busy or self._closed or self._cancel.is_set() or session is None
+                    or session.cancel_event.is_set() or not ((saved and saved.get('goals')) or legacy_held)):
+                raise ValueError('当前没有可继续的任务；明确停止后需先重置')
+            goals = copy.deepcopy(saved['goals'] if saved else [session._recovery_goal])
+            if not all(isinstance(g, dict) and g.get('label') for g in goals):
+                raise ValueError('未找到原始目标，不能猜测恢复任务')
+            protected = (copy.deepcopy(saved['protected_goals']) if saved else
+                [self._goal(item['label'], item) for item in self._batch.get('items', [])
+                 if item['status'] in ('succeeded', 'skipped') and item['label'] not in {g['label'] for g in goals}])
+            instruction = (saved['instruction'] if saved else next(
+                (m['content'] for m in reversed(self._messages) if m.get('role') == 'user'),
+                '继续完成当前持物的原目标'))
+            failure = copy.deepcopy(self._last_result or {})
+            self._needs_reset = False
+            self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
+                              'reason': '', 'message': '', 'history': []}
+            self._launch(lambda: SkillOrchestrator(self).run(instruction, goals=goals,
+                protected_goals=protected, failure=failure, resume=bool(saved)),
+                'observing', '保留原目标，重新规划未完成的基本技能')
+
     def _stopped_message(self):
+        if (self._last_result or {}).get('pending_obligations'):
+            return '任务已停止；仍有承诺的原位复位未完成，已保留各步记录和当前现场'
         transaction = (self._last_result or {}).get('pending_rearrangement')
         if transaction:
             return '任务已停止；暂放或区域调整尚未完成，已保留各步记录，请先核对物品位置'
@@ -320,6 +357,9 @@ class DashboardController:
                 raise RuntimeError('场景准备已取消')
             self._scene = scene
             self._last_result = None
+            from .skill_orchestrator import idle_skill_task
+            self._skill_task = idle_skill_task()
+            self._skill_memory = None
             self._needs_reset = False
             self._status, self._stage = 'ready', '场景已就绪，输入一句中文开始抓取'
         self._event('ready', {'message': '可编辑场景已就绪', 'scene_version': scene.get('scene_version')})
@@ -428,6 +468,9 @@ class DashboardController:
                 self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
                                   'reason': '', 'message': '', 'history': []}
                 self._metrics['requests'] += 1
+            if hasattr(self._client, 'plan_skills'):
+                from .skill_orchestrator import SkillOrchestrator
+                return SkillOrchestrator(self).run(instruction, selected_destination=selected_destination)
             self._set_status('observing', '复用桌面观测生成任务计划，执行前局部确认')
             scene = self._session.scene
             if not getattr(self._session, 'targeted_observation', False) or not scene.get('objects'):
@@ -901,12 +944,18 @@ class DashboardController:
                      'messages': copy.deepcopy(self._messages),
                      'events': copy.deepcopy(list(self._events)),
                      'last_result': copy.deepcopy(self._last_result)}
+            state['skill_task'] = copy.deepcopy(self._skill_task)
             state['batch'] = copy.deepcopy(self._batch)
             state['simulation'] = session.snapshot() if session is not None else {}
             state['can_resume_recovery'] = bool(session is not None and not self._busy
                 and not self._cancel.is_set() and state['simulation'].get('held_object')
                 and getattr(getattr(session, 'runner', None), 'has_held_recovery', False)
                 and not session.cancel_event.is_set())
+            if (hasattr(self._client, 'plan_skills') and self._skill_memory
+                    and self._skill_memory.get('goals') and not self._busy and session is not None
+                    and not self._cancel.is_set() and not session.cancel_event.is_set()
+                    and self._skill_task.get('status') in ('failed', 'declined')):
+                state['can_resume_recovery'] = True
             editor = state['simulation'].setdefault('editor', {})
             editor['editable'] = bool(
                 editor.get('editable', True) and session is not None and self._scene

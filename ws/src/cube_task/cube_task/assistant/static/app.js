@@ -46,7 +46,8 @@ function updateControls(){
   $("send-button").disabled=busy||!ready||Boolean(state.needs_reset);$("instruction").disabled=busy||Boolean(state.needs_reset);
   $("reset-button").disabled=busy||!ready;$("stop-button").disabled=(!state.busy&&!awaiting&&!resuming)||state.status==="stopping";
   document.querySelectorAll("[data-instruction]").forEach(button=>button.disabled=busy||!ready||Boolean(state.needs_reset));
-  setText("command-hint",awaiting?"操作已暂停，请在恢复方案中选择同意或拒绝":resuming?"正在继续处理当前持物，请等待模型分析":state.needs_reset?(state.can_resume_recovery?"当前持物尚未完成，可选择“继续处理当前持物”":"任务已停止，请先重置场景"):busy?"指令处理中，请观察执行流程":"Enter 发送 · Shift + Enter 换行");
+  const skillTask=state.skill_task?.status&&state.skill_task.status!=="idle",resumeLabel=skillTask?"继续未完成任务":"继续处理当前持物";
+  setText("command-hint",awaiting?"操作已暂停，请在恢复方案中选择同意或拒绝":resuming?`正在${resumeLabel}，请等待模型分析`:state.needs_reset?(state.can_resume_recovery?`${skillTask?"原任务":"当前持物"}尚未完成，可选择“${resumeLabel}”`:"任务已停止，请先重置场景"):busy?"指令处理中，请观察执行流程":"Enter 发送 · Shift + Enter 换行");
   document.querySelectorAll("[data-speed]").forEach(button=>{button.classList.toggle("active",number(button.dataset.speed)===number(state.speed,1));button.disabled=!ready||ui.pending;});
   renderRecoveryApproval(state);
 }
@@ -112,16 +113,19 @@ $("recovery-approval-decline").addEventListener("click",()=>submitRecoveryApprov
 
 function renderResumeRecovery(state){
   const panel=$("resume-recovery");if(!panel)return;
+  const skillTask=state.skill_task?.status&&state.skill_task.status!=="idle";
+  const resumeLabel=skillTask?"继续未完成任务":"继续处理当前持物";
+  setText("resume-recovery-button",resumeLabel);panel.ariaLabel=resumeLabel;
   const available=state.can_resume_recovery===true&&!state.busy&&state.status!=="awaiting_approval";
   panel.hidden=!available;
   if(!available){ui.resumeRecovery=null;return;}
   // A new terminal event also releases the lock if a very short attempt fell between polls.
-  const terminal=(Array.isArray(state.events)?state.events:[]).filter(event=>["result","error","stopped"].includes(event.kind)).at(-1);
-  const key=JSON.stringify([state.status,terminal?.id,state.recovery_approval?.request_id,state.recovery_approval?.status]);
+  const terminal=(Array.isArray(state.events)?state.events:[]).filter(event=>["result","error","stopped","skill_feedback"].includes(event.kind)).at(-1);
+  const key=JSON.stringify([state.status,terminal?.id,state.recovery_approval?.request_id,state.recovery_approval?.status,state.skill_task?.status,state.skill_task?.plan_number,state.skill_task?.executed]);
   if(!ui.resumeRecovery||ui.resumeRecovery.key!==key&&!ui.resumeRecovery.submitting)ui.resumeRecovery={key,submitting:false,submitted:false,error:""};
   const local=ui.resumeRecovery;
   $("resume-recovery-button").disabled=!ui.connected||ui.pending||local.submitting||local.submitted;
-  setText("resume-recovery-status",local.error|| (local.submitting?"正在提交，保留当前持物状态…":local.submitted?"已提交，等待恢复分析。":!ui.connected?"连接中断，恢复连接后可继续处理。":"保留原目标，先分析恢复方案。需要确认的方案仍会等待你点击“同意执行”。"));
+  setText("resume-recovery-status",local.error|| (local.submitting?(skillTask?"正在提交，保留未完成目标和当前现场…":"正在提交，保留当前持物状态…"):local.submitted?"已提交，等待恢复分析。":!ui.connected?"连接中断，恢复连接后可继续处理。":skillTask?"保留未完成的原目标，根据最新观测和执行反馈重新规划。需要确认的方案仍会等待你点击“同意执行”。":"保留原目标，先分析恢复方案。需要确认的方案仍会等待你点击“同意执行”。"));
   $("resume-recovery-status").classList.toggle("error",Boolean(local.error));
 }
 async function resumeRecovery(){
@@ -211,8 +215,8 @@ function renderMessages(state){
   if(!messages.length && !$("welcome").childNodes.length){
     const icon=document.createElement("div");icon.className="welcome-icon";icon.append(svgIcon("cube"));
     const heading=document.createElement("h3");heading.textContent="从一句话开始";
-    const description=document.createElement("p");description.textContent="告诉我一个或多个目标，\n我会根据相机观测生成清单，再由机械臂逐件执行。";
-    const note=document.createElement("div");note.className="welcome-note";note.textContent="观测场景 → 生成顺序清单 → 逐件执行与验证";
+    const description=document.createElement("p");description.textContent="告诉我最终目标，\n模型会根据相机观测组合技能，并根据执行反馈调整计划。";
+    const note=document.createElement("div");note.className="welcome-note";note.textContent="观察现场 → 组合技能 → 逐步执行与最终核验";
     $("welcome").append(icon,heading,description,note);
   }
   const activeKeys=new Set();
@@ -250,11 +254,11 @@ function renderMessages(state){
   });
   for(const [key,node] of ui.messageNodes)if(!activeKeys.has(key)){node.remove();ui.messageNodes.delete(key);}
   for(const event of Array.isArray(state.events)?state.events:[]){
-    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected"].includes(event.kind)||!event.message)continue;
+    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan"].includes(event.kind)||!event.message)continue;
     if(["decision","recovery_result"].includes(event.kind)&&messages.some(message=>message.role==="assistant"&&assistantText(message,String(message.content??message.text??""),false)===event.message))continue;
     const key=String(event.id??event.seq??`${event.time}-${event.message}`);
     if(ui.eventNodes.has(key))continue;
-    const node=document.createElement("div");node.className=`event-bubble${["error","recovery_exhausted"].includes(event.kind)?" error":""}`;
+    const node=document.createElement("div");node.className=`event-bubble${["error","recovery_exhausted"].includes(event.kind)||event.kind==="skill_feedback"&&(event.ok===false||event.feedback?.ok===false)?" error":""}`;
     const text=document.createElement("span");text.textContent=event.message;
     node.append(svgIcon(event.kind==="decision"?"spark":event.kind==="result"?"check":event.kind.startsWith("recovery_")?"reset":"focus"),text);conversation.append(node);ui.eventNodes.set(key,node);
   }
@@ -263,6 +267,12 @@ function renderMessages(state){
 
 function stageIndex(state){
   if(!state.busy&&state.status!=="complete")return -1;
+  const task=state.skill_task;
+  if(task?.status&&task.status!=="idle"){
+    if(["thinking","replanning","awaiting_approval"].includes(task.status))return 1;
+    const skill=task.steps?.[task.current_index]?.skill;
+    return {observe:0,pick:2,place:2,move:2,verify:3,finish:3,ask:1}[skill]??-1;
+  }
   const stage=String(state.stage||"").toLowerCase();
   if(/verif|result|valid|check|finish|complete|落位|验证/.test(stage))return 3;
   if(/扫描|重新观察|相机观测/.test(stage))return 0;
@@ -278,6 +288,7 @@ function renderRecovery(state){
   const banner=$("recovery-banner");banner.hidden=status==="idle"||attempt===0;
   if(banner.hidden)return;
   const labels={observing:"重新检查",thinking:"模型分析",executing:"执行方案",verifying:"核验结果",succeeded:"恢复成功",exhausted:"恢复已结束",stopped:"已停止"};
+  if(state.skill_task?.status&&state.skill_task.status!=="idle"){banner.hidden=true;return;}
   banner.dataset.status=status;banner.classList.toggle("error",status==="exhausted");banner.classList.toggle("success",status==="succeeded");
   setText("recovery-title",`自动恢复 · 第 ${attempt} / ${maximum} 次尝试`);
   const fallback={observing:"重新检查当前物体与放置区域。",thinking:"正在接收模型的恢复方案，回复会显示在右侧。",executing:"正在执行模型选择的恢复方案。",verifying:"正在检查目标是否落入指定区域。",succeeded:"目标已通过抓放和落位核验。",exhausted:"自动恢复已结束，请查看反馈后处理。",stopped:"恢复流程已停止，不会继续执行。"};
@@ -288,9 +299,10 @@ function renderRecovery(state){
 }
 function renderPipeline(state){
   let index=stageIndex(state);const result=state.last_result||state.result;
-  const truthSuccess=Boolean(result?.ok!==false&&result?.truth?.success!==false&&
+  const task=state.skill_task,skillTask=task?.status&&task.status!=="idle";
+  const truthSuccess=skillTask?task.status==="complete":Boolean(result?.ok!==false&&result?.truth?.success!==false&&
     (result?.truth?.success===true||result?.success===true||result?.ok===true&&state.status==="complete"));
-  const completed=!state.busy&&result&&truthSuccess;
+  const completed=!state.busy&&truthSuccess&&(skillTask||result);
   if(completed)index=4;
   document.querySelectorAll("#pipeline li").forEach((node,i)=>{
     node.classList.toggle("active",Boolean(state.busy)&&i===index);node.classList.toggle("done",index>i);
@@ -300,21 +312,66 @@ function renderPipeline(state){
   const text=state.message||state.stage||latest?.message||stateLabels[state.status]||"等待一条指令";
   setText("stage-message",text);$("stage-message").title=text;
   renderBatch(state);
+  renderSkillTask(state);
   renderRecovery(state);
   renderGraspFeedback(state);
-  const panel=$("task-result");panel.hidden=!result||Boolean(state.busy);
-  if(result&&!state.busy){
-    const failed=result.ok===false||result.truth?.success===false||state.status==="error";
+  const panel=$("task-result");panel.hidden=Boolean(state.busy)||(skillTask?!["complete","failed","stopped","declined"].includes(task.status):!result);
+  if(!panel.hidden){
+    const failed=skillTask?task.status!=="complete":result.ok===false||result.truth?.success===false||state.status==="error";
     panel.classList.toggle("error",failed);panel.replaceChildren(svgIcon(failed?"focus":"check"));
     const description=document.createElement("span");
-    description.textContent=result.message||result.summary||result.truth?.message||state.stage||(truthSuccess?"抓取与落位验证通过":failed?"本次任务未完成，请查看执行反馈":"模型回复已完成");
+    description.textContent=skillTask?(task.message||(truthSuccess?"原任务所有目标已通过最终核验。":"原任务尚未完成，请查看技能执行反馈。")):result.message||result.summary||result.truth?.message||state.stage||(truthSuccess?"抓取与落位验证通过":failed?"本次任务未完成，请查看执行反馈":"模型回复已完成");
     panel.append(description);
   }
+}
+function renderSkillTask(state){
+  const task=state.skill_task||{},panel=$("skill-panel");if(!panel)return;
+  const status=String(task.status||"idle");panel.hidden=status==="idle";
+  if(panel.hidden){ui.skillSignature=null;return;}
+  const signature=JSON.stringify(task);if(signature===ui.skillSignature)return;ui.skillSignature=signature;
+  panel.dataset.status=status;
+  const names={observe:"观察",pick:"抓取保持",place:"放置",move:"搬移",verify:"验证",ask:"询问人工",finish:"最终核验"};
+  const labels={thinking:"模型规划中",executing:"逐步执行中",awaiting_approval:"等待人工确认",replanning:"根据反馈重规划",complete:"原任务已核验完成",failed:"任务尚未完成",stopped:"已停止",declined:"已拒绝并停止"};
+  const stepLabels={pending:"等待",executing:"执行中",succeeded:"步骤通过",failed:"失败",cancelled:"已取消"};
+  const zoneName=name=>({zone_red:"红色区域",zone_green:"绿色区域",zone_yellow:"黄色区域"})[name]||String(name||"默认区域");
+  const goals=Array.isArray(task.goals)?task.goals:[];
+  const goalDestination=goal=>goal.destination?.type==="region"?"抓取区":goal.destination?.type==="point"?`指定桌面点 (${(goal.destination.xy||[]).map(value=>number(value).toFixed(3)).join(", ")})`:zoneName(goal.zone_name);
+  const destination=value=>{
+    if(!value)return "";
+    if(value.type==="goal"){const goal=goals[value.index];return goal?`最终目标 ${number(value.index)+1} · ${goalDestination(goal)}`:"最终目标";}
+    if(value.type==="zone")return zoneName(value.name);
+    if(value.type==="region")return "抓取区";
+    if(value.type==="auto_free")return "实测空位（暂放）";
+    if(value.type==="original")return `${displayLabel(value.label)}原位置与朝向`;
+    return "待确认目的地";
+  };
+  setText("skill-state",labels[status]||status);
+  setText("skill-budget",`计划 ${number(task.plan_number)} / ${number(task.max_plans,5)} · 已执行 ${number(task.executed)} / ${number(task.max_executed,64)} 步`);
+  setText("skill-goals",goals.length?`最终目标：${goals.map(goal=>`${displayLabel(goal.label)} → ${goalDestination(goal)}`).join("；")}`:"等待模型明确最终目标。");
+  const steps=Array.isArray(task.steps)?task.steps:[],current=Number.isInteger(task.current_index)?steps[task.current_index]:null;
+  setText("skill-message",task.message||(current?`当前第 ${task.current_index+1} / ${steps.length} 步：${names[current.skill]||current.skill}`:status==="complete"?"所有原目标已通过最终核验。":"等待技能计划或后续反馈。"));
+  $("skill-steps").replaceChildren(...steps.map((step,index)=>{
+    const row=document.createElement("li");row.dataset.status=step.status||"pending";
+    const active=index===task.current_index&&["executing","awaiting_approval"].includes(status);
+    row.classList.toggle("current",active);if(active)row.setAttribute("aria-current","step");
+    const order=document.createElement("span");order.className="batch-order";order.textContent=String(index+1);
+    const copy=document.createElement("div");copy.className="batch-item-copy";
+    const title=document.createElement("strong");title.textContent=`${names[step.skill]||step.skill}${step.label?` · ${displayLabel(step.label)}`:""}${step.destination?` → ${destination(step.destination)}`:""}`;copy.append(title);
+    const message=step.message||step.question;if(message){const note=document.createElement("small");note.textContent=String(message);copy.append(note);}
+    const badge=document.createElement("span");badge.className="batch-item-status";badge.textContent=stepLabels[step.status]||"等待";
+    row.append(order,copy,badge);return row;
+  }));
+  const history=Array.isArray(task.history)?task.history:[];
+  $("skill-feedback").replaceChildren(...history.slice(-8).map(item=>{
+    const feedback=item.feedback||item.result||item,step=item.step||item;
+    const row=document.createElement("li");row.dataset.status=feedback.ok===false?"failed":"feedback";
+    row.textContent=`${names[step.skill]||"执行反馈"}${step.label?` · ${displayLabel(step.label)}`:""}：${feedback.message||feedback.error||(feedback.ok===false?"本步骤未通过":feedback.ok===true?"步骤已通过":"已收到执行反馈")}`;return row;
+  }));
 }
 function renderBatch(state){
   const batch=state.batch||{},panel=$("batch-panel");if(!panel)return;
   const total=Math.max(0,number(batch.total)),status=String(batch.status||"idle");
-  panel.hidden=total===0||status==="idle";if(panel.hidden){ui.batchSignature=null;return;}
+  panel.hidden=total===0||status==="idle"||Boolean(state.skill_task?.status&&state.skill_task.status!=="idle");if(panel.hidden){ui.batchSignature=null;return;}
   const signature=JSON.stringify(batch);if(ui.batchSignature===signature)return;ui.batchSignature=signature;
   const completed=Math.min(total,Math.max(0,number(batch.completed)));
   const items=Array.isArray(batch.items)?batch.items:[];
@@ -459,6 +516,12 @@ $("camera-image").addEventListener("error",()=>{ui.cameraLoading=false;$("camera
 function cameraRefreshLoop(){refreshCamera();setTimeout(cameraRefreshLoop,350);}
 setTimeout(cameraRefreshLoop,350);
 function selectedId(state){
+  const task=state.skill_task;
+  if(task?.status&&task.status!=="idle"){
+    const step=Number.isInteger(task.current_index)?task.steps?.[task.current_index]:null;
+    const matches=(state.scene?.objects||[]).filter(object=>object.label===step?.label&&object.valid!==false);
+    return task.status==="executing"&&matches.length===1?String(matches[0].object_id??matches[0].id??""):"";
+  }
   const batch=state.batch;
   if(batch&&number(batch.total)>0&&batch.status!=="idle"){
     const current=(Array.isArray(batch.items)?batch.items:[]).find(item=>number(item.index)===number(batch.current_index,-1));

@@ -1334,7 +1334,8 @@ class PlacePlanner:
              candidate_filter: Optional[Callable[[float, float], bool]] = None,
              strict: bool = False, fixed_xy: bool = False,
              pose_filter: Optional[Callable[[float, float, float], bool]] = None,
-             avoid_poses: Sequence[Sequence[float]] = ()) -> PlacePlan:
+             avoid_poses: Sequence[Sequence[float]] = (),
+             cancelled: Optional[Callable[[], bool]] = None) -> PlacePlan:
         """
         Return a PlacePlan for releasing into zone (poses in the base frame, m).
 
@@ -1382,10 +1383,12 @@ class PlacePlanner:
         if held is not None and _finite(L) and _finite(W) and max(L, W) > 0.0:
             if strict:
                 candidate = self._strict_release(zone, held, occupied, avoid, lower,
-                                                 fixed_xy, candidate_filter, pose_filter, avoid_poses)
+                                                 fixed_xy, candidate_filter, pose_filter, avoid_poses,
+                                                 cancelled)
                 if candidate is None:
                     return PlacePlan(zone.name, eye, eye.copy(), eye.copy(), self.open_width,
-                                     False, 'no_clear_supported_release')
+                                     False, 'planning_cancelled' if cancelled and cancelled()
+                                     else 'no_clear_supported_release')
                 x, y, ang, info = candidate
             else:
                 x, y, ang, info = self.release_pose(zone, held, occupied, center_first, pending,
@@ -1419,7 +1422,7 @@ class PlacePlanner:
                          open_width=open_w)
 
     def _strict_release(self, zone, held, occupied, avoid, lower, fixed_xy,
-                        candidate_filter, pose_filter, avoid_poses):
+                        candidate_filter, pose_filter, avoid_poses, cancelled=None):
         """Search only fully clear candidates; an exact point never drifts."""
         L, W = sorted((float(held['length']), float(held['width'])), reverse=True)
         grip = float(held.get('grip_width', W) or W)
@@ -1436,6 +1439,8 @@ class PlacePlanner:
                     for i in range(-nx, nx + 1) for j in range(-ny, ny + 1)]
             candidates += sorted(grid, key=lambda p: math.hypot(p[0]-center[0], p[1]-center[1]))
         for x, y in candidates:
+            if cancelled is not None and cancelled():
+                return None
             axis_offset = float(held.get('axis_offset', -math.pi / 2.0))
             axes = self._axes(zone, x, y, L, W, bool(held.get('elongated')))
             angles = [(axis, neutral_closing_angle(x, y) if axis is None else
@@ -1450,6 +1455,8 @@ class PlacePlanner:
                     return None
                 angles = [(required + axis_offset if held.get('elongated') else None, required)]
             for axis, closing in angles:
+                if cancelled is not None and cancelled():
+                    return None
                 delta = closing - float(held.get('grasp_closing', closing))
                 c, s = math.cos(delta), math.sin(delta)
                 offset = held.get('center_offset', (0.0, 0.0))

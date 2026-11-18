@@ -119,7 +119,7 @@ def test_transfer_cannot_reanchor_saved_grip_for_ik(monkeypatch):
     runner, target, _grasp, temporary = transfer_scene()
     original = runner._held_recovery_context['grasp'].T_grasp.copy()
 
-    def reanchor(_arm, gp, _pp, *_args):
+    def reanchor(_arm, gp, _pp, *_args, **_kwargs):
         gp.T_grasp[0, 3] += .001
         return True, '', {}
 

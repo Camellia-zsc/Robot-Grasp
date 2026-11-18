@@ -10,7 +10,9 @@ import copy
 import logging
 import math
 import threading
+import time
 from collections import deque
+from contextlib import nullcontext
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 from typing import Any, Callable, Mapping, Optional
@@ -50,7 +52,41 @@ _STAGE_MESSAGES = {
     'verify_close': '检查是否夹住方块', 'dropped': '检查抬升后的夹持状态',
     'dropped_in_transit': '检查移动后的夹持状态',
     'inspect_lift': '保持夹持并抬升到观察高度', 'inspect_place': '从侧上方观察目标区域空位',
+    'placement_planning': '保持夹持，正在检查安全放置点',
 }
+
+
+class _PlacementInterrupted(Exception):
+    pass
+
+
+class _PlacementBudget:
+    """Bound computation only; camera motions do not consume this budget."""
+
+    def __init__(self, arm, stop, seconds=45.):
+        self.arm, self.stop = arm, stop
+        self.remaining = float(seconds)
+        self.deadline = None
+
+    def cancelled(self):
+        return (self.stop.is_set() or self.remaining <= 0 or
+                (self.deadline is not None and time.monotonic() >= self.deadline))
+
+    def run(self, fn, *args, **kwargs):
+        if self.cancelled():
+            raise _PlacementInterrupted()
+        started = time.monotonic()
+        self.deadline = started + self.remaining
+        scope = getattr(self.arm, 'planning_scope', None)
+        try:
+            with scope(self.cancelled) if scope is not None else nullcontext():
+                value = fn(*args, **kwargs)
+                if self.cancelled():
+                    raise _PlacementInterrupted()
+                return value
+        finally:
+            self.remaining -= time.monotonic() - started
+            self.deadline = None
 
 
 class _Cancellation(threading.Event):
@@ -320,15 +356,43 @@ class SimulationSession:
         return None
 
     def _before_release(self, grasp, place, width, result):
+        if self.cancel_event.is_set():
+            return None
+        budget = _PlacementBudget(self.arm, self.cancel_event)
+        try:
+            return self._refine_release(grasp, place, width, result, budget)
+        except _PlacementInterrupted:
+            reason = ('aborted' if self.cancel_event.is_set()
+                      else 'placement_planning_budget_exceeded')
+            result.detail['placement_planning_reason'] = reason
+            if not self.cancel_event.is_set():
+                self._emit('placement_changed', {
+                    'message': '本轮放置规划计算已达时间预算，仍保持夹持，将反馈后重新规划',
+                    'reason': reason})
+            return None
+
+    def _refine_release(self, grasp, place, width, result, budget):
         """At the destination hover, measure occupancy before choosing a final slot."""
         target, destination, zone_name, options = self._active_placement
         self._apply_interventions()
+        self._on_stage('placement_planning')
         self._emit('inspect_place', {'message': '已到目标区域上方，正在局部确认空位'})
         from .observation_policy import merge_local_detections, measurement_visible
-        from .placement_observation import (candidate_visibility_filter, safe_inspection_poses,
+        from .placement_observation import (candidate_visibility_filter, iter_safe_inspection_poses,
                                              safe_inspection_route)
         from ..core.extrinsics import camera_pose_in_base
         neighbors = list(self._observed_detections)
+        last_progress = [0.]
+        def progress(fields):
+            now = time.monotonic()
+            if self.cancel_event.is_set() or now - last_progress[0] < 1.:
+                return
+            last_progress[0] = now
+            count = fields.get('checked')
+            message = ('正在检查安全放置点，仍保持夹持' if count is None else
+                       '正在检查观察视角，已检查 %d 个，仍保持夹持' % count)
+            self._emit('placement_progress', dict(fields, message=message))
+        self._emit('placement_planning', {'message': '正在检查安全放置点，仍保持夹持'})
         def measure():
             nonlocal neighbors
             revision = self._environment_revision
@@ -345,15 +409,17 @@ class SimulationSession:
                         nominal=self.runner.nominal.get(target.label),
                         max_open_width=self.runner.placer.open_width)
             updated, why = self.runner.replan_release(target, grasp, place, width, neighbors,
-                                                      observation_filter=visible, **options)
+                              observation_filter=visible, cancelled=budget.cancelled,
+                              progress=progress, **options)
             return updated, why, revision
-        updated, why, revision = measure()
+        updated, why, revision = budget.run(measure)
         if updated is None:
             # Extra views only help when the measurements admit a reachable
             # release. Known occupancy can already rule every candidate out;
             # raising the held object again cannot resolve that obstruction.
-            capacity, capacity_why = self.runner.replan_release(
-                target, grasp, place, width, neighbors, **options)
+            capacity, capacity_why = budget.run(self.runner.replan_release,
+                target, grasp, place, width, neighbors, cancelled=budget.cancelled,
+                progress=progress, **options)
             if capacity is None:
                 why = '当前测量下无可确认的放置方案：' + str(capacity_why)
             else:
@@ -365,35 +431,45 @@ class SimulationSession:
                 # The pose generator bounds rotations above the table. Actual
                 # obstacles are checked against each full swept route below,
                 # so a distant tall item cannot mandate an impossible lift.
-                poses, _minimum = safe_inspection_poses(self.arm, grasp, T_fc,
+                poses = iter_safe_inspection_poses(self.arm, grasp, T_fc,
                                  self.runner.T_flange_tcp, xy, table,
                                  table_z=table, free_tilt_deg=self.runner.free_tilt,
                                  nominal=self.runner.nominal.get(target.label),
-                                 intrinsics=self.camera.intrinsics())
+                                 intrinsics=self.camera.intrinsics(),
+                                 cancelled=budget.cancelled, progress=progress)
                 observed_views = 0
-                for inspection in poses:
+                sentinel = object()
+                while True:
+                    inspection = budget.run(next, poses, sentinel)
+                    if inspection is sentinel:
+                        break
                     current = self.arm.get_tcp_pose().value.copy()
-                    route, route_why = safe_inspection_route(
+                    route, route_why = budget.run(safe_inspection_route,
                         self.arm, grasp, current, inspection, neighbors, width,
                         table_z=table, nominal=self.runner.nominal.get(target.label),
                         neighbor_nominal=self.runner.nominal,
-                        free_tilt_deg=self.runner.free_tilt)
+                        free_tilt_deg=self.runner.free_tilt,
+                        cancelled=budget.cancelled, progress=progress)
                     if not route:
                         why = route_why
                         continue
                     observed_views += 1
                     route_revision = self._environment_revision
                     for waypoint in route:
+                        if self.cancel_event.is_set():
+                            raise _PlacementInterrupted()
                         self._apply_interventions()
                         if self._environment_revision != route_revision:
                             break
                         self.runner.skill._move(result, 'inspect_place', waypoint, True)
                         self.runner.skill._verify_held(result, 'dropped_in_transit')
-                    updated, why, revision = measure()
+                    self._on_stage('placement_planning')
+                    updated, why, revision = budget.run(measure)
                     if updated is not None or observed_views >= 4:
                         break
         self._active_revision = revision
         if updated is None:
+            result.detail['placement_planning_reason'] = str(why)
             self._emit('placement_changed', {'message': '当前测量下无法确认安全放置方案，将保持夹持', 'reason': why})
             return None
         self._observed_detections = copy.deepcopy(neighbors)
@@ -1024,6 +1100,7 @@ class SimulationSession:
                     'zone': zone_name, 'duration': 0.0})
         if result is not None:
             summary['diagnostics'] = str(result.detail.get('last_motion_detail') or
+                                         result.detail.get('placement_planning_reason') or
                                          result.detail.get('reason') or why or '')[:500]
         summary['object_id'] = object_id
         summary['source_xy'] = det.center_base[:2].tolist()

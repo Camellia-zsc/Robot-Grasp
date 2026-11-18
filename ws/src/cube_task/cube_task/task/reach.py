@@ -36,6 +36,14 @@ DEFAULT_MAX_TILT_FREE_DEG = 40.0
 RELEASE_WORKSPACE_MARGIN = 0.002
 
 
+def _planning_cancelled(arm):
+    predicate = getattr(arm, '_planning_cancelled', None)
+    if callable(predicate) and predicate():
+        return True
+    event = getattr(arm, 'abort_event', None)
+    return bool(event is not None and event.is_set())
+
+
 def accepts_kwarg(fn, name: str) -> bool:
     """Return True when callable fn takes keyword argument name (or **kwargs)."""
     if fn is None:
@@ -79,6 +87,8 @@ def reach_adjust(arm, T_base_tcp: np.ndarray, q_seed: Optional[Sequence[float]] 
     default (max_tilt_from_down_deg).
     """
     T = np.asarray(T_base_tcp, dtype=float)
+    if _planning_cancelled(arm):
+        return None, 0.0, 'aborted'
     fn = getattr(arm, 'find_reachable_tilt', None)
     if fn is not None:
         if max_tilt_deg is not None and accepts_kwarg(fn, 'max_tilt_deg'):
@@ -95,6 +105,8 @@ def reach_adjust(arm, T_base_tcp: np.ndarray, q_seed: Optional[Sequence[float]] 
 
 
 def _check(arm, T: np.ndarray, max_tilt_deg: Optional[float]) -> Tuple[bool, str]:
+    if _planning_cancelled(arm):
+        return False, 'aborted'
     chk = getattr(arm, 'check_reachable', None)
     if chk is None:
         return True, ''
@@ -146,11 +158,15 @@ def reach_lowered(arm, T_base_tcp: np.ndarray, floor_z: Optional[float] = None,
     why = ''
     if keep_R is not None and vertical_first:
         for z in zs:
+            if _planning_cancelled(arm):
+                return None, 0.0, 0.0, 'aborted'
             Tk = _at_z(T0, z, keep_R)
             ok, why = _check(arm, Tk, max_tilt_deg)
             if ok:
                 return Tk, _tilt_deg(Tk), z0 - z, ''
     for z in zs:
+        if _planning_cancelled(arm):
+            return None, 0.0, 0.0, 'aborted'
         if keep_R is not None and not vertical_first:
             Tk = _at_z(T0, z, keep_R)
             ok, why = _check(arm, Tk, max_tilt_deg)
@@ -164,7 +180,8 @@ def reach_lowered(arm, T_base_tcp: np.ndarray, floor_z: Optional[float] = None,
 
 def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = None,
                       free_tilt_deg: Optional[float] = None,
-                      report: Optional[dict] = None) -> Tuple[bool, str, dict]:
+                      report: Optional[dict] = None, held_only: bool = False
+                      ) -> Tuple[bool, str, dict]:
     """
     Replace the poses of a GraspPlan and PlacePlan in place with reachable ones.
 
@@ -177,6 +194,8 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
     leaning. A free-space pose that stays out of reach is lowered down to
     floors[name] (m, base z; missing = never lowered). report (dict) gets
     'lowered' {name: m} of the lowered poses.
+    held_only checks only release/pre-place/retreat and freezes the physically
+    completed grasp; it cannot replan already executed grasp/lift motions.
     """
     reason = release_workspace_reason(arm, place.T_release[:2, 3])
     if reason:
@@ -185,7 +204,11 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
     new = {}
     tilts = {}
     lowered = {}
-    for name, obj, attr in (('grasp', grasp, 'T_grasp'), ('release', place, 'T_release')):
+    contacts = (('release', place, 'T_release'),) if held_only else (
+        ('grasp', grasp, 'T_grasp'), ('release', place, 'T_release'))
+    for name, obj, attr in contacts:
+        if _planning_cancelled(arm):
+            return False, 'aborted', tilts
         T2, tilt, why = reach_adjust(arm, getattr(obj, attr))
         if T2 is None:
             return False, '%s: %s' % (name, why), tilts
@@ -194,7 +217,9 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
     joined = {'pre_grasp': ('grasp', grasp, 'T_pre'), 'lift': ('grasp', grasp, 'T_lift'),
               'pre_place': ('release', place, 'T_pre'),
               'retreat': ('release', place, 'T_retreat')}
-    for name in FREE_POSES:
+    for name in (('pre_place', 'retreat') if held_only else FREE_POSES):
+        if _planning_cancelled(arm):
+            return False, 'aborted', tilts
         ref, obj, attr = joined[name]
         T2, tilt, dz, why = reach_lowered(arm, getattr(obj, attr), floors.get(name),
                                           free_tilt_deg, keep_R=new[ref][2][:3, :3],
@@ -206,7 +231,9 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
         if dz > 1e-9:
             lowered[name] = round(dz, 4)
     order = ('pre_grasp', 'grasp', 'lift', 'pre_place', 'release', 'retreat')
-    tilts = {k: tilts[k] for k in order}
+    if _planning_cancelled(arm):
+        return False, 'aborted', tilts
+    tilts = {k: tilts[k] for k in order if k in tilts}
     for obj, attr, T2 in new.values():
         setattr(obj, attr, T2)
     if report is not None:

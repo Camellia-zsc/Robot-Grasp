@@ -1258,7 +1258,8 @@ class TaskRunner:
         return result, ''
 
     def replan_release(self, det, gp, pp, width, neighbors, placement_zone=None,
-                       placement_polygon=None, exact_xy=False, observation_filter=None):
+                       placement_polygon=None, exact_xy=False, observation_filter=None,
+                       cancelled=None, progress=None):
         """Plan the held object's release from fresh measured surroundings.
 
         This is the stationary ``before_release`` seam, not another grasp or
@@ -1269,7 +1270,15 @@ class TaskRunner:
         """
         from .reach import adjust_plan_poses, release_workspace_reason
 
-        if self._aborted() or not self._healthy():
+        def interrupted():
+            return self._aborted() or bool(cancelled is not None and cancelled())
+
+        def interruption_reason():
+            return 'aborted' if self._aborted() else 'placement_planning_budget_exceeded'
+
+        if interrupted():
+            return None, interruption_reason()
+        if not self._healthy():
             return None, 'arm stopped or unhealthy before release'
         try:
             width = float(width)
@@ -1317,28 +1326,42 @@ class TaskRunner:
                              *dims, float(other.yaw)))
         allowed = self._strict_place_filter(det, planning_grasp, neighbors, polygon)
         def measured_allowed(x, y, closing):
-            return (allowed(x, y, closing) and
-                    (observation_filter is None or observation_filter(x, y, closing)))
+            return (not interrupted() and
+                    (observation_filter is None or observation_filter(x, y, closing)) and
+                    allowed(x, y, closing))
         avoided, avoided_poses = [], []
         why = 'no clear reachable position in the requested destination'
-        for _ in range(RELEASE_RETRIES + 1):
+        for attempt in range(RELEASE_RETRIES + 1):
+            if interrupted():
+                return None, interruption_reason()
+            if progress is not None:
+                progress({'phase': 'release_candidates', 'attempt': attempt + 1,
+                          'max_attempts': RELEASE_RETRIES + 1})
             candidate = self.placer.plan(
                 zone, held, transit, footprint=self._footprint(det), occupied=occupied,
                 held=shape, avoid=avoided, strict=True, fixed_xy=bool(exact_xy),
                 avoid_poses=avoided_poses, pose_filter=measured_allowed,
                 candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
                 center_first=self._center_first(zone.name),
-                lower=self.release_lower.get(det.label, 0.0))
+                lower=self.release_lower.get(det.label, 0.0), cancelled=interrupted)
+            if interrupted():
+                return None, interruption_reason()
             if not candidate.feasible:
                 return None, candidate.reason or why
             info = dict(self.placer.last_info)
             xy = tuple(info['xy'])
             ok, why, _tilts = adjust_plan_poses(
                 self.arm, planning_grasp, candidate,
-                self._floors(det, planning_grasp, candidate, held), self.free_tilt)
+                self._floors(det, planning_grasp, candidate, held), self.free_tilt,
+                held_only=True)
+            if interrupted():
+                return None, interruption_reason()
             if ok:
                 ok, why = self._adjust_strict_release(
-                    det, planning_grasp, candidate, neighbors, polygon, xy, held)
+                    det, planning_grasp, candidate, neighbors, polygon, xy, held,
+                    held_only=True)
+            if interrupted():
+                return None, interruption_reason()
             if ok and observation_filter is not None:
                 closing = math.atan2(float(candidate.T_release[1, 1]),
                                      float(candidate.T_release[0, 1]))
@@ -1348,6 +1371,8 @@ class TaskRunner:
             if ok and not np.allclose(planning_grasp.T_grasp, gp.T_grasp, atol=1e-7, rtol=0):
                 ok, why = False, 'release planning would change the held grasp transform'
             if ok:
+                if interrupted():
+                    return None, interruption_reason()
                 self._event('decision', action='replan_release', label=det.label, zone=zone.name,
                             release_xyz=[round(float(v), 4) for v in candidate.T_release[:3, 3]],
                             place=info, observed_neighbors=len(occupied),
@@ -1663,9 +1688,10 @@ class TaskRunner:
             return True
         return allowed
 
-    def _adjust_strict_release(self, det, gp, pp, neighbors, polygon, desired_xy, held):
+    def _adjust_strict_release(self, det, gp, pp, neighbors, polygon, desired_xy, held,
+                               held_only=False):
         """Recheck final leaned poses and compensate their measured center shift."""
-        from .reach import adjust_plan_poses
+        from .reach import adjust_plan_poses, _planning_cancelled
 
         desired = np.asarray(desired_xy, float)
         table = detection_table_z(det) or 0.0
@@ -1676,6 +1702,8 @@ class TaskRunner:
         source_axis = np.array([math.cos(float(det.yaw or 0)), math.sin(float(det.yaw or 0)), 0])
         allowed = self._strict_place_filter(det, gp, neighbors, polygon)
         for _ in range(4):
+            if _planning_cancelled(self.arm):
+                return False, 'aborted'
             rotation = pp.T_release[:3, :3] @ gp.T_grasp[:3, :3].T
             if cloud is not None:
                 carried_cloud = (cloud - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3]
@@ -1687,7 +1715,7 @@ class TaskRunner:
                 for T in (pp.T_pre, pp.T_release, pp.T_retreat):
                     T[:2, 3] += delta
                 ok, why, _tilts = adjust_plan_poses(self.arm, gp, pp,
-                                                   self._floors(det, gp, pp, held), self.free_tilt)
+                    self._floors(det, gp, pp, held), self.free_tilt, held_only=held_only)
                 if not ok:
                     return False, why
                 continue

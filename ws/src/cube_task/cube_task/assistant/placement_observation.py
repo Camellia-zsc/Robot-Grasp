@@ -5,6 +5,7 @@ robot's public reachability check are inputs. No world state is read here.
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
 import math
 
 import numpy as np
@@ -112,19 +113,23 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
     return allowed
 
 
-def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
-                          highest_obstacle, table_z=0., clearance=.04,
-                          free_tilt_deg=40., nominal=None, intrinsics=None):
-    """Propose reachable TCP poses keeping the held object above all obstacles.
+def _planning_cancelled(arm, cancelled=None):
+    if cancelled is not None and cancelled():
+        return True
+    scoped = getattr(arm, '_planning_cancelled', None)
+    if scoped is not None and scoped():
+        return True
+    event = getattr(arm, 'abort_event', None)
+    return event is not None and event.is_set()
 
-    Callers first lift vertically to at least ``minimum_tcp_z`` before moving
-    sideways, then use their existing guarded motion path. The bound uses the
-    farthest measured/nominal object corner from the *actual grasp*, so it also
-    covers intermediate rotations. This function sends no motion commands.
-    Return (poses, minimum_tcp_z); an empty list means hold and report inability
-    to inspect, never release blindly.
-    """
-    check = getattr(arm, 'check_reachable', None)
+
+def _planning_call(arm, cancelled, function, *args, **kwargs):
+    scope = getattr(arm, 'planning_scope', None)
+    with scope(cancelled) if scope is not None and cancelled is not None else nullcontext():
+        return function(*args, **kwargs)
+
+
+def _inspection_geometry(grasp, nominal, highest_obstacle, table_z, clearance):
     length, width, height = _dimensions(grasp.target, nominal)
     det = grasp.target
     table = detection_table_z(det)
@@ -133,9 +138,50 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
     xy = _rectangle(np.asarray(det.center_base[:2]), length, width, float(det.yaw or 0.))
     corners = np.vstack([np.column_stack([xy, np.full(4, z)]) for z in (table, table + height)])
     radius = float(np.max(np.linalg.norm(corners - grasp.T_grasp[:3, 3], axis=1)))
-    minimum_tcp_z = max(float(table_z), float(highest_obstacle)) + float(clearance) + radius
+    minimum = max(float(table_z), float(highest_obstacle)) + float(clearance) + radius
+    return length, width, corners, minimum
+
+
+def _inspection_visibility_score(T_bc, points, sizes, starts, held_polygon, intrinsics):
+    """Project all 32 support groups once, preserving their original ranking."""
+    T_cb = inv_T(T_bc)
+    camera = points @ T_cb[:3, :3].T + T_cb[:3, 3]
+    uv = camera[:, :2] / np.maximum(camera[:, 2:3], 1e-9)
+    inside = camera[:, 2] > 1e-6
+    if intrinsics is not None:
+        inside &= ((uv[:, 0] * intrinsics.fx + intrinsics.cx >= 8)
+                   & (uv[:, 0] * intrinsics.fx + intrinsics.cx <= intrinsics.width - 9)
+                   & (uv[:, 1] * intrinsics.fy + intrinsics.cy >= 8)
+                   & (uv[:, 1] * intrinsics.fy + intrinsics.cy <= intrinsics.height - 9))
+    if held_polygon is not None:
+        inside &= ~points_in_polygon(uv, held_polygon, margin=.015)
+    counts = np.add.reduceat(inside, starts, dtype=np.int64)
+    # Python sum retains the old group-by-group floating-point addition order.
+    return int(np.count_nonzero(counts == sizes)), sum((counts / sizes).tolist())
+
+
+def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
+                              highest_obstacle, table_z=0., clearance=.04,
+                              free_tilt_deg=40., nominal=None, intrinsics=None, *,
+                              cancelled=None, progress=None, max_poses=12, max_checks=None):
+    """Yield reachable held-camera poses, spending IK only as consumed.
+
+    Callers first lift vertically to at least ``minimum_tcp_z`` before moving
+    sideways, then use their existing guarded motion path. The bound uses the
+    farthest measured/nominal object corner from the *actual grasp*, so it also
+    covers intermediate rotations. This function sends no motion commands.
+    Cancellation or an exhausted reachability-check budget ends the iterator.
+    ``progress`` receives small dictionaries; no motion commands are sent.
+    """
+    if (_planning_cancelled(arm, cancelled) or (max_poses is not None and max_poses <= 0)
+            or (max_checks is not None and max_checks <= 0)):
+        return
+    check = getattr(arm, 'check_reachable', None)
+    length, width, corners, minimum_tcp_z = _inspection_geometry(
+        grasp, nominal, highest_obstacle, table_z, clearance)
+    det = grasp.target
     if check is None:
-        return [], minimum_tcp_z
+        return
     target = np.r_[np.asarray(target_xy, float), float(table_z) + .015]
     radial = target[:2] / max(float(np.linalg.norm(target[:2])), 1e-6)
     lateral = np.array([-radial[1], radial[0]])
@@ -158,6 +204,8 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
     support = []
     opening = float(grasp.expected_width) + RELEASE_OPEN_EXTRA
     for closing in closing_angles:
+        if _planning_cancelled(arm, cancelled):
+            return
         delta = closing - float(grasp.closing_angle)
         c, s = math.cos(delta), math.sin(delta)
         tcp_xy = target[:2] - np.array([[c, -s], [s, c]]) @ offset
@@ -167,26 +215,19 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
                                2 * FINGER_HALF_BAND, closing)]
         samples = np.vstack([_samples(p, .012) for p in polygons])
         support.append(np.column_stack([samples, np.full(len(samples), float(table_z) + .001)]))
+    support_sizes = np.array([len(points) for points in support])
+    support_starts = np.r_[0, np.cumsum(support_sizes)[:-1]]
+    support_points = np.vstack(support)
 
     def visibility_score(T_bc):
-        T_cb = inv_T(T_bc)
-        clear, quality = 0, 0.
-        for points in support:
-            camera = points @ T_cb[:3, :3].T + T_cb[:3, 3]
-            uv = camera[:, :2] / np.maximum(camera[:, 2:3], 1e-9)
-            inside = camera[:, 2] > 1e-6
-            if intrinsics is not None:
-                inside &= ((uv[:, 0] * intrinsics.fx + intrinsics.cx >= 8)
-                           & (uv[:, 0] * intrinsics.fx + intrinsics.cx <= intrinsics.width - 9)
-                           & (uv[:, 1] * intrinsics.fy + intrinsics.cy >= 8)
-                           & (uv[:, 1] * intrinsics.fy + intrinsics.cy <= intrinsics.height - 9))
-            if held_polygon is not None:
-                inside &= ~points_in_polygon(uv, held_polygon, margin=.015)
-            clear += int(np.all(inside))
-            quality += float(np.mean(inside))
-        return clear, quality
+        if _planning_cancelled(arm, cancelled):
+            return 0, 0.
+        return _inspection_visibility_score(T_bc, support_points, support_sizes,
+                                            support_starts, held_polygon, intrinsics)
 
     proposals = []
+    if progress is not None:
+        progress({'phase': 'inspection_candidates', 'generated': 0, 'checked': 0, 'reachable': 0})
     for height in (.27, .32, .38, .44):
         # Short baselines also cover staging points near the robot. The longer
         # original baselines can otherwise put every proposed TCP inside the
@@ -198,6 +239,8 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
                                        (0., -.10), (-.08, .08), (-.08, -.08),
                                        (.08, .08), (.08, -.08), (0., .14), (0., -.14),
                                        (-.04, .14), (-.04, -.14), (.04, .14), (.04, -.14)):
+                if _planning_cancelled(arm, cancelled):
+                    return
                 gaze = target + np.r_[forward * radial + sideways * lateral, 0.]
                 z = gaze - eye
                 z /= np.linalg.norm(z)
@@ -213,20 +256,48 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
                     T_tcp = T_bc @ T_camera_tcp
                     if float(T_tcp[2, 3]) >= minimum_tcp_z:
                         proposals.append((visibility_score(T_bc), T_tcp))
-    poses = []
+    if progress is not None:
+        progress({'phase': 'inspection_reachability', 'generated': len(proposals),
+                  'checked': 0, 'reachable': 0})
+    checked, reachable = 0, 0
     for _score, T_tcp in sorted(proposals, key=lambda item: item[0], reverse=True):
+        if (_planning_cancelled(arm, cancelled)
+                or (max_checks is not None and checked >= max_checks)):
+            return
         kwargs = {'max_tilt_deg': free_tilt_deg} if accepts_kwarg(check, 'max_tilt_deg') else {}
-        ok, _reason = check(T_tcp, **kwargs)
+        ok, _reason = _planning_call(arm, cancelled, check, T_tcp, **kwargs)
+        checked += 1
+        if _planning_cancelled(arm, cancelled):
+            return
+        reachable += int(ok)
+        if progress is not None and (ok or checked == 1 or checked % 16 == 0):
+            progress({'phase': 'inspection_reachability', 'generated': len(proposals),
+                      'checked': checked, 'reachable': reachable})
+        if _planning_cancelled(arm, cancelled):
+            return
         if ok:
-            poses.append(T_tcp)
-            if len(poses) >= 12:
-                break
-    return poses, minimum_tcp_z
+            yield T_tcp
+            if max_poses is not None and reachable >= max_poses:
+                return
+
+
+def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
+                          highest_obstacle, table_z=0., clearance=.04,
+                          free_tilt_deg=40., nominal=None, intrinsics=None, *,
+                          cancelled=None, progress=None, max_poses=12, max_checks=None):
+    """Compatible list wrapper; cancelled searches never offer motion poses."""
+    _length, _width, _corners, minimum = _inspection_geometry(
+        grasp, nominal, highest_obstacle, table_z, clearance)
+    poses = list(iter_safe_inspection_poses(
+        arm, grasp, T_flange_camera, T_flange_tcp, target_xy, highest_obstacle,
+        table_z, clearance, free_tilt_deg, nominal, intrinsics, cancelled=cancelled,
+        progress=progress, max_poses=max_poses, max_checks=max_checks))
+    return ([] if _planning_cancelled(arm, cancelled) else poses), minimum
 
 
 def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
                           table_z=0., nominal=None, neighbor_nominal=None,
-                          free_tilt_deg=40.):
+                          free_tilt_deg=40., *, cancelled=None, progress=None, max_checks=None):
     """Return a fully prechecked linear held-camera route, or hold position.
 
     Endpoint reachability alone does not establish a reachable lift or a safe
@@ -235,6 +306,8 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
     path, and invokes the arm's normal linear-path preflight before any motion.
     The small interval padding bounds translation plus rotation between samples.
     """
+    if _planning_cancelled(arm, cancelled):
+        return [], 'aborted'
     import cv2
     from ..robot.kinematics import rot_log
     from ..robot.safety import interpolate_pose
@@ -257,6 +330,8 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
     radius = max(float(np.max(np.linalg.norm(b, axis=1))) for b in local_boxes)
     obstacles = []
     for other in neighbors:
+        if _planning_cancelled(arm, cancelled):
+            return [], 'aborted'
         if other is det or other.center_base is None:
             continue
         try:
@@ -281,6 +356,8 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
         return True
 
     def clear(T, pad):
+        if _planning_cancelled(arm, cancelled):
+            return False
         for local in local_boxes:
             carried = local @ T[:3, :3].T + T[:3, 3]
             low, high = float(carried[:, 2].min()), float(carried[:, 2].max())
@@ -307,16 +384,28 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
     raised[2, 3] = max(float(current[2, 3]), float(inspection[2, 3]))
     choices.append([raised, inspection])
     last_reason = 'no collision-free reachable inspection route'
-    for route in choices:
+    checks = 0
+    for route_index, route in enumerate(choices):
+        if _planning_cancelled(arm, cancelled):
+            return [], 'aborted'
+        if progress is not None:
+            progress({'phase': 'inspection_route', 'route': route_index + 1, 'checked': checks})
         start = current
         joints = arm.get_joints() if hasattr(arm, 'get_joints') else None
         seed = None if joints is None else joints.value
         accepted = True
         for end in route:
+            if _planning_cancelled(arm, cancelled):
+                return [], 'aborted'
+            if max_checks is not None and checks >= max_checks:
+                return [], 'inspection route check budget exhausted'
             kwargs = {'max_tilt_deg': free_tilt_deg} if accepts_kwarg(check, 'max_tilt_deg') else {}
             if accepts_kwarg(check, 'q_seed'):
                 kwargs['q_seed'] = seed
-            ok, last_reason = check(end, **kwargs)
+            ok, last_reason = _planning_call(arm, cancelled, check, end, **kwargs)
+            checks += 1
+            if _planning_cancelled(arm, cancelled):
+                return [], 'aborted'
             if not ok:
                 accepted = False
                 break
@@ -326,17 +415,30 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
             pad = .008 + (distance + radius * angle) / (2 * count)
             samples = [interpolate_pose(start, end, k / count) for k in range(count + 1)]
             if not all(clear(pose, pad) for pose in samples):
+                if _planning_cancelled(arm, cancelled):
+                    return [], 'aborted'
                 last_reason, accepted = 'inspection swept held object or fingers overlaps a measured obstacle', False
                 break
             native = getattr(arm, '_check_linear_path', None)
             if native is not None:
-                ok, last_reason = native(start, end, seed, free_tilt_deg)
+                ok, last_reason = _planning_call(arm, cancelled, native, start, end, seed, free_tilt_deg)
+                if _planning_cancelled(arm, cancelled):
+                    return [], 'aborted'
                 if ok and getattr(arm, '_kin', None) is not None:
-                    seed, _ep, _eo = arm._ik_tcp(end, seed)
+                    seed, _ep, _eo = _planning_call(arm, cancelled, arm._ik_tcp, end, seed)
+                    if _planning_cancelled(arm, cancelled):
+                        return [], 'aborted'
             else:
                 ok = True
                 for pose in samples:
-                    ok, last_reason = check(pose, **kwargs)
+                    if _planning_cancelled(arm, cancelled):
+                        return [], 'aborted'
+                    if max_checks is not None and checks >= max_checks:
+                        return [], 'inspection route check budget exhausted'
+                    ok, last_reason = _planning_call(arm, cancelled, check, pose, **kwargs)
+                    checks += 1
+                    if _planning_cancelled(arm, cancelled):
+                        return [], 'aborted'
                     if not ok:
                         break
             if not ok:

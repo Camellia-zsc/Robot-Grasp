@@ -12,6 +12,8 @@ Units: m, rad (config keys ending in _deg are degrees).
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+import inspect
 import logging
 import math
 import threading
@@ -382,8 +384,33 @@ class SafeArm(ArmInterface):
             return None
         return q
 
+    def _planning_cancelled(self) -> bool:
+        predicate = getattr(self, '_planning_cancel', None)
+        return self.abort_event.is_set() or bool(predicate is not None and predicate())
+
+    @contextmanager
+    def planning_scope(self, cancelled):
+        """Bound a serialized planning operation without latching robot stop."""
+        previous = getattr(self, '_planning_cancel', None)
+        self._planning_cancel = (cancelled if previous is None else
+                                 lambda: previous() or (cancelled is not None and cancelled()))
+        try:
+            yield
+        finally:
+            self._planning_cancel = previous
+
     def _ik_tcp(self, T_tcp: np.ndarray, seed: Optional[Sequence[float]]):
-        return self._kin.ik(T_tcp @ self._T_tf, q_seed=seed)
+        if self._planning_cancelled():
+            return None, math.inf, math.inf
+        kwargs = {'q_seed': seed}
+        # Keep alternate/injected kinematics with the old signature compatible.
+        try:
+            parameters = inspect.signature(self._kin.ik).parameters.values()
+            if any(p.name == 'cancelled' or p.kind == p.VAR_KEYWORD for p in parameters):
+                kwargs['cancelled'] = self._planning_cancelled
+        except (TypeError, ValueError):
+            pass
+        return self._kin.ik(T_tcp @ self._T_tf, **kwargs)
 
     def check_reachable(self, T_base_tcp: np.ndarray,
                         q_seed: Optional[Sequence[float]] = None,
@@ -395,6 +422,8 @@ class SafeArm(ArmInterface):
         joints when available. max_tilt_deg: tilt limit of this check
         (SafetyGuard.tilt_limit).
         """
+        if self._planning_cancelled():
+            return False, 'aborted'
         ok, reason = self._guard.check_tcp(T_base_tcp, self._table_z,
                                            max_tilt_deg=max_tilt_deg)
         if not ok:
@@ -404,6 +433,8 @@ class SafeArm(ArmInterface):
         if q_seed is None:
             q_seed = self._current_joints()
         q, ep, eo = self._ik_tcp(np.asarray(T_base_tcp, dtype=float), q_seed)
+        if self._planning_cancelled():
+            return False, 'aborted'
         if q is None:
             return False, ('no IK solution within joint limits (best residual %.4f m, %.2f deg)'
                            % (ep, math.degrees(eo)))
@@ -430,6 +461,8 @@ class SafeArm(ArmInterface):
         k = 0
         limit = self._guard.tilt_limit(max_tilt_deg)
         while k * step <= limit + 1e-9:
+            if self._planning_cancelled():
+                return None, 0.0, 'aborted'
             tilt = k * step
             Tc = tilt_outward(T0, tilt) if k > 0 else T0
             ok, reason = self.check_reachable(Tc, q_seed=q_seed, max_tilt_deg=max_tilt_deg)
@@ -460,11 +493,15 @@ class SafeArm(ArmInterface):
     def _check_linear_path(self, T_from: np.ndarray, T_to: np.ndarray,
                            q_from: Optional[np.ndarray],
                            max_tilt_deg: Optional[float] = None) -> Tuple[bool, str]:
+        if self._planning_cancelled():
+            return False, 'aborted'
         dist = float(np.linalg.norm(T_to[:3, 3] - T_from[:3, 3]))
         ang = float(np.linalg.norm(rot_log(T_from[:3, :3].T @ T_to[:3, :3])))
         n = int(min(_PATH_MAX_SAMPLES, max(2, math.ceil(max(dist, 0.1 * ang) / _PATH_STEP_M))))
         seed = q_from
         for k in range(1, n):
+            if self._planning_cancelled():
+                return False, 'aborted'
             s = k / float(n)
             Ts = interpolate_pose(T_from, T_to, s)
             ok, reason = self._guard.check_tcp(Ts, self._table_z, max_tilt_deg=max_tilt_deg)
@@ -472,6 +509,8 @@ class SafeArm(ArmInterface):
                 return False, 'linear path at %.0f%%: %s' % (100 * s, reason)
             if self._kin is not None:
                 q, ep, eo = self._ik_tcp(Ts, seed)
+                if self._planning_cancelled():
+                    return False, 'aborted'
                 if q is None:
                     return False, ('linear path at %.0f%% has no IK solution (residual %.4f m)'
                                    % (100 * s, ep))

@@ -300,7 +300,7 @@ class PiperKinematics:
         return seeds
 
     def _solve(self, Tt: np.ndarray, q0: np.ndarray, max_iter: int, tol_pos: float,
-               tol_rot: float) -> Tuple[np.ndarray, float, float, bool]:
+               tol_rot: float, cancelled=None) -> Tuple[np.ndarray, float, float, bool]:
         lo, hi = self._lim[:, 0], self._lim[:, 1]
         w = np.array([1.0, 1.0, 1.0, _ROT_WEIGHT, _ROT_WEIGHT, _ROT_WEIGHT])
         q = np.clip(q0, lo, hi)
@@ -310,6 +310,8 @@ class PiperKinematics:
         lam = 1e-3
         stall = 0
         for _ in range(max_iter):
+            if cancelled is not None and cancelled():
+                return q, ep, eo, False
             if ep < tol_pos and eo < tol_rot:
                 return q, ep, eo, True
             J = self._jacobian_from(frames) * w[:, None]
@@ -341,7 +343,7 @@ class PiperKinematics:
 
     def ik(self, T_base_flange: np.ndarray, q_seed: Optional[Sequence[float]] = None,
            max_iter: int = 60, tol_pos: float = 1e-4, tol_rot: float = 1e-3,
-           n_random: int = 4) -> Tuple[Optional[np.ndarray], float, float]:
+           n_random: int = 4, cancelled=None) -> Tuple[Optional[np.ndarray], float, float]:
         """
         Solve joint angles for a flange pose, respecting the joint limits.
 
@@ -352,8 +354,12 @@ class PiperKinematics:
         then those of the best attempt.
 
         Raises ValueError for a malformed target (shape, NaN, not a rotation).
+        An optional cancellation predicate stops between seeds and solver steps;
+        cancellation returns no solution and never changes robot state.
         """
         Tt = _check_pose(T_base_flange, 'T_base_flange')
+        if cancelled is not None and cancelled():
+            return None, math.inf, math.inf
         seeds: List[np.ndarray] = []
         if q_seed is not None:
             seeds.append(self.clamp(q_seed))
@@ -365,7 +371,11 @@ class PiperKinematics:
                 seeds.append(rng.uniform(lo, hi))
         best = (math.inf, math.inf, math.inf)
         for s in seeds:
-            q, ep, eo, ok = self._solve(Tt, s, max_iter, tol_pos, tol_rot)
+            if cancelled is not None and cancelled():
+                return None, best[1], best[2]
+            q, ep, eo, ok = self._solve(Tt, s, max_iter, tol_pos, tol_rot, cancelled)
+            if cancelled is not None and cancelled():
+                return None, ep, eo
             if ok:
                 return q, ep, eo
             c = ep * ep + (_ROT_WEIGHT * eo) ** 2

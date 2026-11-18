@@ -71,7 +71,7 @@ def test_region_final_tilt_failure_retries_another_center():
     runner, target, grasp, previous = scene()
     visited = []
 
-    def final_check(det, gp, pp, neighbors, polygon, desired, held):
+    def final_check(det, gp, pp, neighbors, polygon, desired, held, **kwargs):
         visited.append(tuple(desired))
         return (False, 'leaned finger blocked') if len(visited) == 1 else (True, '')
 
@@ -85,7 +85,7 @@ def test_point_final_tilt_failure_retries_angle_at_the_same_center():
     runner, target, grasp, previous = scene()
     visited = []
 
-    def final_check(det, gp, pp, neighbors, polygon, desired, held):
+    def final_check(det, gp, pp, neighbors, polygon, desired, held, **kwargs):
         visited.append((tuple(desired), pp.T_release[:3, :3].copy()))
         return (False, 'leaned finger blocked') if len(visited) == 1 else (True, '')
 
@@ -150,3 +150,55 @@ def test_missing_fresh_visibility_does_not_allow_blind_release():
     updated, why = runner.replan_release(target, grasp, previous, .05, [target],
                                          observation_filter=lambda *args, **kwargs: False)
     assert updated is None and why == 'no_clear_supported_release'
+
+
+def test_stop_during_visibility_search_does_not_scan_the_remaining_grid():
+    runner, target, grasp, previous = scene()
+    stopped, calls = [], []
+    runner._aborted = lambda: bool(stopped)
+
+    def visibility(*args, **kwargs):
+        calls.append(args)
+        stopped.append(True)
+        return False
+
+    updated, why = runner.replan_release(target, grasp, previous, .05, [target],
+                                         observation_filter=visibility)
+    assert updated is None and why == 'aborted'
+    assert len(calls) == 1
+    assert not runner.events
+
+
+def test_stop_during_reach_check_cannot_publish_a_release(monkeypatch):
+    runner, target, grasp, previous = scene()
+    stopped = []
+    runner._aborted = lambda: bool(stopped)
+
+    def reach(*args, **kwargs):
+        stopped.append(True)
+        return True, '', {}
+
+    monkeypatch.setattr('cube_task.task.reach.adjust_plan_poses', reach)
+    updated, why = runner.replan_release(target, grasp, previous, .05, [target])
+    assert updated is None and why == 'aborted'
+    assert not runner.events
+
+
+def test_held_release_checks_only_future_poses_and_never_replans_the_grasp():
+    from cube_task.task.reach import adjust_plan_poses
+    runner, target, grasp, previous = scene()
+    before = copy.deepcopy(grasp)
+    checked = []
+
+    def reachable(pose):
+        checked.append(pose.copy())
+        # The old source is no longer reachable; the grasp has already happened.
+        return (bool(pose[0, 3] > .3), 'old grasp is not a future motion')
+
+    arm = SimpleNamespace(check_reachable=reachable)
+    ok, why, tilts = adjust_plan_poses(arm, grasp, previous, held_only=True)
+    assert ok, why
+    assert set(tilts) == {'release', 'pre_place', 'retreat'}
+    assert len(checked) == 3
+    for attr in ('T_grasp', 'T_pre', 'T_lift'):
+        np.testing.assert_array_equal(getattr(grasp, attr), getattr(before, attr))

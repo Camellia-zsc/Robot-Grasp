@@ -91,6 +91,8 @@ MIN_GRASP_HEIGHT = 0.008
 RELEASE_HEIGHT_FLAT = 0.015
 #: spread releases: grid step (m) of the fallback search, smallest edge margin it accepts.
 SLOT_GRID_STEP = 0.005
+SLOT_COARSE_GRID_STEP = 0.04
+SLOT_COARSE_MIN_POINTS = 2048
 SLOT_MIN_EDGE = 0.0
 #: a release xy found unreachable bans the release positions this close (m) to it.
 AVOID_RADIUS = 0.012
@@ -1441,16 +1443,34 @@ class PlacePlanner:
                     candidates.append(tuple(float(v) for v in point))
         candidates.append(center)
         if not fixed_xy:
+            c, s = math.cos(zone.yaw), math.sin(zone.yaw)
             nx = int(float(zone.size[0]) / 2 / SLOT_GRID_STEP)
             ny = int(float(zone.size[1]) / 2 / SLOT_GRID_STEP)
-            c, s = math.cos(zone.yaw), math.sin(zone.yaw)
+            # Cover the whole support before spending a bounded phase on
+            # millimetre neighbours of an occupied/unobserved region centre.
+            # Small supports retain fine local alternatives for narrow slots.
+            # Only a grid with enough points to starve a bounded phase benefits
+            # from the coarse pass. All candidates use the same safety checks.
+            if (2 * nx + 1) * (2 * ny + 1) > SLOT_COARSE_MIN_POINTS:
+                coarse_nx = int(float(zone.size[0]) / 2 / SLOT_COARSE_GRID_STEP)
+                coarse_ny = int(float(zone.size[1]) / 2 / SLOT_COARSE_GRID_STEP)
+                coarse = [(center[0] + c * i * SLOT_COARSE_GRID_STEP - s * j * SLOT_COARSE_GRID_STEP,
+                           center[1] + s * i * SLOT_COARSE_GRID_STEP + c * j * SLOT_COARSE_GRID_STEP)
+                          for i in range(-coarse_nx, coarse_nx + 1)
+                          for j in range(-coarse_ny, coarse_ny + 1)]
+                candidates += sorted(coarse, key=lambda p: math.hypot(p[0]-center[0], p[1]-center[1]))
             grid = [(center[0] + c * i * SLOT_GRID_STEP - s * j * SLOT_GRID_STEP,
                      center[1] + s * i * SLOT_GRID_STEP + c * j * SLOT_GRID_STEP)
                     for i in range(-nx, nx + 1) for j in range(-ny, ny + 1)]
             candidates += sorted(grid, key=lambda p: math.hypot(p[0]-center[0], p[1]-center[1]))
+        visited = set()
         for x, y in candidates:
             if cancelled is not None and cancelled():
                 return None
+            key = (round(x, 12), round(y, 12))
+            if key in visited:
+                continue
+            visited.add(key)
             axis_offset = float(held.get('axis_offset', -math.pi / 2.0))
             axes = self._axes(zone, x, y, L, W, bool(held.get('elongated')))
             angles = [(axis, neutral_closing_angle(x, y) if axis is None else

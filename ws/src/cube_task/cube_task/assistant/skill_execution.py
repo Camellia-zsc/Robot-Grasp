@@ -32,13 +32,15 @@ class SkillExecutor:
         session._skill_free_failures = self._free_failures
 
     def capabilities(self):
+        physical = bool(getattr(self.session, '_physics', None))
         return dict(skills=['observe', 'pick', 'place', 'move', 'verify', 'ask', 'finish'],
             observe_modes=['stationary', 'active'],
-            observe_destination_types=['goal', 'zone', 'region', 'original'],
-            destination_types=['goal', 'zone', 'region', 'auto_free', 'original'],
+            observe_destination_types=['goal', 'zone', 'region', 'original', 'on_object'],
+            destination_types=['goal', 'zone', 'region', 'auto_free', 'original', 'on_object'],
             holding_allowed_skills=['observe', 'place', 'ask'],
             active_observe_requires_geometry=True, multi_object_rearrangement=True,
-            restores_original_pose=True)
+            restores_original_pose=True, stacking=physical, physical_stacking=physical,
+            gravity_contacts=physical, physics_backend='mujoco' if physical else 'sim')
 
     def _stopped(self, cancel):
         return self.session.cancel_event.is_set() or (cancel is not None and cancel.is_set())
@@ -247,6 +249,14 @@ class SkillExecutor:
             destination, _yaw = self._resolve(specification, goals)
             if destination['type'] == 'auto_free':
                 raise ValueError('主动观察需要一个已有目的区域或物品位置')
+            if destination['type'] == 'on_object':
+                reference = self._reference(destination['label'])
+                if reference.get('center_base') is None:
+                    raise ValueError('缺少底座的相机位置线索，请先扫描寻找底座')
+                xy = np.asarray(reference['center_base'][:2], float)
+                # Observation can revisit a temporarily occluded measured base;
+                # execution still requires a new complete support measurement.
+                return xy, np.array([[-.07, -.07], [-.07, .07], [.07, .07], [.07, -.07]]) + xy
             options = self._options(destination)
             zone, polygon = options['placement_zone'], options['placement_polygon']
             xy = np.asarray(zone.center[:2], float)
@@ -364,7 +374,8 @@ class SkillExecutor:
         if kind == 'goal':
             goal = self._goal(goals, value.get('index'))
             if goal.get('destination') is not None:
-                return validate_destination(copy.deepcopy(goal['destination']), self.session.scene), None
+                return validate_destination(copy.deepcopy(goal['destination']), self.session.scene,
+                    require_observed=goal['destination'].get('type') != 'on_object'), None
             value = {'type': 'zone', 'name': goal.get('zone_name')}
             kind = 'zone'
         if kind in ('zone', 'named_region'):
@@ -384,6 +395,8 @@ class SkillExecutor:
             return validate_destination({'type': 'point', 'xy': list(xy[:2])}, self.session.scene), float(yaw)
         if kind == 'auto_free':
             return dict(value), None
+        if kind == 'on_object':
+            return validate_destination(dict(value), self.session.scene, require_observed=False), None
         return validate_destination(dict(value), self.session.scene), None
 
     def _options(self, destination):
@@ -454,6 +467,19 @@ class SkillExecutor:
     def _completed_move(self, step, destination, yaw, cancel, *, observe=True):
         """Prove this step's postcondition before spending work on its grasp."""
         session = self.session
+        if destination['type'] == 'on_object':
+            from .stacking import camera_confirmed, audit
+            if self._holding() or not camera_confirmed(session, step['label'], destination):
+                return None
+            det = unique_target(session._last_fresh, step['label'])
+            truth = audit(session, session._evaluation_object(det), destination)
+            return dict(ok=truth.get('success') is True, skipped=True, changed=False,
+                skill=step['skill'], label=step['label'], stage='already_satisfied',
+                camera_verified=True, controller_ok=True, holding=False,
+                verified_revision=session._environment_revision, truth=truth,
+                resolved_destination=copy.deepcopy(destination),
+                message='相机与物理接触确认已叠放，跳过重复抓取' if truth.get('success') else
+                        '已看到叠放目标，物理支撑或落稳尚未确认，未重复抓取')
         if (destination['type'] == 'auto_free' or self._holding() or
                 not getattr(session, 'scene', None)):
             return None
@@ -585,7 +611,19 @@ class SkillExecutor:
         destination, yaw = self._resolve(step.get('destination'), goals)
         automatic = destination['type'] == 'auto_free'
         target = copy.deepcopy(context['det'])
+        context['det'].extra.pop('_stack_support', None)
+        saved_target = getattr(context.get('grasp'), 'target', None)
+        if saved_target is not None:
+            saved_target.extra.pop('_stack_support', None)
+        target.extra.pop('_stack_support', None)
         neighbors = self._stationary()
+        if destination['type'] == 'on_object':
+            from .stacking import planning_options, annotate
+            _options, support = planning_options(session, destination)
+            annotate(context['det'], support)
+            if saved_target is not None:
+                annotate(saved_target, support)
+            annotate(target, support)
         self._check_plan()
         if self._stopped(cancel):
             return self._failure(step, 'aborted', '任务已停止')

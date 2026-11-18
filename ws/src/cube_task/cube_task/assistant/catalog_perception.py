@@ -229,7 +229,8 @@ class SandboxPerception(Perception):
 
     def process(self, frame, T_base_camera, zones=None):
         result = super().process(frame, T_base_camera, zones)
-        changed = False
+        from .stack_perception import refine_supported_objects
+        changed = refine_supported_objects(frame, T_base_camera, zones, result, self, completeness)
         for det in result.detections:
             if det.valid and det.label != 'unknown' and not completeness(det):
                 det.valid = False

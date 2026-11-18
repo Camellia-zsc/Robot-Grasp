@@ -7,6 +7,7 @@ log/
 __pycache__/
 *.py[cod]
 .venv/
+.venv-physics/
 venv*/
 
 # C++ / CMake
@@ -62,3 +63,4 @@ local_validation/capacity_recovery/
 # 仅发布所需 PiPER 模型，排除嵌套仓库元数据和其他模型库文件
 local_assets/mujoco_menagerie/*
 !local_assets/mujoco_menagerie/agilex_piper/
+local_assets/mujoco_menagerie/agilex_piper/_scene_*.xml

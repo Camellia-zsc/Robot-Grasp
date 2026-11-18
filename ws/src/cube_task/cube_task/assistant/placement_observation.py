@@ -47,7 +47,7 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
                                 margin_px=8, depth_tolerance=.008, *, observations=()):
     """Return a pose filter proving full support/finger footprints are observed.
 
-    Every sample must see table depth in at least one supplied fresh view. A
+    Every sample must see the landing plane in a supplied fresh view. A
     foreground object, the carried target itself, a depth hole or image crop
     cannot establish a clear landing area. This complements measured collision
     checks; it never interprets an unobserved area as empty.
@@ -56,6 +56,10 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
     table = detection_table_z(det)
     if table is None:
         raise ValueError('candidate visibility requires a measured table height')
+    stack_support = (det.extra or {}).get('_stack_support')
+    landing_z = table if stack_support is None else float(stack_support['top_z'])
+    if not math.isfinite(landing_z):
+        raise ValueError('candidate visibility requires a measured landing height')
     views = []
     for observed_frame, camera_pose in ((frame, T_base_camera), *observations):
         intr = observed_frame.intrinsics if observed_frame is not None else None
@@ -103,7 +107,7 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
                 box = ((center + signs * [.010, .006, .025]) @ pose[:3, :3].T + pose[:3, 3])
                 fingers.append(cv2.convexHull(box[:, :2].astype(np.float32)).reshape(-1, 2))
         xy = np.vstack([_samples(p, sample_step) for p in [object_polygon] + fingers])
-        points = np.column_stack([xy, np.full(len(xy), table + .001)])
+        points = np.column_stack([xy, np.full(len(xy), landing_z + .001)])
         covered = np.zeros(len(points), bool)
         for T_bc, T_cb, intr, depth in views:
             remaining = np.flatnonzero(~covered)

@@ -1,6 +1,6 @@
 """Camera-to-motion adapter and editable tabletop for the local assistant.
 
-Only the existing kinematic simulator can be constructed here. Perception
+The dashboard supports kinematic and MuJoCo simulation. Perception
 observations are separate from the ground truth published to the viewer; model
 decisions resolve exclusively to detections from the latest observation.
 """
@@ -174,7 +174,14 @@ class SimulationSession:
 
     def __init__(self, seed: int = 0, log_dir: Optional[Path] = None,
                  on_event: Optional[Callable[[str, dict], None]] = None,
-                 realtime: bool = True):
+                 realtime: bool = True, backend: str = 'sim'):
+        if backend not in ('sim', 'mujoco'):
+            raise ValueError('仿真后端必须为 sim 或 mujoco')
+        self.backend = backend
+        self._physics = None
+        self._physics_reference = {}
+        self._idle_stop = threading.Event()
+        self._idle_thread = None
         self.seed = int(seed)
         self.on_event = on_event
         self.cancel_event = _Cancellation()
@@ -238,15 +245,23 @@ class SimulationSession:
                 [float(lo[0]), float(lo[1])], [float(hi[0]), float(lo[1])],
                 [float(hi[0]), float(hi[1])], [float(lo[0]), float(hi[1])]])
         self.cfg.set('perception.roi.exclude_zones', False)
-        self.arm = make_arm(self.cfg, self.clock, sim_world=self.world)
+        if backend == 'mujoco':
+            from .physics import DashboardPhysics
+            self._physics = DashboardPhysics(self.cfg, self.world, self.info, self.clock,
+                                             on_event=self._emit)
+            self.cfg = self._physics.cfg
+            self.arm, physics_camera = self._physics.arm, self._physics.camera
+        else:
+            self.arm = make_arm(self.cfg, self.clock, sim_world=self.world)
         self.operator = Operator(enabled=False)
         self.operator.abort_event = self.cancel_event
         self.arm.set_abort_event(self.cancel_event)
-        self.camera = make_camera(self.cfg, self.clock, sim_world=self.world, arm=self.arm)
+        self.camera = (physics_camera if self._physics is not None else
+                       make_camera(self.cfg, self.clock, sim_world=self.world, arm=self.arm))
         self.logger = _EventLogger(self, log_dir)
         self.runner = TaskRunner(self.cfg, 'Sandbox', self.arm, self.camera,
                                  make_sandbox_perception(self.cfg), self.clock, self.logger,
-                                 operator=self.operator, mode='sim')
+                                 operator=self.operator, mode=backend)
         self._configure_observation_views()
         self._base_view_count = len(self.runner.views)
         self.runner.skill.on_stage = self._on_stage
@@ -277,6 +292,9 @@ class SimulationSession:
                              'message': _STAGE_MESSAGES.get(stage, '正在执行机械臂动作')})
 
     def _tick(self):
+        if getattr(self, '_physics', None) is not None:
+            self._physics.sync()
+            self._check_physical_changes()
         revision = self._environment_revision
         self._apply_interventions()
         # Keep every intervention/control tick, but bound display work in wall
@@ -284,6 +302,56 @@ class SimulationSession:
         if (revision != self._environment_revision or
                 time.monotonic() - self._last_snapshot_wall >= .05):
             self._publish_snapshot()
+
+    def _remember_physics(self):
+        self._physics_reference = {o.name: o.T_base_obj.copy() for o in self.world.objects}
+
+    def _check_physical_changes(self):
+        """Unexpected body motion invalidates camera proofs, including while idle."""
+        if not self._prepared or not self._physics_reference:
+            self._remember_physics()
+            return
+        context = getattr(getattr(self, 'runner', None), '_held_recovery_context', None)
+        active = getattr(self, '_recovery_target', None)
+        active_label = (getattr(context.get('det'), 'label', None) if context else
+                        getattr(active, 'label', None))
+        self._physics.expected_labels = ({active_label} if active_label and
+            self._status in ('executing', 'settling') else set())
+        moving = []
+        for obj in self.world.objects:
+            old = self._physics_reference.get(obj.name)
+            if old is None:
+                continue
+            # The currently commanded target can move without invalidating its
+            # own plan. Other bodies remain obstacles with measured positions.
+            if self._status in ('executing', 'settling') and obj.label == active_label:
+                self._physics_reference[obj.name] = obj.T_base_obj.copy()
+                continue
+            distance = float(np.linalg.norm(obj.T_base_obj[:3, 3] - old[:3, 3]))
+            angle = math.acos(float(np.clip((np.trace(old[:3, :3].T @ obj.T_base_obj[:3, :3])-1)/2, -1, 1)))
+            if distance > .006 or angle > math.radians(8):
+                moving.append(obj.label)
+        if moving:
+            self._environment_revision += 1
+            self._remember_physics()
+            self._emit('physics_scene_changed', dict(labels=moving,
+                message='物理接触使物品位置发生变化，旧观测和完成记录已失效'))
+
+    def _start_idle_physics(self):
+        if self._physics is None or self._idle_thread is not None or not self.clock.realtime:
+            return
+        def idle():
+            while not self._idle_stop.wait(.025):
+                if not self._operation_lock.acquire(blocking=False):
+                    continue
+                try:
+                    if (self._prepared and not self._closed and not self.cancel_event.is_set()
+                            and self._status in ('ready', 'error')):
+                        self.clock.sleep(.025)
+                finally:
+                    self._operation_lock.release()
+        self._idle_thread = threading.Thread(target=idle, name='dashboard-physics', daemon=True)
+        self._idle_thread.start()
 
     def intervene_scene(self, request):
         """Queue an edit; only the simulation owner mutates world geometry."""
@@ -347,6 +415,9 @@ class SimulationSession:
                                  float(o.aabb()[0][2]) > float(candidate.aabb()[1][2]) + .008)])
                 # Keep object identity: held/evaluation references must remain meaningful.
                 obj.T_base_obj = candidate.T_base_obj.copy()
+                if self._physics is not None:
+                    self._physics.apply_scene_changes()
+                    self._remember_physics()
                 self._environment_revision += 1
                 self._emit('scene_intervention_applied', {'request_id': request_id,
                            'message': '人为干预已生效，后续动作将通过相机重新确认'})
@@ -393,6 +464,7 @@ class SimulationSession:
         from ..core.extrinsics import camera_pose_in_base
         neighbors = list(self._observed_detections)
         support_views, support_revision = [], None
+        support_current = True
         last_progress = [0.]
         def progress(fields):
             now = time.monotonic()
@@ -415,7 +487,7 @@ class SimulationSession:
                 return function(*args, cancelled=interrupted, **kwargs)
 
         def measure():
-            nonlocal neighbors, support_revision
+            nonlocal neighbors, support_revision, options, support_current
             revision = self._environment_revision
             fresh = self._stationary_recovery_observation()
             if revision != self._environment_revision:
@@ -437,6 +509,17 @@ class SimulationSession:
             neighbors = merge_local_detections(neighbors, fresh,
                          lambda d: measurement_visible(d, frame, pose), forget=[target])
             self._recovery_neighbors = copy.deepcopy(neighbors)
+            if destination is not None and destination['type'] == 'on_object':
+                from .stacking import planning_options, annotate
+                support_current = False
+                try:
+                    options, support = planning_options(self, destination, fresh)
+                except ValueError as exc:
+                    return None, str(exc), revision
+                support_current = True
+                annotate(target, support)
+                annotate(grasp.target, support)
+                self._active_placement = (target, destination, zone_name, options)
             self._refresh_placement_occupancy(target, neighbors, destination)
             visible = candidate_visibility_filter(target, grasp, frame, pose,
                         nominal=self.runner.nominal.get(target.label),
@@ -455,9 +538,12 @@ class SimulationSession:
             # Geometry alone can prove a destination full. IK exhaustion cannot:
             # a different camera pose may reveal another feasible candidate.
             # This preflight returns only capacity, never an executable plan.
-            capacity, capacity_why = budget.run(phase, self.runner.has_release_capacity,
-                target, grasp, place, width, neighbors, seconds=5.,
-                progress=progress, **options)
+            if not support_current:
+                capacity, capacity_why = None, why
+            else:
+                capacity, capacity_why = budget.run(phase, self.runner.has_release_capacity,
+                    target, grasp, place, width, neighbors, seconds=5.,
+                    progress=progress, **options)
             if capacity is False:
                 why = '当前测量下无可确认的放置方案：' + str(capacity_why)
             else:
@@ -578,6 +664,9 @@ class SimulationSession:
             if self.world.held is not None:
                 raise ValueError('夹爪仍夹着物品，不能编辑场景')
             change = self.editor.apply(request)
+            if self._physics is not None:
+                self._physics.apply_scene_changes()
+                self._remember_physics()
             self._environment_revision += 1
             self._observed_detections = []
             self.runner._placed.clear()
@@ -641,6 +730,9 @@ class SimulationSession:
                 self._prepared = True
             scene = self.observe()
             self.clock.paced = True
+            if self._physics is not None:
+                self._remember_physics()
+                self._start_idle_physics()
             return scene
 
     def observe(self, target=None, purpose='search', forget=()) -> dict:
@@ -828,13 +920,16 @@ class SimulationSession:
                 objects.append(dict(measured.summary(), object_id=object_id,
                                     in_zone=zone is not None, zone=zone,
                                     view=measured.extra.get('view', 0)))
+                for key in ('support_z', 'support_label', 'support_polygon', 'support_observed'):
+                    if key in measured.extra:
+                        objects[-1][key] = copy.deepcopy(measured.extra[key])
             self._detections = MappingProxyType(mapping)
             self._observed_detections = list(mapping.values())
             self._scene = {'scene_version': self._scene_version, 'objects': objects,
                            'zones': self._zones(),
                            'placement': copy.deepcopy(self._placement),
                            'class_to_zone': dict(self.runner.class_to_zone),
-                           'task': 'Sandbox', 'mode': 'sim',
+                           'task': 'Sandbox', 'mode': self.backend,
                            'observation_diagnostics': diagnostics,
                            'observed_at': float(stamp),
                            'observation_stats': copy.deepcopy(self._scan_stats),
@@ -975,6 +1070,10 @@ class SimulationSession:
                 # Pass the exact measured target among the valid neighbors; this
                 # preserves the runner's identity checks for transit clearance.
                 target = copy.deepcopy(det)
+                if destination is not None and destination['type'] == 'on_object':
+                    from .stacking import planning_options, annotate
+                    placement_options, support = planning_options(self, destination)
+                    annotate(target, support)
                 self.runner._tracks = [t for t in self.runner._tracks if not
                     (t.get('label') == det.label and
                      np.linalg.norm(np.asarray(t['xy']) - det.center_base[:2]) < .04 and
@@ -1050,6 +1149,9 @@ class SimulationSession:
 
     def _placement_options(self, destination):
         """Resolve configured support into a local planning zone, never a world zone."""
+        if destination['type'] == 'on_object':
+            from .stacking import planning_options
+            return planning_options(self, destination)[0]
         if destination['type'] == 'region':
             polygon = np.asarray(self._placement['pick_polygon'], float)
             low, high = polygon.min(axis=0), polygon.max(axis=0)
@@ -1097,6 +1199,9 @@ class SimulationSession:
 
     def _verify_destination(self, obj, destination):
         """Independent truth check, after execution only; never supplies a plan."""
+        if destination['type'] == 'on_object':
+            from .stacking import audit
+            return bool(audit(self, obj, destination).get('success'))
         if obj is None or obj is self.world.held or abs(obj.bottom_z() - self.world.table_z) > .01:
             return False
         if (destination['type'] == 'point' and
@@ -1116,6 +1221,14 @@ class SimulationSession:
                 key, xy = ('zone', zone.name), zone.center[:2].tolist()
             elif destination['type'] == 'point':
                 key, xy = ('point', *destination['xy']), destination['xy']
+            elif destination['type'] == 'on_object':
+                key = ('on_object', destination['label'])
+                reference = next((d for d in self._observed_detections
+                    if d.center_base is not None and d.label == destination['label']), None)
+                if reference is None:
+                    reference = next((d for d in self._observed_detections
+                        if d.center_base is not None and d.label == goal['label']), None)
+                xy = reference.center_base[:2].tolist() if reference is not None else [.26, 0.]
             else:
                 key, xy = ('region', destination['name']), [.26, 0.]
             groups.setdefault(key, (xy, []))[1].append(goal)
@@ -1125,6 +1238,13 @@ class SimulationSession:
             fresh = list(self._last_fresh)
             for goal in group:
                 def confirmed():
+                    if (goal.get('destination') or {}).get('type') == 'on_object':
+                        from .stacking import camera_confirmed, audit
+                        from .observation_policy import unique_target
+                        upper = unique_target(fresh, goal['label'])
+                        obj = self._evaluation_object(upper) if upper is not None else None
+                        return bool(camera_confirmed(self, goal['label'], goal['destination']) and
+                                    audit(self, obj, goal['destination']).get('success'))
                     return (self._observation_revision == self._environment_revision and any(
                         d.valid and d.label == goal['label'] and
                         whole_footprint_at_goal(d.summary(), scene, goal) for d in fresh))
@@ -1150,6 +1270,11 @@ class SimulationSession:
             summary['diagnostics'] = str(result.detail.get('last_motion_detail') or
                                          result.detail.get('placement_planning_reason') or
                                          result.detail.get('reason') or why or '')[:500]
+        if self._physics is not None and not self.cancel_event.is_set() and self.world.held is None:
+            self._status = 'settling'
+            self._emit('settling', {'message': '正在等待物品在重力和接触作用下落稳'})
+            self._physics.settle(.8)
+            self._remember_physics()
         summary['object_id'] = object_id
         summary['source_xy'] = det.center_base[:2].tolist()
         if destination is not None:
@@ -1200,13 +1325,20 @@ class SimulationSession:
         if destination is not None:
             summary['truth']['expected_destination'] = copy.deepcopy(destination)
             summary['truth']['expected_zone'] = None
+            if destination['type'] == 'on_object':
+                from .stacking import audit
+                summary['truth']['support'] = audit(self, evaluation_object, destination)
         from .batch import whole_footprint_at_goal
         goal = {'zone_name': zone_name}
         if destination is not None:
             goal['destination'] = destination
-        camera_success = any(d.valid and d.label == det.label and
-                             whole_footprint_at_goal(d.summary(), self._scene, goal)
-                             for d in getattr(self, '_last_fresh', []))
+        if destination is not None and destination['type'] == 'on_object':
+            from .stacking import camera_confirmed
+            camera_success = camera_confirmed(self, det.label, destination)
+        else:
+            camera_success = any(d.valid and d.label == det.label and
+                                 whole_footprint_at_goal(d.summary(), self._scene, goal)
+                                 for d in getattr(self, '_last_fresh', []))
         summary['camera_verified'] = camera_success
         summary['verified_revision'] = getattr(self, '_observation_revision', -1)
         camera_success = camera_success and (getattr(self, '_observation_revision', -1) ==
@@ -1214,7 +1346,8 @@ class SimulationSession:
         summary['camera_verified'] = camera_success
         summary['ok'] = summary['controller_ok'] and truth_success and camera_success
         if summary['controller_ok'] and not truth_success:
-            summary['error'] = 'placement_not_verified'
+            summary['error'] = ('stack_unstable_or_fallen' if destination is not None and
+                destination['type'] == 'on_object' else 'placement_not_verified')
         elif summary['controller_ok'] and not camera_success:
             summary['error'] = 'placement_not_observed'
         colors = {'red': '红色', 'green': '绿色', 'yellow': '黄色'}
@@ -1229,7 +1362,9 @@ class SimulationSession:
                 names.get(det.label, det.label), destination_label(destination) if destination else
                 colors.get(zone_label, zone_label or zone_name) + '区域')
         elif summary['controller_ok']:
-            summary['message'] = ('抓放动作已结束，但无法唯一核对目标物品'
+            summary['message'] = ('叠放未通过支撑与落稳核验，物品可能滑落、倾倒或支撑已移动'
+                                  if destination is not None and destination['type'] == 'on_object' and not truth_success else
+                                  '抓放动作已结束，但无法唯一核对目标物品'
                                   if evaluation_object is None else
                                   '抓放动作已结束，但目标物品没有位于指定区域')
         else:
@@ -1415,11 +1550,17 @@ class SimulationSession:
         for det in (self._detections.values() if detections is None else detections):
             if det is target or det.center_base is None or (not det.valid and destination is None):
                 continue
+            if (destination is not None and destination['type'] == 'on_object'
+                    and det.label == destination['label']):
+                continue  # Only the designated support is intentional contact.
             x, y = [float(v) for v in det.center_base[:2]]
             zone = next((z for z in self.runner.zones.values() if z.contains_xy(x, y)), None)
             footprint = self.runner._footprint(det)
             if destination is not None:
-                zone = self._placement_options(destination)['placement_zone']
+                zone = (self._active_placement[3]['placement_zone'] if
+                    destination['type'] == 'on_object' and getattr(self, '_active_placement', None)
+                    and self._active_placement[1] == destination else
+                    self._placement_options(destination)['placement_zone'])
             if zone is None or footprint is None:
                 continue
             occupied.setdefault(zone.name, []).append(
@@ -1533,7 +1674,9 @@ class SimulationSession:
                       intervention_pending=len(self._interventions),
                       editable=(self._prepared and not self.cancel_event.is_set()
                                 and self.world.held is None and self._status in ('ready', 'error')))
-        snap = {'mode': 'sim', 'simulation_kind': 'kinematic', 'seed': self.seed,
+        physics = getattr(self, '_physics', None)
+        snap = {'mode': getattr(self, 'backend', 'sim'),
+                'simulation_kind': 'mujoco' if physics is not None else 'kinematic', 'seed': self.seed,
                 'placement': copy.deepcopy(self._placement),
                 'status': 'stopped' if self.cancel_event.is_set() else self._status,
                 'stage': self._stage, 'scene_version': self._scene_version,
@@ -1552,6 +1695,8 @@ class SimulationSession:
                 'observation_stats': copy.deepcopy(self._scan_stats),
                 'score': self.world.score(self.runner.class_to_zone),
                 'class_to_zone': dict(self.runner.class_to_zone)}
+        if physics is not None:
+            snap['physics'] = physics.state()
         with self._cache_lock:
             self._snapshot = snap
         self._last_snapshot_wall = time.monotonic()
@@ -1559,12 +1704,17 @@ class SimulationSession:
     def close(self) -> None:
         """Stop before disconnecting the simulator and closing its run log."""
         self.stop()
+        self._idle_stop.set()
+        if self._idle_thread is not None and self._idle_thread is not threading.current_thread():
+            self._idle_thread.join(timeout=2)
         with self._operation_lock:
             if self._closed:
                 return
             self.clock.on_tick = None
             self.camera.stop()
             self.arm.close()
+            if self._physics is not None:
+                self._physics.close()
             self.operator.close()
             self.logger.close()
             self._closed = True

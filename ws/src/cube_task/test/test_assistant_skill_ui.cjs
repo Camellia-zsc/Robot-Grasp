@@ -28,7 +28,7 @@ const ui={connected:true,pending:false,messageNodes:new Map(),eventNodes:new Map
 const requests=[],copy=value=>JSON.parse(JSON.stringify(value));
 const context={document:{createElement:tag=>new Element(tag),querySelectorAll:selector=>selector==="#pipeline li"?pipeline:[]},window:{},ui,$:get,stateLabels:{},
   number:(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback,
-  displayLabel:value=>({apple:"苹果",pear:"梨",banana:"香蕉"})[value]||String(value||"目标"),
+  displayLabel:value=>({apple:"苹果",pear:"梨",banana:"香蕉",red:"红色方块"})[value]||String(value||"目标"),
   setText:(id,value)=>get(id).textContent=value,svgIcon:()=>new Element("svg"),
   showError:message=>get("inline-error").textContent=message||"",
   api:async(url,payload)=>{requests.push({url,payload:copy(payload)});return {ok:true};},
@@ -74,6 +74,33 @@ const base={status:"executing",busy:true,skill_task:task,messages:[],events:[],
   has(rows[6].textContent,/抓取区/);has(rows[8].textContent,/询问人工.*允许移动梨吗/);has(rows[9].textContent,/最终核验/);
   eq(get("skill-feedback").children.length,1);has(get("skill-feedback").textContent,/抓取保持 · 苹果：已抓取保持/);
   eq(context.selectedId(base),"measured-apple");eq(get("task-result").hidden,true);
+
+  // A support object is distinct from a colored destination zone. Physics
+  // feedback explains settling and real drops instead of reporting completion.
+  const stackDestination={type:"on_object",label:"red"};
+  const stackTask={...task,current_index:0,goals:[{label:"apple",zone_name:null,destination:stackDestination}],
+    steps:[{id:"stack",skill:"move",label:"apple",destination:stackDestination,status:"executing"}]};
+  const physical={objects:[{id:"red-base",label:"red"},{id:"apple-top",label:"apple"}],
+    physics:{backend:"mujoco",gravity:[0,0,-9.81],settling:true,support_relations:[],last_event:{}}};
+  const stacking={...base,skill_task:stackTask,simulation:physical};
+  update(stacking);
+  has(get("skill-goals").textContent,/苹果 → 红色方块顶面/);
+  has(get("skill-steps").textContent,/红色方块顶面/);
+  eq(get("simulation-engine").textContent,"MuJoCo · 重力与接触");
+  has(get("simulation-description").textContent,/真实重力接触/);
+  eq(get("feedback-engine").textContent,"MuJoCo · 重力与接触");
+  has(get("physics-feedback").textContent,/等待物品落稳.*尚不能判定叠放成功/);
+  eq(get("physics-feedback").dataset.status,"settling");eq(get("task-result").hidden,true);
+  update({...stacking,simulation:{...physical,physics:{...physical.physics,settling:false,
+    support_relations:[{object:"apple-top",support:"red-base"}],last_event:{}}}});
+  has(get("physics-feedback").textContent,/苹果由红色方块支撑/);
+  const dropped={id:"real-drop",kind:"object_dropped",message:"苹果从红色方块滑落，正在重新观察"};
+  update({...stacking,events:[dropped],simulation:{...physical,physics:{...physical.physics,settling:false,
+    last_event:{kind:"object_dropped",message:dropped.message}}}});
+  has(get("physics-feedback").textContent,/滑落/);eq(get("physics-feedback").dataset.status,"failed");
+  has(ui.eventNodes.get("real-drop").className,/error/);eq(get("task-result").hidden,true);
+  update(base);eq(get("feedback-engine").textContent,"运动学模拟检查");eq(get("physics-feedback").hidden,true);
+  ui.eventNodes.get("real-drop").remove();ui.eventNodes.delete("real-drop");
 
   // A successful temporary place/old last_result cannot complete original goals.
   update({...base,busy:false,status:"complete",skill_task:{...task,steps:task.steps.map(step=>({...step,status:"succeeded"}))}});
@@ -188,5 +215,8 @@ const base={status:"executing",busy:true,skill_task:task,messages:[],events:[],
   for(const id of ["skill-panel","skill-state","skill-budget","skill-goals","skill-message","skill-steps","skill-feedback"])
     eq((html.match(new RegExp('id="'+id+'"',"g"))||[]).length,1);
   has(html,/暂放与单步通过不代表原任务完成/);has(html,/允许同一物品多次搬移/);
+  for(const id of ["simulation-engine","simulation-description","feedback-engine","physics-feedback"])
+    eq((html.match(new RegExp('id="'+id+'"',"g"))||[]).length,1);
+  has(html,/最近四轮对话/);has(html,/把苹果放到红色方块上面/);
   console.log("Skill UI real rendering/listeners: "+checks+" assertions passed.");
 })().catch(error=>{console.error(error);process.exitCode=1;});

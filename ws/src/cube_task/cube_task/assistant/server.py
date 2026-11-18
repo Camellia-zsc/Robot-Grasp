@@ -8,6 +8,7 @@ import threading
 import time
 import uuid
 from collections import deque
+from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,7 @@ class DashboardController:
     """One worker owns all robot operations; web readers see cached state."""
 
     def __init__(self, seed=0, realtime=True, session_factory=None, client=None,
-                 settings=None, log_dir=None, preview_factory=None):
+                 settings=None, log_dir=None, preview_factory=None, backend='sim'):
         from .llm import ModelClient, load_settings
         from .preview import LivePreview
         from .simulation import SimulationSession
@@ -36,7 +37,11 @@ class DashboardController:
         self.seed = int(seed)
         self.realtime = bool(realtime)
         self.log_dir = log_dir
-        self._session_factory = session_factory or SimulationSession
+        if backend not in ('sim', 'mujoco'):
+            raise ValueError('仿真后端必须为 sim 或 mujoco')
+        self.backend = backend
+        # Custom session factories retain their existing public arguments.
+        self._session_factory = session_factory or partial(SimulationSession, backend=backend)
         self._preview_factory = preview_factory or (LivePreview if session_factory is None else None)
         self._lock = threading.RLock()
         self._cancel = threading.Event()
@@ -88,11 +93,50 @@ class DashboardController:
 
     def _on_sim_event(self, kind, payload=None):
         self._event(kind, payload)
-        if isinstance(payload, dict) and payload.get('message'):
+        if isinstance(payload, dict):
             with self._lock:
-                if self._status == 'executing' or (
-                        kind == 'scan_view' and self._status in ('observing', 'preparing')):
+                if kind == 'physics_scene_changed':
+                    self._invalidate_idle_stack(payload)
+                if payload.get('message') and (self._status == 'executing' or (
+                        kind == 'scan_view' and self._status in ('observing', 'preparing'))):
                     self._stage = str(payload['message'])
+
+    def _invalidate_idle_stack(self, payload):
+        """Retain a completed task for explicit recovery when its stack moves.
+
+        Running tasks already watch the physical scene revision. Idle feedback
+        only revokes their old completion proof; it never dispatches a new task.
+        Called with the controller lock held.
+        """
+        saved, previous = self._skill_memory, self._last_result
+        if (self._busy or self._closed or self._cancel.is_set() or not saved
+                or (previous is not None and previous.get('ok') is not True)
+                or self._skill_task.get('status') != 'complete'):
+            return
+        changed = set(payload.get('labels') or ())
+        affected = [goal for goal in saved.get('goals', []) + saved.get('protected_goals', [])
+                    if (goal.get('destination') or {}).get('type') == 'on_object'
+                    and changed.intersection((goal['label'], goal['destination']['label']))]
+        if not affected:
+            return
+        message = '已完成的叠放物品或底座发生位移，原完成核验已失效；可继续原任务重新观察与恢复'
+        # An explicit scene edit clears the displayed result but preserves the
+        # completed task. Its later physical fall must still offer recovery.
+        result = copy.deepcopy(previous or {})
+        result.update(ok=False, camera_verified=False, verified_revision=-1,
+                      error='stack_scene_changed', message=message,
+                      changed_labels=sorted(changed), skill_task=True,
+                      goals=copy.deepcopy(saved['goals']))
+        result['truth'] = dict(result.get('truth') or {}, success=False)
+        for item in result.get('items', []):
+            if item.get('goal') in affected:
+                item.update(ok=False, camera_verified=False, verified_revision=-1)
+                item['truth'] = dict(item.get('truth') or {}, success=False)
+        self._last_result = result
+        self._skill_task.update(status='failed', message=message, current_index=None)
+        self._status, self._stage, self._error = 'error', message, message
+        self._needs_reset = True
+        self._event('result', dict(message=message, result=result))
 
     def _set_status(self, status, stage):
         with self._lock:

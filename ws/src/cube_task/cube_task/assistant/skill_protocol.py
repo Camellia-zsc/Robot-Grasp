@@ -46,6 +46,14 @@ active 是由本地执行器检查持物几何、碰撞与可达性后的安全�
 每次观察应带来信息增量；history.changed=false 或 reason 表示没有新信息时，应改变观察意图、
 组合其他可行技能或说明无法推进，不要反复同视角 observe。
 goals 每项为 {"label":"唯一实测类别","zone_name":"已有区域名或null"}，
+叠放目标用 zone_name=null、destination={"type":"on_object","label":"实测支撑物类别"}。
+红色方块是物品 red，红色区域是 zone_red，二者不能互换；用户要求放在方块上面时不得偷偷改成区域。
+capabilities.stacking=true 时可以规划叠放；本地会检查实测支撑顶面、碰撞、可达性以及释放后重力接触落稳。
+不能假设任意曲面都可靠支撑。重心投影落在支撑范围内也不保证圆形物体不会滚动，必须等待实际落稳核验。
+叠放成功必须同时通过新相机与实际支撑核验；若滑落、倾倒、底座移动或目标丢失，先观察并根据失败反馈恢复，
+不能把物体仍在同一颜色区域当作叠放成功，也不能反复盲抓。已有叠放goal在底座遮挡时仍保留，先observe再规划动作。
+scene.objects 中 support_observed/support_label/support_z/support_polygon 是相机局部支撑关系测量。
+若上层物品已在底座上面且底座部分遮挡，可据此提出该叠放goal并先verify；关系证据不替代搬放前完整底座测量。
 也可在 zone_name=null 时带 destination={"type":"region","name":"pick_area"}，
 或用户明确给出的/scene.selected_destination 原样选定的 {"type":"point","xy":[x,y]}。
 未指定区域时用 class_to_zone 默认区域。不能猜测坐标。最终目标必须落位，不能以空中保持为最终目标。
@@ -53,11 +61,12 @@ goals 每项为 {"label":"唯一实测类别","zone_name":"已有区域名或nul
 {"type":"goal","index":从0开始的goals序号}；
 {"type":"zone","name":"已有区域名"}；
 {"type":"region","name":"pick_area"}；
+{"type":"on_object","label":"当前唯一有效实测支撑物类别"}（放到物品顶面，坐标与高度由本地测量决定）；
 {"type":"auto_free"}（本地按实测寻找暂放空位，可带 away_from:["已配置或曾实测类别",...]）；
 away_from 只是避让偏好，不是待抓取目标；不要求这些类别当前完整可见，执行器只使用实际测到的邻居判断几何。
 {"type":"original","label":"originals中的唯一类别"}（引用任务开始相机记录的位置和朝向）。
 place/move 步骤绝不能输出坐标、姿态、轨迹或高度；固定点只能引用 goal。
-observe 的 destination 只允许 goal/zone/region/original，不能用 auto_free 或直接 point/坐标。
+observe 的 destination 只允许 goal/zone/region/original/on_object，不能用 auto_free 或直接 point/坐标。
 改变非目标物品或临时改变目标目的地会由控制器请求人工确认，不能自行假定已获同意。
 ask 的 affected_goals 列出可能受影响的goals序号，question 明确问题；可放在计划中间，
 程序收到人工明确同意后才继续后续步骤，拒绝后停止。模型回复不代表人工同意。
@@ -122,12 +131,23 @@ def _observations(items):
     for item in items:
         if not isinstance(item, dict):
             raise ValueError('技能规划观测项目无效。')
-        result.append(_fields(
+        record = _fields(
             item, strings=('object_id', 'label', 'score_kind', 'reject_reason', 'zone'),
             flags=('valid', 'in_zone'),
             numbers=('score', 'top_z', 'height', 'yaw', 'length', 'width',
                      'n_points', 'track_id', 'view'),
-            vectors=(('bbox', 4), ('center_base', 3))))
+            vectors=(('bbox', 4), ('center_base', 3)))
+        record.update(_fields(item, strings=('support_label',), flags=('support_observed',),
+                              numbers=('support_z',)))
+        if 'support_polygon' in item:
+            polygon = item['support_polygon']
+            if (isinstance(polygon, (list, tuple)) and 3 <= len(polygon) <= 64
+                    and all(isinstance(p, (list, tuple)) and len(p) == 2
+                            and all(_finite(v) for v in p) for p in polygon)):
+                record['support_polygon'] = [list(p) for p in polygon]
+            else:
+                record['support_observed'] = False
+        result.append(record)
     return result
 
 
@@ -141,7 +161,7 @@ def _destination_summary(value):
     if not isinstance(value, dict):
         return None
     kind = value.get('type')
-    if kind not in ('goal', 'zone', 'region', 'auto_free', 'original', 'point'):
+    if kind not in ('goal', 'zone', 'region', 'auto_free', 'original', 'point', 'on_object'):
         return None
     result = {'type': kind}
     result.update(_fields(value, strings=('name', 'label')))
@@ -165,8 +185,9 @@ def _failure_summary(value):
 def _capabilities(value):
     if not isinstance(value, dict):
         raise ValueError('技能执行能力无效。')
-    result = _fields(value, flags=('active_observe_requires_geometry',
-                                  'multi_object_rearrangement', 'restores_original_pose'))
+    result = _fields(value, strings=('physics_backend',),
+                     flags=('active_observe_requires_geometry', 'multi_object_rearrangement',
+                            'restores_original_pose', 'stacking', 'gravity_contacts'))
     for key in ('skills', 'observe_modes', 'observe_destination_types',
                 'destination_types', 'holding_allowed_skills'):
         items = value.get(key)
@@ -184,7 +205,7 @@ def _planning_budget(value):
             if type(value.get(key)) is int and value[key] >= 0 and _finite(value[key])}
 
 
-def _goals(value, scene, *, selected=False):
+def _goals(value, scene, *, selected=False, existing=False, support_labels=()):
     if not isinstance(value, list) or len(value) > MAX_SKILL_STEPS:
         raise ValueError('最终目标列表无效。')
     result, seen = [], set()
@@ -203,7 +224,16 @@ def _goals(value, scene, *, selected=False):
             if zone is not None:
                 raise ValueError('最终目标不能同时指定区域与桌面目的地。')
             from .destinations import validate_destination
-            normalized['destination'] = validate_destination(destination, scene)
+            relation_observed = (destination.get('type') == 'on_object' and any(
+                o.get('label') == label and o.get('valid') is True
+                and o.get('support_observed') is True and _finite(o.get('support_z'))
+                and o.get('support_label') == destination.get('label')
+                for o in scene.get('objects', ()))) if isinstance(destination, dict) else False
+            normalized['destination'] = validate_destination(destination, scene,
+                require_observed=not (existing or relation_observed), known_labels=support_labels)
+            if (normalized['destination']['type'] == 'on_object'
+                    and normalized['destination']['label'] == label):
+                raise ValueError('物品不能叠放在自身上面。')
             selected_point = scene.get('selected_destination') if selected else None
             if (selected_point is not None and normalized['destination']['type'] == 'point'
                     and normalized['destination'] != selected_point):
@@ -214,6 +244,15 @@ def _goals(value, scene, *, selected=False):
                 raise ValueError('最终目标区域无效。')
             normalized['zone_name'] = zone
         result.append(normalized)
+    edges = {g['label']: g['destination']['label'] for g in result
+             if (g.get('destination') or {}).get('type') == 'on_object'}
+    for label in edges:
+        chain = set()
+        while label in edges:
+            if label in chain:
+                raise ValueError('最终叠放目标不能形成循环支撑。')
+            chain.add(label)
+            label = edges[label]
     return result
 
 
@@ -266,12 +305,14 @@ def model_skill_context(context: dict) -> dict:
         held_label = _text(held_label, '夹持物品类别', 100)
     elif held_label is not None:
         raise ValueError('空夹爪不能包含夹持物品。')
+    originals = _observations(context.get('originals', []))
+    support_labels = [o['label'] for o in originals if o.get('valid') and 'center_base' in o]
     visible = {
         'scene_version': version, 'scene': visible_scene,
         'perception': 'structured_camera_observations', 'images_provided': False,
-        'goals': _goals(context.get('goals', []), visible_scene),
-        'protected_goals': _goals(context.get('protected_goals', []), visible_scene),
-        'originals': _observations(context.get('originals', [])),
+        'goals': _goals(context.get('goals', []), visible_scene, existing=True, support_labels=support_labels),
+        'protected_goals': _goals(context.get('protected_goals', []), visible_scene, existing=True, support_labels=support_labels),
+        'originals': originals,
         'holding': holding, 'held_label': held_label,
         'max_steps': maximum, 'remaining_steps': remaining,
         'failure': _failure_summary(failure),
@@ -347,7 +388,7 @@ def _index(value, goals):
     return value
 
 
-def _step_destination(value, goals, visible):
+def _step_destination(value, goals, visible, *, require_observed=True):
     if not isinstance(value, dict):
         raise ValueError('技能放置目的地无效。')
     kind = value.get('type')
@@ -359,6 +400,10 @@ def _step_destination(value, goals, visible):
     elif kind == 'region' and set(value) == {'type', 'name'}:
         from .destinations import validate_destination
         validate_destination(value, visible['scene'])
+    elif kind == 'on_object' and set(value) == {'type', 'label'}:
+        from .destinations import validate_destination
+        known = [o['label'] for o in visible['originals'] if o.get('valid') and 'center_base' in o]
+        validate_destination(value, visible['scene'], require_observed=require_observed, known_labels=known)
     elif kind == 'original' and set(value) == {'type', 'label'}:
         label = _text(value['label'], '原始观测物品', 100)
         found = [o for o in visible['originals'] if o.get('label') == label]
@@ -391,7 +436,9 @@ def validate_skill_plan(plan: dict, context: dict) -> dict:
     if action not in ('plan', 'answer', 'clarify', 'stop'):
         raise ValueError('模型返回了不支持的规划动作。')
     message = _text(plan['message'], '模型说明')
-    goals = _goals(plan['goals'], visible['scene'], selected=not bool(visible['goals']))
+    goals = _goals(plan['goals'], visible['scene'], selected=not bool(visible['goals']),
+                   existing=bool(visible['goals']),
+                   support_labels=[o['label'] for o in visible['originals'] if o.get('valid') and 'center_base' in o])
     if visible['goals'] and goals != visible['goals']:
         raise ValueError('恢复计划不能改变用户最终目标。')
     if not visible['goals']:
@@ -440,8 +487,8 @@ def validate_skill_plan(plan: dict, context: dict) -> dict:
                                    step['mode'] not in ('stationary', 'active')):
                 raise ValueError('技能观察模式无效。')
             if 'destination' in step:
-                destination = _step_destination(step['destination'], goals, visible)
-                if destination['type'] not in ('goal', 'zone', 'region', 'original'):
+                destination = _step_destination(step['destination'], goals, visible, require_observed=False)
+                if destination['type'] not in ('goal', 'zone', 'region', 'original', 'on_object'):
                     raise ValueError('观察只能引用已有目标、区域或原始观测。')
                 item['destination'] = destination
         elif skill in ('pick', 'place', 'move'):
@@ -461,9 +508,16 @@ def validate_skill_plan(plan: dict, context: dict) -> dict:
             if skill == 'place' and held_label != item['label']:
                 raise ValueError('放置目标必须匹配夹爪当前持有的物品。')
             item['destination'] = _step_destination(step['destination'], goals, visible)
+            effective = item['destination']
             if item['destination']['type'] == 'goal':
                 if goals[item['destination']['index']]['label'] != item['label']:
                     raise ValueError('技能目标与引用的最终目标物品不一致。')
+                effective = goals[item['destination']['index']].get('destination') or {}
+            if effective.get('type') == 'on_object':
+                if effective['label'] == item['label']:
+                    raise ValueError('物品不能叠放在自身上面。')
+                from .destinations import validate_destination
+                validate_destination(effective, visible['scene'])
             if (item['destination']['type'] == 'original'
                     and item['destination']['label'] != item['label']):
                 raise ValueError('原位复位只能引用同一物品的原始观测。')

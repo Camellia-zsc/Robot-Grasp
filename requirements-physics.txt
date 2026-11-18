@@ -1,0 +1,3 @@
+# Existing PiPER driver uses the MuJoCo 3.x qM inertia interface.
+# Install into an optional --system-site-packages virtual environment.
+mujoco==3.3.7

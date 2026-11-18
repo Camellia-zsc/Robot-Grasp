@@ -98,6 +98,21 @@ def _has_xy(det: Detection) -> bool:
             and math.isfinite(float(c[1])))
 
 
+def _is_stack_base(det: Detection, other: Detection) -> bool:
+    """Match only the measured support named by this intentional contact."""
+    support = (det.extra or {}).get('_stack_support')
+    if not isinstance(support, dict) or other.label != support.get('label') or not _has_xy(other):
+        return False
+    try:
+        xy = np.asarray(support['xy'], float)
+        top = float(support['top_z'])
+        return bool(xy.shape == (2,) and np.all(np.isfinite(xy)) and math.isfinite(top)
+                    and np.linalg.norm(np.asarray(other.center_base[:2]) - xy) <= .012
+                    and other.top_z is not None and abs(float(other.top_z) - top) <= .012)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 def _footprint(det: Detection) -> Optional[float]:
     """Largest horizontal extent of a detection (m), None when unknown."""
     vals = [float(v) for v in (det.length, det.width) if v is not None and math.isfinite(float(v))]
@@ -1299,7 +1314,7 @@ class TaskRunner:
         # old placement reservations after the user moved a table object.
         occupied = []
         for other in neighbors:
-            if other is det or not _has_xy(other):
+            if other is det or not _has_xy(other) or _is_stack_base(det, other):
                 continue
             dims = footprint_dims(other, self.nominal.get(other.label))
             if dims is None or other.yaw is None:
@@ -1695,6 +1710,9 @@ class TaskRunner:
                         return False
             return True
 
+        stack_support = (det.extra or {}).get('_stack_support')
+        if stack_support is not None and not any(_is_stack_base(det, other) for other in neighbors):
+            return lambda *args, **kwargs: False
         obstacles = []
         for other in neighbors:
             if other is det or not _has_xy(other):
@@ -1708,7 +1726,7 @@ class TaskRunner:
             bottom = 0.0 if bottom is None else float(bottom)
             top = float(other.top_z) if other.top_z is not None else bottom + height
             obstacles.append((corners(np.asarray(other.center_base[:2]), odims, float(other.yaw)),
-                              height, bottom, top))
+                              height, bottom, top, _is_stack_base(det, other)))
         offset = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
         margin_offsets = np.array([[.002, .002], [.002, -.002], [-.002, .002], [-.002, -.002]])
         opening = min(self.placer.open_width, gp.expected_width + RELEASE_OPEN_EXTRA)
@@ -1718,6 +1736,10 @@ class TaskRunner:
 
         def allowed(x, y, closing, final_yaw=None, tcp_xy=None, held_projection=None,
                     gripper_pose=None, gripper_open_width=None):
+            if stack_support is not None:
+                from ..assistant.stacking import center_supported
+                if not center_supported([x, y], stack_support):
+                    return False
             delta = closing - gp.closing_angle
             rotated = np.array([[math.cos(delta), -math.sin(delta)],
                                 [math.sin(delta), math.cos(delta)]]) @ offset
@@ -1738,8 +1760,9 @@ class TaskRunner:
                 return False
             fingers = corners(np.array([x, y]) - rotated if tcp_xy is None else tcp_xy,
                               (fingers_length, 2 * FINGER_HALF_BAND), closing)
-            if any(overlaps(obj, other) or (height > finger_floor and overlaps(fingers, other))
-                   for other, height, _bottom, _top in obstacles):
+            if any(not designated and (overlaps(obj, other)
+                   or (height > finger_floor and overlaps(fingers, other)))
+                   for other, height, _bottom, _top, designated in obstacles):
                 return False
             if gripper_pose is not None:
                 import cv2
@@ -1752,11 +1775,22 @@ class TaskRunner:
                 boxes.append((np.array([0., 0., -.095]), np.array([.0225, .045, .045])))
                 signs = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
                 T = np.asarray(gripper_pose, float)
+                if stack_support is not None:
+                    source_floor = detection_table_z(det)
+                    if source_floor is None or det.height is None:
+                        return False
+                    source_xy = corners(np.asarray(det.center_base[:2]), dims, float(det.yaw or 0.))
+                    source_box = np.vstack([np.column_stack([source_xy, np.full(4, z)])
+                        for z in (source_floor, source_floor + float(det.height))])
+                    rotation = T[:3, :3] @ gp.T_grasp[:3, :3].T
+                    released = (source_box - gp.T_grasp[:3, 3]) @ rotation.T + T[:3, 3]
+                    if float(released[:, 2].min()) < float(stack_support['top_z']) - .002:
+                        return False
                 for center, half in boxes:
                     points = (center + signs * half) @ T[:3, :3].T + T[:3, 3]
                     footprint = cv2.convexHull(points[:, :2].astype(np.float32)).reshape(-1, 2)
                     low_z, high_z = float(points[:, 2].min()), float(points[:, 2].max())
-                    for other, _height, bottom, top in obstacles:
+                    for other, _height, bottom, top, _designated in obstacles:
                         if top + .002 > low_z and bottom - .002 < high_z and overlaps(footprint, other):
                             return False
             return True

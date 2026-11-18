@@ -66,6 +66,35 @@ def test_missing_depth_never_confirms_landing_space():
     assert not candidate_visibility_filter(target, grasp, frame, camera)(0., 0., 0.)
 
 
+def test_stack_landing_sees_support_top_instead_of_demanding_table_through_base():
+    target, grasp, frame, camera = inputs()
+    target.extra['_stack_support'] = dict(top_z=.12)
+    frame.depth[:] = .88
+    assert candidate_visibility_filter(target, grasp, frame, camera)(0., 0., 0.)
+    frame.depth[:] = .82
+    assert not candidate_visibility_filter(target, grasp, frame, camera)(0., 0., 0.)
+
+
+def test_stack_landing_height_does_not_shift_source_geometry_during_final_tilt(monkeypatch):
+    from cube_task.assistant import placement_observation
+    target, grasp, frame, camera = inputs()
+    pose = top_down_T(0., 0., .2, 0.)
+    angle = np.deg2rad(20.)
+    rotation = np.array([[np.cos(angle), 0., np.sin(angle)],
+                         [0., 1., 0.], [-np.sin(angle), 0., np.cos(angle)]])
+    pose[:3, :3] = rotation @ pose[:3, :3]
+    seen = []
+    original = placement_observation._samples
+    monkeypatch.setattr(placement_observation, '_samples',
+        lambda polygon, step: seen.append(polygon.copy()) or original(polygon, step))
+    candidate_visibility_filter(target, grasp, frame, camera)(0., 0., 0., gripper_pose=pose)
+    source_projection = seen[0]
+    seen.clear()
+    target.extra['_stack_support'] = dict(top_z=.12)
+    candidate_visibility_filter(target, grasp, frame, camera)(0., 0., 0., gripper_pose=pose)
+    np.testing.assert_array_equal(seen[0], source_projection)
+
+
 def test_inspection_pose_proposals_are_guarded_and_clear_all_intermediate_rotations():
     target, grasp, _frame, _camera = inputs()
     checked = []

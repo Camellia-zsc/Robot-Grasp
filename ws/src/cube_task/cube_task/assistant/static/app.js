@@ -254,11 +254,11 @@ function renderMessages(state){
   });
   for(const [key,node] of ui.messageNodes)if(!activeKeys.has(key)){node.remove();ui.messageNodes.delete(key);}
   for(const event of Array.isArray(state.events)?state.events:[]){
-    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan","inspect_place","active_observation","recovery_observation","placement_planning","placement_progress","placement_refined","placement_changed"].includes(event.kind)||!event.message)continue;
+    if(!(["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan","inspect_place","active_observation","recovery_observation","placement_planning","placement_progress","placement_refined","placement_changed"].includes(event.kind)||/^(stack_|stacking_|physics_|object_dropped|settling)/.test(event.kind))||!event.message)continue;
     if(["decision","recovery_result"].includes(event.kind)&&messages.some(message=>message.role==="assistant"&&assistantText(message,String(message.content??message.text??""),false)===event.message))continue;
     const key=String(event.id??event.seq??`${event.time}-${event.message}`);
     if(ui.eventNodes.has(key))continue;
-    const node=document.createElement("div");node.className=`event-bubble${["error","recovery_exhausted"].includes(event.kind)||event.kind==="skill_feedback"&&(event.ok===false||event.feedback?.ok===false)?" error":""}`;
+    const node=document.createElement("div");node.className=`event-bubble${["error","recovery_exhausted"].includes(event.kind)||/drop|fall|unstable/.test(event.kind)||event.kind==="skill_feedback"&&(event.ok===false||event.feedback?.ok===false)?" error":""}`;
     const text=document.createElement("span");text.textContent=event.message;
     node.append(svgIcon(event.kind==="decision"?"spark":event.kind==="result"?"check":event.kind.startsWith("recovery_")?"reset":"focus"),text);conversation.append(node);ui.eventNodes.set(key,node);
   }
@@ -362,12 +362,13 @@ function renderSkillTask(state){
   const stepLabels={pending:"等待",executing:"执行中",succeeded:"步骤通过",failed:"失败",cancelled:"已取消"};
   const zoneName=name=>({zone_red:"红色区域",zone_green:"绿色区域",zone_yellow:"黄色区域"})[name]||String(name||"默认区域");
   const goals=Array.isArray(task.goals)?task.goals:[];
-  const goalDestination=goal=>goal.destination?.type==="region"?"抓取区":goal.destination?.type==="point"?`指定桌面点 (${(goal.destination.xy||[]).map(value=>number(value).toFixed(3)).join(", ")})`:zoneName(goal.zone_name);
+  const goalDestination=goal=>goal.destination?.type==="on_object"?`${displayLabel(goal.destination.label)}顶面`:goal.destination?.type==="region"?"抓取区":goal.destination?.type==="point"?`指定桌面点 (${(goal.destination.xy||[]).map(value=>number(value).toFixed(3)).join(", ")})`:zoneName(goal.zone_name);
   const destination=value=>{
     if(!value)return "";
     if(value.type==="goal"){const goal=goals[value.index];return goal?`最终目标 ${number(value.index)+1} · ${goalDestination(goal)}`:"最终目标";}
     if(value.type==="zone")return zoneName(value.name);
     if(value.type==="region")return "抓取区";
+    if(value.type==="on_object")return `${displayLabel(value.label)}顶面`;
     if(value.type==="auto_free")return "实测空位（暂放）";
     if(value.type==="original")return `${displayLabel(value.label)}原位置与朝向`;
     return "待确认目的地";
@@ -426,10 +427,23 @@ function renderBatch(state){
   $("batch-items").replaceChildren(...rows);
 }
 function renderGraspFeedback(state){
+  const physics=state.simulation?.physics||{},physical=String(physics.backend||state.simulation?.simulation_kind||"").toLowerCase().includes("mujoco");
+  setText("simulation-engine",physical?"MuJoCo · 重力与接触":"交互实验 · RGB-D");
+  setText("simulation-mode-label",physical?"MuJoCo 物理仿真":"多物品运动学仿真");
+  setText("simulation-description",physical?"RGB-D 抓取、真实重力接触与落稳核验":"RGB-D 形状抓取、夹持反馈与落位校验 · 运动学仿真");
+  setText("feedback-engine",physical?"MuJoCo · 重力与接触":"运动学模拟检查");
+  const objectName=(id,label)=>["table","floor"].includes(id)?"桌面":displayLabel(label||(state.simulation?.objects||[]).find(item=>String(item.id??item.object_id)===String(id))?.label||id);
+  const relations=Array.isArray(physics.support_relations)?physics.support_relations:[];
+  const supports=relations.map(relation=>`${objectName(relation.object,relation.label)}由${objectName(relation.support,relation.support_label)}支撑`);
+  const latest=physics.last_event||{},dropped=/drop|fall|slip|unstable/.test(String(latest.kind||latest.reason||""));
+  const physicsText=physical?[physics.settling?"正在等待物品落稳，尚不能判定叠放成功。":"释放后按重力与接触运动，并核对实际支撑。",...supports,
+    Number.isFinite(physics.gripper_max_width)?`物理模型夹爪行程 ${(physics.gripper_max_width*1000).toFixed(0)} mm。`:"",
+    latest.message||(dropped?"检测到物品失稳或掉落，将按新的相机观测处理。":"")].filter(Boolean).join(" "):"";
+  $("physics-feedback").hidden=!physical;setText("physics-feedback",physicsText);$("physics-feedback").dataset.status=dropped?"failed":physics.settling?"settling":"ready";
   const feedback=state.simulation?.feedback||{},plan=feedback.grasp_plan||{};
   const checks=Array.isArray(feedback.checks)?feedback.checks:[];
   const panel=$("grasp-feedback");if(!panel)return;
-  const holding=holdingMessage(state);panel.hidden=!Object.keys(plan).length&&!checks.length&&!holding;
+  const holding=holdingMessage(state);panel.hidden=!physical&&!Object.keys(plan).length&&!checks.length&&!holding;
   const mm=value=>value!=null&&Number.isFinite(Number(value))?`${(Number(value)*1000).toFixed(1)} mm`:"—";
   const parts=[];
   if(plan.label)parts.push(displayLabel(plan.label));

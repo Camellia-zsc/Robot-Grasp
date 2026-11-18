@@ -30,12 +30,34 @@ def _number(value):
         return False
 
 
-def validate_destination(value, scene):
-    """Normalize only the two supported, non-executable destination forms."""
+def validate_destination(value, scene, *, require_observed=True, known_labels=()):
+    """Normalize destinations; object supports remain semantic camera references.
+
+    Only fixed existing goals or observation requests may retain a temporarily
+    occluded known support. Actual new placements require its current measure.
+    """
     if value is None:
         return None
     if not isinstance(value, dict):
         raise ValueError('放置目标必须是对象')
+    if value.get('type') == 'on_object':
+        label = value.get('label')
+        if (set(value) != {'type', 'label'} or not isinstance(label, str)
+                or not label.strip() or label != label.strip() or len(label) > 100):
+            raise ValueError('叠放支撑物只能使用类别引用，不能指定坐标或高度')
+        objects = [obj for obj in scene.get('objects', ())
+                   if isinstance(obj, dict) and obj.get('label') == label and obj.get('valid') is True]
+        known = set(scene.get('class_to_zone', {})) | set(known_labels)
+        known.update(obj.get('label') for obj in scene.get('objects', ())
+                     if isinstance(obj, dict) and obj.get('valid') is True)
+        if label not in known:
+            raise ValueError('叠放支撑物尚未配置或测量')
+        if require_observed:
+            center = objects[0].get('center_base') if len(objects) == 1 else None
+            if (not isinstance(center, (list, tuple, np.ndarray)) or len(center) != 3
+                    or not all(_number(v) for v in center)):
+                raise ValueError('叠放支撑物必须是当前唯一有效的三维相机测量')
+        return {'type': 'on_object', 'label': label}
     placement = scene.get('placement', {})
     if value.get('type') == 'region':
         if set(value) != {'type', 'name'} or value.get('name') != 'pick_area':
@@ -75,6 +97,10 @@ def destination_label(destination):
         return ''
     if destination['type'] == 'region':
         return '抓取区'
+    if destination['type'] == 'on_object':
+        names = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块',
+                 'apple': '苹果', 'banana': '香蕉', 'pear': '梨'}
+        return names.get(destination['label'], destination['label']) + '顶面'
     return '桌面指定点（%.3f，%.3f 米）' % tuple(destination['xy'])
 
 
@@ -86,6 +112,8 @@ def footprint_corners(xy, length, width, yaw):
 
 def footprint_in_destination(corners, scene, destination):
     """Full footprint must stay on the configured tabletop, and in a region."""
+    if destination['type'] == 'on_object':
+        return False  # A 2-D tabletop boundary cannot prove height or support.
     placement = scene['placement']
     margin = float(placement.get('margin', PLACEMENT_MARGIN))
     table = placement['table_bounds']
@@ -109,6 +137,8 @@ def whole_footprint_at_destination(target, scene, destination):
     from .catalog import catalog_entries
     try:
         destination = validate_destination(destination, scene)
+        if destination['type'] == 'on_object':
+            return False
         center = np.asarray(target['center_base'], float)
         length, width, yaw = (float(target[k]) for k in ('length', 'width', 'yaw'))
         if center.shape != (3,) or not np.all(np.isfinite(np.r_[center, length, width, yaw])):

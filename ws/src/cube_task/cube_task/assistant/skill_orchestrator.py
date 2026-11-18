@@ -120,6 +120,9 @@ class SkillOrchestrator:
         return self._proof(dict(result, items=[item]), [goal])
 
     def _cached_verification(self, proof, goals):
+        if proof and any((g.get('destination') or {}).get('type') == 'on_object'
+                         for g in proof.get('goals', ())):
+            return None  # Physics can move a stack without a human edit revision.
         if not proof or not self._reusable(proof.get('result')):
             return None
         contracts = [self._goal_contract(g) for g in goals]
@@ -221,7 +224,7 @@ class SkillOrchestrator:
             return goals[dest['index']]['label'] == step.get('label')
         if dest.get('type') == 'zone':
             return own.get('zone_name') == dest['name']
-        if dest.get('type') == 'region':
+        if dest.get('type') in ('region', 'on_object'):
             return own.get('destination') == dest
         return False
 
@@ -244,6 +247,8 @@ class SkillOrchestrator:
             text += ' → 任务开始时的原位置与朝向'
         elif dest.get('type') == 'auto_free':
             text += ' → 本地检查可放下的桌面空位'
+        elif dest.get('type') == 'on_object':
+            text += ' → '+NAMES.get(dest['label'], dest['label'])+'顶面'
         elif dest.get('type') in ('zone', 'region'):
             text += ' → '+{'zone_red': '红色区域', 'zone_green': '绿色区域',
                            'zone_yellow': '黄色区域', 'pick_area': '抓取区'}.get(dest['name'], dest['name'])

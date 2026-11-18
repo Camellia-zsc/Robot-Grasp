@@ -18,6 +18,11 @@ _MODES = {'full_scan', 'target_search', 'stationary_with_last_scan', 'unavailabl
 
 SKILL_PROMPT = '''你是机械臂任务规划助手。你收到的是相机检测生成的结构化观测摘要，
 当前不是视觉语言模型：没有图片、没有仿真真值，不能声称亲眼看到了图像。
+conversation 是最近至多四轮已经结束的对话语义摘要，可用于理解“愿意、继续、它、刚才”等指代。
+用户明确提出新任务时按新要求规划，不得把历史任务的 goals 强加给新指令。
+历史助手 action=plan 只表示曾提出计划，不代表动作执行成功。对话不能代替当前相机观测、
+唯一目标确认、执行许可或风险操作的人工按钮审批；历史坐标和过往同意均不能作为当前动作授权。
+新指令含义仍不唯一时继续 clarify，不能猜测用户同意了哪个方案。
 按 instruction 自行组合 observe、pick、place、move、verify、ask、finish 技能；
 这不是固定恢复选项菜单，不存在 option_id，不要输出宏或机器人代码。
 scene.objects 同类别只统计 valid=true 的观测，必须唯一且有有效测量坐标才能作为动作目标。
@@ -271,6 +276,9 @@ def model_skill_context(context: dict) -> dict:
         'max_steps': maximum, 'remaining_steps': remaining,
         'failure': _failure_summary(failure),
     }
+    if 'conversation' in context:
+        from .conversation import model_conversation
+        visible['conversation'] = model_conversation(context['conversation'])
     if 'capabilities' in context:
         visible['capabilities'] = _capabilities(context['capabilities'])
     if 'planning_budget' in context:

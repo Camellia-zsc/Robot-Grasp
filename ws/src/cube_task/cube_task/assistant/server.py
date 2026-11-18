@@ -52,6 +52,7 @@ class DashboardController:
         self._messages = []
         self._events = deque(maxlen=160)
         self._next_id = 0
+        self._conversation_after_id = 0
         self._last_result = None
         from .skill_orchestrator import idle_skill_task
         self._skill_task = idle_skill_task()
@@ -323,6 +324,8 @@ class DashboardController:
 
     def _reset_impl(self):
         with self._lock:
+            # Keep visible chat, but a reset starts a new planning conversation.
+            self._conversation_after_id = self._next_id
             previous = self._session
             previous_preview = self._preview
             self._session = None
@@ -459,6 +462,9 @@ class DashboardController:
 
         def run():
             with self._lock:
+                from .conversation import conversation_summary
+                conversation = conversation_summary(
+                    self._messages, after_id=self._conversation_after_id)
                 self._next_id += 1
                 self._messages.append({'id': self._next_id, 'role': 'user',
                                        'content': instruction, 'status': 'complete'})
@@ -470,7 +476,8 @@ class DashboardController:
                 self._metrics['requests'] += 1
             if hasattr(self._client, 'plan_skills'):
                 from .skill_orchestrator import SkillOrchestrator
-                return SkillOrchestrator(self).run(instruction, selected_destination=selected_destination)
+                return SkillOrchestrator(self).run(instruction, selected_destination=selected_destination,
+                                                   conversation=conversation)
             self._set_status('observing', '复用桌面观测生成任务计划，执行前局部确认')
             scene = self._session.scene
             if not getattr(self._session, 'targeted_observation', False) or not scene.get('objects'):

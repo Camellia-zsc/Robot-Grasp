@@ -169,6 +169,7 @@ class SkillOrchestrator:
                       remaining_plans=max(0, task['max_plans']-task['plan_number']),
                       remaining_steps=max(0, remaining), stagnation=memory['stagnation'])
         return dict(scene=scene, goals=copy.deepcopy(memory['goals']),
+                    conversation=copy.deepcopy(memory.get('conversation', [])),
                     originals=copy.deepcopy(memory['originals']),
                     protected_goals=copy.deepcopy(memory['protected_goals']),
                     holding=bool(snap.get('held_object')), held_label=self._held_label(),
@@ -376,7 +377,7 @@ class SkillOrchestrator:
         return result
 
     def run(self, instruction, *, goals=None, protected_goals=(), failure=None,
-            selected_destination=None, resume=False):
+            selected_destination=None, resume=False, conversation=()):
         ctl = self.ctl
         previous = getattr(ctl, '_skill_memory', None)
         if resume and previous and previous.get('goals'):
@@ -385,6 +386,7 @@ class SkillOrchestrator:
             scene = self.session.scene
             originals = [copy.deepcopy(o) for o in scene.get('objects', []) if o.get('valid')]
             memory = dict(instruction=instruction, goals=copy.deepcopy(goals or []),
+                          conversation=copy.deepcopy(list(conversation)),
                           protected_goals=copy.deepcopy(list(protected_goals)),
                           originals=originals, obligations={}, restorations=[],
                           selected_destination=copy.deepcopy(selected_destination))

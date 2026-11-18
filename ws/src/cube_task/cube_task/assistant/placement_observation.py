@@ -44,10 +44,10 @@ def _samples(polygon, step):
 
 def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
                                 max_open_width=.1, sample_step=.008,
-                                margin_px=8, depth_tolerance=.008):
+                                margin_px=8, depth_tolerance=.008, *, observations=()):
     """Return a pose filter proving full support/finger footprints are observed.
 
-    Every sample must project inside the new image and see table depth. A
+    Every sample must see table depth in at least one supplied fresh view. A
     foreground object, the carried target itself, a depth hole or image crop
     cannot establish a clear landing area. This complements measured collision
     checks; it never interprets an unobserved area as empty.
@@ -56,10 +56,15 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
     table = detection_table_z(det)
     if table is None:
         raise ValueError('candidate visibility requires a measured table height')
-    T_bc = np.asarray(T_base_camera, float)
-    T_cb = inv_T(T_bc)
-    intr = frame.intrinsics if frame is not None else None
-    depth = None if frame is None or frame.depth is None else np.asarray(frame.depth)
+    views = []
+    for observed_frame, camera_pose in ((frame, T_base_camera), *observations):
+        intr = observed_frame.intrinsics if observed_frame is not None else None
+        depth = (None if observed_frame is None or observed_frame.depth is None
+                 else np.asarray(observed_frame.depth))
+        if intr is None or depth is None or depth.shape != (intr.height, intr.width):
+            continue
+        T_bc = np.asarray(camera_pose, float)
+        views.append((T_bc, inv_T(T_bc), intr, depth))
     source_center = np.r_[det.center_base[:2], table + height / 2]
     original_yaw = float(det.yaw or 0.)
     source_xy = _rectangle(source_center[:2], length, width, original_yaw)
@@ -69,7 +74,7 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
     opening_default = min(float(max_open_width), float(grasp.expected_width) + RELEASE_OPEN_EXTRA)
 
     def allowed(x, y, closing, gripper_pose=None, opening=None):
-        if depth is None or intr is None or depth.shape != (intr.height, intr.width):
+        if not views:
             return False
         delta = float(closing) - float(grasp.closing_angle)
         c, s = math.cos(delta), math.sin(delta)
@@ -99,17 +104,22 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
                 fingers.append(cv2.convexHull(box[:, :2].astype(np.float32)).reshape(-1, 2))
         xy = np.vstack([_samples(p, sample_step) for p in [object_polygon] + fingers])
         points = np.column_stack([xy, np.full(len(xy), table + .001)])
-        uv = project_points(points, T_bc, intr)
-        if (not np.all(np.isfinite(uv)) or np.any(uv[:, 0] < margin_px)
-                or np.any(uv[:, 0] > intr.width - 1 - margin_px)
-                or np.any(uv[:, 1] < margin_px)
-                or np.any(uv[:, 1] > intr.height - 1 - margin_px)):
-            return False
-        pixels = np.rint(uv).astype(int)
-        observed = depth[pixels[:, 1], pixels[:, 0]]
-        expected = points @ T_cb[2, :3] + T_cb[2, 3]
-        return bool(np.all(np.isfinite(observed)) and np.all(observed > 0)
-                    and np.all(observed >= expected - depth_tolerance))
+        covered = np.zeros(len(points), bool)
+        for T_bc, T_cb, intr, depth in views:
+            remaining = np.flatnonzero(~covered)
+            samples = points[remaining]
+            uv = project_points(samples, T_bc, intr)
+            expected = samples @ T_cb[2, :3] + T_cb[2, 3]
+            inside = np.flatnonzero(np.all(np.isfinite(uv), axis=1) & (expected > 0)
+                & (uv[:, 0] >= margin_px) & (uv[:, 0] <= intr.width - 1 - margin_px)
+                & (uv[:, 1] >= margin_px) & (uv[:, 1] <= intr.height - 1 - margin_px))
+            pixels = np.rint(uv[inside]).astype(int)
+            observed = depth[pixels[:, 1], pixels[:, 0]]
+            covered[remaining[inside]] = (np.isfinite(observed) & (observed > 0)
+                                         & (observed >= expected[inside] - depth_tolerance))
+            if np.all(covered):
+                return True
+        return False
     return allowed
 
 
@@ -127,6 +137,29 @@ def _planning_call(arm, cancelled, function, *args, **kwargs):
     scope = getattr(arm, 'planning_scope', None)
     with scope(cancelled) if scope is not None and cancelled is not None else nullcontext():
         return function(*args, **kwargs)
+
+
+def inspection_history(session, grasp):
+    """Measured views are reusable only for the same held grasp and scene."""
+    key = (session._environment_revision, grasp.target.label,
+           tuple(np.round(grasp.T_grasp, 6).ravel()))
+    if getattr(session, '_held_view_key', None) != key:
+        session._held_view_key, session._held_view_history = key, []
+    return session._held_view_history
+
+
+def forget_inspection(session):
+    """Object motion can make an old viewpoint informative again."""
+    session._held_view_key = None
+    session._held_view_history = []
+    session._skill_coverage_revision = None
+    session._skill_observation_coverage = {}
+
+
+def remember_inspection(session, grasp, pose):
+    history = inspection_history(session, grasp)
+    history.append(np.asarray(pose, float).copy())
+    del history[:-64]
 
 
 def _inspection_geometry(grasp, nominal, highest_obstacle, table_z, clearance):
@@ -163,7 +196,8 @@ def _inspection_visibility_score(T_bc, points, sizes, starts, held_polygon, intr
 def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
                               highest_obstacle, table_z=0., clearance=.04,
                               free_tilt_deg=40., nominal=None, intrinsics=None, *,
-                              cancelled=None, progress=None, max_poses=12, max_checks=None):
+                              cancelled=None, progress=None, max_poses=12, max_checks=None,
+                              exclude_poses=()):
     """Yield reachable held-camera poses, spending IK only as consumed.
 
     Callers first lift vertically to at least ``minimum_tcp_z`` before moving
@@ -260,10 +294,17 @@ def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target
         progress({'phase': 'inspection_reachability', 'generated': len(proposals),
                   'checked': 0, 'reachable': 0})
     checked, reachable = 0, 0
+    excluded = np.asarray(list(exclude_poses), float).reshape(-1, 4, 4)
     for _score, T_tcp in sorted(proposals, key=lambda item: item[0], reverse=True):
         if (_planning_cancelled(arm, cancelled)
                 or (max_checks is not None and checked >= max_checks)):
             return
+        if len(excluded):
+            near = np.linalg.norm(excluded[:, :3, 3] - T_tcp[:3, 3], axis=1) < .03
+            # trace(R_old.T @ R_new) is the sum of elementwise products.
+            traces = np.sum(excluded[:, :3, :3] * T_tcp[:3, :3], axis=(1, 2))
+            if np.any(near & (traces > 1. + 2. * math.cos(math.radians(12.)))):
+                continue
         kwargs = {'max_tilt_deg': free_tilt_deg} if accepts_kwarg(check, 'max_tilt_deg') else {}
         ok, _reason = _planning_call(arm, cancelled, check, T_tcp, **kwargs)
         checked += 1

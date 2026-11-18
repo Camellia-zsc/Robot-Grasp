@@ -6,6 +6,7 @@ import pytest
 
 from cube_task.assistant.placement_observation import (
     candidate_visibility_filter, safe_inspection_poses, safe_inspection_route,
+    iter_safe_inspection_poses, inspection_history, remember_inspection, forget_inspection,
 )
 from cube_task.core.transforms import make_T, top_down_T
 from cube_task.core.types import CameraIntrinsics, Detection, Frame, GraspPlan
@@ -141,3 +142,43 @@ def test_no_inspection_motion_is_offered_when_every_native_path_is_rejected():
     route, why = safe_inspection_route(arm, grasp, top_down_T(.4, 0., .15, 0.),
                                       top_down_T(.2, 0., .18, 0.), [], .05)
     assert not route and why == 'joint path unavailable'
+
+
+def test_already_measured_view_is_skipped_before_ik_for_same_held_scene():
+    _target, grasp, _frame, _camera = inputs()
+    checks = []
+    arm = SimpleNamespace(check_reachable=lambda pose, **kw: checks.append(pose.copy()) or (True, ''))
+    T_fc = make_T(np.diag([1., -1., -1.]), [0., 0., .05])
+    first = next(iter_safe_inspection_poses(arm, grasp, T_fc, np.eye(4), [.3, 0.], .11,
+                                            max_poses=1))
+    checks.clear()
+    second = next(iter_safe_inspection_poses(arm, grasp, T_fc, np.eye(4), [.3, 0.], .11,
+                                             exclude_poses=[first], max_poses=1))
+    trace = np.sum(first[:3, :3] * second[:3, :3])
+    assert np.linalg.norm(first[:3, 3] - second[:3, 3]) >= .005 or trace <= 1 + 2*np.cos(np.deg2rad(3))
+    assert len(checks) == 1
+
+
+def test_inspection_memory_expires_for_user_edit_or_new_grasp():
+    _target, grasp, _frame, _camera = inputs()
+    session = SimpleNamespace(_environment_revision=3)
+    pose = top_down_T(.3, 0., .2, 0.)
+    remember_inspection(session, grasp, pose)
+    pose[0, 3] = 9.
+    assert inspection_history(session, grasp)[0][0, 3] == .3
+    session._environment_revision += 1
+    assert inspection_history(session, grasp) == []
+    remember_inspection(session, grasp, pose)
+    grasp.T_grasp[0, 3] += .01
+    assert inspection_history(session, grasp) == []
+
+
+def test_releasing_and_regrasping_same_anchor_allows_old_views_again():
+    _target, grasp, _frame, _camera = inputs()
+    session = SimpleNamespace(_environment_revision=3,
+        _skill_coverage_revision=3, _skill_observation_coverage={'focus': np.array([True])})
+    remember_inspection(session, grasp, top_down_T(.3, 0., .2, 0.))
+    assert inspection_history(session, grasp)
+    forget_inspection(session)
+    assert inspection_history(session, grasp) == []
+    assert session._skill_coverage_revision is None and not session._skill_observation_coverage

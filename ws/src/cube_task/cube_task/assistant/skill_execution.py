@@ -30,6 +30,15 @@ class SkillExecutor:
         self._free_failures = getattr(session, '_skill_free_failures', {})
         session._skill_free_failures = self._free_failures
 
+    def capabilities(self):
+        return dict(skills=['observe', 'pick', 'place', 'move', 'verify', 'ask', 'finish'],
+            observe_modes=['stationary', 'active'],
+            observe_destination_types=['goal', 'zone', 'region', 'original'],
+            destination_types=['goal', 'zone', 'region', 'auto_free', 'original'],
+            holding_allowed_skills=['observe', 'place', 'ask'],
+            active_observe_requires_geometry=True, multi_object_rearrangement=True,
+            restores_original_pose=True)
+
     def _stopped(self, cancel):
         return self.session.cancel_event.is_set() or (cancel is not None and cancel.is_set())
 
@@ -84,7 +93,7 @@ class SkillExecutor:
                 self._check_plan()
                 skill = step.get('skill')
                 if skill == 'observe':
-                    return self._observe(step)
+                    return self._observe(step, goals)
                 if skill == 'pick':
                     return self._pick(step, goals, cancel_event)
                 if skill == 'place':
@@ -181,13 +190,15 @@ class SkillExecutor:
         flange = session.arm.get_flange_pose()
         pose = camera_pose_in_base(session.runner.ext, flange.value, session.runner.T_flange_tcp)
         frame = session.camera._last
-        target = session.runner._held_recovery_context['det']
+        context = session.runner._held_recovery_context
+        target = context['det'] if context is not None else None
         # The held target uses its original measured anchor. Its current image
         # may be cropped by the gripper and must never replace that anchor.
-        fresh = [d for d in fresh if d.center_base is not None and d.label != target.label]
+        fresh = [d for d in fresh if d.center_base is not None
+                 and (target is None or d.label != target.label)]
         neighbors = merge_local_detections(
             session._observed_detections, fresh,
-            lambda d: measurement_visible(d, frame, pose), forget=[target])
+            lambda d: measurement_visible(d, frame, pose), forget=[target] if target is not None else [])
         session._last_fresh = fresh
         session._observation_revision = revision
         session._observed_detections = copy.deepcopy(neighbors)
@@ -195,20 +206,71 @@ class SkillExecutor:
         session._publish_scene(neighbors, [], [], session.runner._last_stamp)
         return neighbors
 
-    def _observe(self, step):
+    def _observation_focus(self, step, goals):
+        specification = step.get('destination')
+        if specification is None and not step.get('label'):
+            goal = getattr(self.session, '_recovery_goal', None)
+            if goal:
+                specification = (goal.get('destination') or
+                                 {'type': 'zone', 'name': goal.get('zone_name')})
+        if specification is not None:
+            destination, _yaw = self._resolve(specification, goals)
+            if destination['type'] == 'auto_free':
+                raise ValueError('主动观察需要一个已有目的区域或物品位置')
+            options = self._options(destination)
+            zone, polygon = options['placement_zone'], options['placement_polygon']
+            xy = np.asarray(zone.center[:2], float)
+            if destination['type'] != 'point':
+                return xy, np.asarray(polygon, float)
+        elif step.get('label'):
+            reference = self._reference(step['label'])
+            if reference.get('center_base') is None:
+                raise ValueError('缺少该物品的实测观察位置，请指定已有目的区域')
+            xy = np.asarray(reference['center_base'][:2], float)
+        else:
+            raise ValueError('主动观察需要已有目标区域或物品位置')
+        return xy, np.array([[-.10, -.10], [-.10, .10], [.10, .10], [.10, -.10]]) + xy
+
+    def _active_observe(self, step, goals):
+        from .active_observation import inspect_held
+        xy, polygon = self._observation_focus(step, goals)
+        result = inspect_held(self.session, xy, polygon, self._stationary, self._check_plan)
+        self.session._status = 'stopped' if self.session.cancel_event.is_set() else 'ready'
+        self.session._publish_snapshot()
+        return dict(result, skill='observe', scene=copy.deepcopy(self.session.scene))
+
+    def _observe(self, step, goals):
         session = self.session
+        from .active_observation import measurements_changed
+        before = copy.deepcopy(session.scene.get('objects', []))
         if self._held():
+            if step.get('mode') == 'active':
+                return self._active_observe(step, goals)
             self._stationary()
             scene = session.scene
         elif self._holding():
             return self._failure(step, 'held_context_missing', '当前仍有持物反馈，缺少安全续接记录，已保持当前位置')
+        elif step.get('mode') == 'stationary':
+            self._stationary()
+            scene = session.scene
         else:
             label = step.get('label')
-            scene = session.observe(target=self._reference(label) if label else None,
+            reference = self._reference(label) if label else None
+            if step.get('destination') is not None:
+                xy, _polygon = self._observation_focus(step, goals)
+                destination = {'type': 'point', 'xy': xy.tolist()}
+                session._ensure_destination_view(destination)
+                reference = {'xy': xy.tolist()}
+                if label:
+                    reference['label'] = label
+            scene = session.observe(target=reference,
                                     purpose='skill_observe')
         session._status = 'ready'
         session._publish_snapshot()
         return dict(ok=True, skill='observe', stage='observed', holding=self._held(),
+                    changed=measurements_changed(before, scene.get('objects', [])),
+                    observation_mode='stationary' if self._held() or step.get('mode') == 'stationary' else 'active_local',
+                    reason='camera_measurement_refresh',
                     scene=copy.deepcopy(scene), camera_verified=True,
                     message='已获得新的相机观测')
 
@@ -350,6 +412,9 @@ class SkillExecutor:
         self._free_failures.setdefault(key, set()).add(point)
 
     def _place(self, step, goals, protected, cancel):
+        import time
+        from .simulation import _PlacementBudget, _PlacementInterrupted
+
         session = self.session
         context = session.runner._held_recovery_context
         if context is None or context['det'].label != step.get('label'):
@@ -368,15 +433,51 @@ class SkillExecutor:
             context['det'].extra['_restore_yaw'] = yaw
             target.extra['_restore_yaw'] = yaw
         bundle, why, options = None, '没有通过严格检查的桌面空位', None
-        try:
+        budget = _PlacementBudget(getattr(session, 'arm', None), session.cancel_event, seconds=15.)
+        emit = getattr(session, '_emit', lambda *_args: None)
+        last_progress = [-float('inf')]
+
+        def interrupted():
+            return budget.cancelled() or self._stopped(cancel) or not self._plan_current()
+
+        def progress(fields):
+            now = time.monotonic()
+            if self._stopped(cancel) or now - last_progress[0] < 1.:
+                return
+            last_progress[0] = now
+            emit('placement_progress', dict(fields,
+                message='正在检查持物的安全放置方案，仍保持夹持'))
+
+        def search():
+            nonlocal bundle, why, options, destination
             for candidate in candidates:
-                if self._stopped(cancel):
-                    return self._failure(step, 'aborted', '任务已停止')
+                self._check_plan()
+                if interrupted():
+                    raise _PlacementInterrupted()
                 options = self._options(candidate)
-                bundle, why = session.runner.plan_held_transfer(target, neighbors, **options)
+                bundle, why = session.runner.plan_held_transfer(
+                    target, neighbors, **options, cancelled=interrupted,
+                    progress=progress)
+                self._check_plan()
+                if interrupted():
+                    raise _PlacementInterrupted()
                 if bundle is not None:
                     destination = candidate
                     break
+
+        try:
+            emit('placement_planning', dict(message='正在检查持物的安全放置点，仍保持夹持'))
+            try:
+                budget.run(search)
+            except _PlacementInterrupted:
+                stopped = self._stopped(cancel)
+                reason = 'aborted' if stopped else 'placement_planning_budget_exceeded'
+                message = ('任务已停止，仍保持当前夹持' if stopped else
+                           '本轮持物放置搜索已达计算预算，仍保持夹持，可调整观察后重新规划')
+                if not stopped:
+                    emit('placement_changed', dict(message=message, reason=reason))
+                return dict(self._failure(step, reason, message), diagnostics=reason,
+                            aborted=stopped, fault=False)
             if bundle is None:
                 return self._failure(step, 'placement_infeasible', why)
             target = bundle['det']

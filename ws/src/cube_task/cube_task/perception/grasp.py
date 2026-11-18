@@ -1335,7 +1335,8 @@ class PlacePlanner:
              strict: bool = False, fixed_xy: bool = False,
              pose_filter: Optional[Callable[[float, float, float], bool]] = None,
              avoid_poses: Sequence[Sequence[float]] = (),
-             cancelled: Optional[Callable[[], bool]] = None) -> PlacePlan:
+             cancelled: Optional[Callable[[], bool]] = None,
+             preferred_xy: Sequence[Sequence[float]] = ()) -> PlacePlan:
         """
         Return a PlacePlan for releasing into zone (poses in the base frame, m).
 
@@ -1352,6 +1353,8 @@ class PlacePlanner:
         per label); the wall rim and stack clearances still apply.
         candidate_filter: optional local XY feasibility predicate, applied before
         choosing a shaped release. If it rejects every candidate, the plan is infeasible.
+        preferred_xy: measured object landing centers tried before the normal
+        strict region search; exact destinations and non-strict plans ignore it.
         """
         eye = np.eye(4)
         self.last_info = {}
@@ -1384,7 +1387,7 @@ class PlacePlanner:
             if strict:
                 candidate = self._strict_release(zone, held, occupied, avoid, lower,
                                                  fixed_xy, candidate_filter, pose_filter, avoid_poses,
-                                                 cancelled)
+                                                 cancelled, preferred_xy=preferred_xy)
                 if candidate is None:
                     return PlacePlan(zone.name, eye, eye.copy(), eye.copy(), self.open_width,
                                      False, 'planning_cancelled' if cancelled and cancelled()
@@ -1422,14 +1425,21 @@ class PlacePlanner:
                          open_width=open_w)
 
     def _strict_release(self, zone, held, occupied, avoid, lower, fixed_xy,
-                        candidate_filter, pose_filter, avoid_poses, cancelled=None):
+                        candidate_filter, pose_filter, avoid_poses, cancelled=None,
+                        preferred_xy=()):
         """Search only fully clear candidates; an exact point never drifts."""
         L, W = sorted((float(held['length']), float(held['width'])), reverse=True)
         grip = float(held.get('grip_width', W) or W)
         opening = min(self.open_width, grip + RELEASE_OPEN_EXTRA)
         floor = self.release_height_flat - lower + float(held.get('grip_z', 0)) - PAD_HALF
         center = tuple(float(v) for v in zone.center[:2])
-        candidates = [center]
+        candidates = []
+        if not fixed_xy:
+            for value in preferred_xy:
+                point = np.asarray(value, float)
+                if point.shape == (2,) and np.all(np.isfinite(point)):
+                    candidates.append(tuple(float(v) for v in point))
+        candidates.append(center)
         if not fixed_xy:
             nx = int(float(zone.size[0]) / 2 / SLOT_GRID_STEP)
             ny = int(float(zone.size[1]) / 2 / SLOT_GRID_STEP)

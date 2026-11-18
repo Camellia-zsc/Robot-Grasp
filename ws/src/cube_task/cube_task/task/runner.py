@@ -1061,7 +1061,8 @@ class TaskRunner:
         return context, width, ''
 
     def plan_held_transfer(self, det: Detection, neighbors: Sequence[Detection],
-                           placement_zone, placement_polygon, exact_xy=True):
+                           placement_zone, placement_polygon, exact_xy=True,
+                           cancelled=None, progress=None, max_attempts=None):
         """Check a temporary release without changing the original recovery goal.
 
         The caller owns the outer transaction and its restoration obligations.
@@ -1081,7 +1082,8 @@ class TaskRunner:
         place, why = self.replan_release(
             original, grasp, placeholder, width, neighbors,
             placement_zone=placement_zone, placement_polygon=placement_polygon,
-            exact_xy=bool(exact_xy))
+            exact_xy=bool(exact_xy), cancelled=cancelled,
+            progress=progress, max_attempts=max_attempts)
         if place is None:
             return None, why
         return {'det': original, 'grasp': grasp, 'place': place, 'width': width,
@@ -1257,29 +1259,9 @@ class TaskRunner:
                  self.placer.last_info.get('axis') if shape else None))
         return result, ''
 
-    def replan_release(self, det, gp, pp, width, neighbors, placement_zone=None,
-                       placement_polygon=None, exact_xy=False, observation_filter=None,
-                       cancelled=None, progress=None):
-        """Plan the held object's release from fresh measured surroundings.
-
-        This is the stationary ``before_release`` seam, not another grasp or
-        recovery action. It sends no arm/gripper commands. The original held
-        grasp transform remains fixed; only the same destination's release
-        center/orientation may change. A fixed point permits orientation retries
-        but never silently moves to another center.
-        """
-        from .reach import adjust_plan_poses, release_workspace_reason
-
-        def interrupted():
-            return self._aborted() or bool(cancelled is not None and cancelled())
-
-        def interruption_reason():
-            return 'aborted' if self._aborted() else 'placement_planning_budget_exceeded'
-
-        if interrupted():
-            return None, interruption_reason()
-        if not self._healthy():
-            return None, 'arm stopped or unhealthy before release'
+    def _release_search_geometry(self, det, gp, pp, width, neighbors,
+                                 placement_zone=None, placement_polygon=None):
+        """Build the same measured constraints for capacity and release searches."""
         try:
             width = float(width)
         except (TypeError, ValueError):
@@ -1324,26 +1306,118 @@ class TaskRunner:
                 return None, 'neighbor footprint is unavailable before release'
             occupied.append((*_xy(other), dims[0], float(other.height or 0.),
                              *dims, float(other.yaw)))
+        return dict(width=width, zone=zone, polygon=polygon, grasp=planning_grasp,
+                    shape=shape, held=held, transit=transit, neighbors=neighbors,
+                    occupied=occupied), ''
+
+    def has_release_capacity(self, det, gp, pp, width, neighbors, placement_zone=None,
+                             placement_polygon=None, exact_xy=False, cancelled=None,
+                             progress=None):
+        """Return measured geometric capacity, never an executable placement.
+
+        True permits looking for a better view, not releasing the object. False
+        proves no strict geometric candidate was found. None means computation
+        or measurements were insufficient; every actual release still goes
+        through replan_release and its final pose/path/visibility checks.
+        """
+        from .reach import release_workspace_reason
+
+        def interrupted():
+            return self._aborted() or bool(cancelled is not None and cancelled())
+
+        if interrupted():
+            return None, 'aborted' if self._aborted() else 'placement_planning_budget_exceeded'
+        if not self._healthy():
+            return None, 'arm stopped or unhealthy before release'
+        search, why = self._release_search_geometry(
+            det, gp, pp, width, neighbors, placement_zone, placement_polygon)
+        if search is None:
+            return None, why
+        if progress is not None:
+            progress({'phase': 'release_capacity'})
+        previous_info = self.placer.last_info
+        try:
+            candidate = self.placer.plan(
+                search['zone'], search['held'], search['transit'], footprint=self._footprint(det),
+                occupied=search['occupied'], held=search['shape'], strict=True,
+                fixed_xy=bool(exact_xy),
+                pose_filter=self._strict_place_filter(det, search['grasp'], search['neighbors'],
+                                                      search['polygon']),
+                candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
+                center_first=self._center_first(search['zone'].name),
+                lower=self.release_lower.get(det.label, 0.0), cancelled=interrupted)
+        finally:
+            # Capacity is observation evidence, never the executable release.
+            self.placer.last_info = previous_info
+        if interrupted():
+            return None, 'aborted' if self._aborted() else 'placement_planning_budget_exceeded'
+        return bool(candidate.feasible), '' if candidate.feasible else candidate.reason
+
+    def replan_release(self, det, gp, pp, width, neighbors, placement_zone=None,
+                       placement_polygon=None, exact_xy=False, observation_filter=None,
+                       cancelled=None, progress=None, max_attempts=None):
+        """Plan a held release with every geometric, reach and visibility check.
+
+        max_attempts bounds one computation phase; its default retains the
+        existing retry count. The physically held grasp is never replanned.
+        """
+        from .reach import adjust_plan_poses, release_workspace_reason
+
+        def interrupted():
+            return self._aborted() or bool(cancelled is not None and cancelled())
+
+        def interruption_reason():
+            return 'aborted' if self._aborted() else 'placement_planning_budget_exceeded'
+
+        if interrupted():
+            return None, interruption_reason()
+        if not self._healthy():
+            return None, 'arm stopped or unhealthy before release'
+        if max_attempts is not None and (type(max_attempts) is not int or max_attempts < 1):
+            return None, 'invalid release attempt budget'
+        attempt_limit = RELEASE_RETRIES + 1 if max_attempts is None else max_attempts
+        search, why = self._release_search_geometry(
+            det, gp, pp, width, neighbors, placement_zone, placement_polygon)
+        if search is None:
+            return None, why
+        width, zone, polygon = search['width'], search['zone'], search['polygon']
+        planning_grasp, shape = search['grasp'], search['shape']
+        held, transit = search['held'], search['transit']
+        neighbors, occupied = search['neighbors'], search['occupied']
+        preferred_xy = ()
+        if not exact_xy:
+            rotation = pp.T_release[:3, :3] @ gp.T_grasp[:3, :3].T
+            cloud = np.asarray((det.extra or {}).get('_placement_points_base'), float)
+            if (cloud.ndim == 2 and cloud.shape[1:] == (3,) and len(cloud) >= 40
+                    and np.all(np.isfinite(cloud))):
+                carried = (cloud - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3]
+                center = (carried.min(axis=0) + carried.max(axis=0)) / 2
+            else:
+                table = detection_table_z(det) or 0.0
+                source = np.r_[det.center_base[:2], table + float(det.height or 0.0) / 2]
+                center = pp.T_release[:3, 3] + rotation @ (source - gp.T_grasp[:3, 3])
+            preferred_xy = (tuple(center[:2]),)
         allowed = self._strict_place_filter(det, planning_grasp, neighbors, polygon)
         def measured_allowed(x, y, closing):
             return (not interrupted() and
-                    (observation_filter is None or observation_filter(x, y, closing)) and
-                    allowed(x, y, closing))
+                    allowed(x, y, closing) and
+                    (observation_filter is None or observation_filter(x, y, closing)))
         avoided, avoided_poses = [], []
         why = 'no clear reachable position in the requested destination'
-        for attempt in range(RELEASE_RETRIES + 1):
+        for attempt in range(attempt_limit):
             if interrupted():
                 return None, interruption_reason()
             if progress is not None:
                 progress({'phase': 'release_candidates', 'attempt': attempt + 1,
-                          'max_attempts': RELEASE_RETRIES + 1})
+                          'max_attempts': attempt_limit})
             candidate = self.placer.plan(
                 zone, held, transit, footprint=self._footprint(det), occupied=occupied,
                 held=shape, avoid=avoided, strict=True, fixed_xy=bool(exact_xy),
                 avoid_poses=avoided_poses, pose_filter=measured_allowed,
                 candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
                 center_first=self._center_first(zone.name),
-                lower=self.release_lower.get(det.label, 0.0), cancelled=interrupted)
+                lower=self.release_lower.get(det.label, 0.0), cancelled=interrupted,
+                preferred_xy=preferred_xy)
             if interrupted():
                 return None, interruption_reason()
             if not candidate.feasible:

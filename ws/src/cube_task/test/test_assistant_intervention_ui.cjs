@@ -172,14 +172,54 @@ function pointerAt(xy,table=state.scene.placement.table_bounds){
   eq(get("editor-mode-intervene").disabled,true);
   eq(map.attributes["aria-disabled"],"true");
 
-  // Returning to ordinary editing/robot point selection keeps the original
-  // work-area viewport and reach constraints instead of inheriting the table.
+  // Idle editing uses the same full tabletop as interventions. Library clicks,
+  // drops and existing-object drags may land in a zone or cross its boundary.
   update({...state,needs_reset:false,busy:false,status:"ready",
-    simulation:{...state.simulation,editor:{...state.simulation.editor,editable:true}}});
+    simulation:{...state.simulation,zones:[{name:"zone_red",center:[.65,.14],size:[.2,.16]}],
+      editor:{...state.simulation.editor,editable:true,catalog:[{id:"pear",label:"pear",name:"梨子"}]}}});
   await get("editor-mode-edit").dispatch("click");
   const editOutline=boundary();
-  eq(Math.round((editOutline[1][0]-editOutline[0][0])/(editOutline[0][1]-editOutline[3][1])*1e6),1000000);
+  eq(editOutline.every(([x,y])=>x>=0&&x<=420&&y>=0&&y<=280),true);
+  eq(Math.round((editOutline[1][0]-editOutline[0][0])/(editOutline[0][1]-editOutline[3][1])*1e6),1333333);
+  has(get("editor-hint").textContent,/整个桌面/);
+  const labels=drawing.slice(drawing.findLastIndex(command=>command[0]==="clearRect"))
+    .filter(command=>command[0]==="fillText").map(command=>command[1]);
+  eq(labels.some(label=>/整个桌面/.test(label)),true);
+  eq(labels.some(label=>/抓取区.*拖入/.test(label)),false);
+
+  const pear=get("object-library").children[0];
+  has(pear.title,/拖到桌面/);
+  has(pear.querySelector("small").textContent,/拖入桌面/);
+  await pear.dispatch("click");
+  has(get("editor-hint").textContent,/桌面/);
+  eq(/抓取区内/.test(get("editor-hint").textContent),false);
+  eq(/抓取区内/.test(get("editor-selected-position").textContent),false);
+  await map.dispatch("pointerdown",pointerAt([.68,.18]));
+  await new Promise(resolve=>setImmediate(resolve));
+  let editRequest=requests.filter(item=>item.url==="/api/scene-edit").at(-1);
+  eq(editRequest.payload.action,"add");
+  eq(editRequest.payload.catalog_id,"pear");
+  deep(editRequest.payload.xy.map(value=>Math.round(value*1e4)/1e4),[.68,.18]);
+
+  await map.dispatch("drop",{...pointerAt([.58,.22]),dataTransfer:{getData:()=>"pear"}});
+  await new Promise(resolve=>setImmediate(resolve));
+  editRequest=requests.filter(item=>item.url==="/api/scene-edit").at(-1);
+  eq(editRequest.payload.action,"add");
+  deep(editRequest.payload.xy.map(value=>Math.round(value*1e4)/1e4),[.58,.22]);
+
+  await map.dispatch("pointerdown",pointerAt([.30,0]));
+  await map.dispatch("pointermove",pointerAt([.68,.18]));
+  await map.dispatch("pointerup",pointerAt([.68,.18]));
+  await new Promise(resolve=>setImmediate(resolve));
+  editRequest=requests.filter(item=>item.url==="/api/scene-edit").at(-1);
+  eq(editRequest.payload.action,"move");
+  eq(editRequest.payload.object_id,"truth-apple");
+  deep(editRequest.payload.xy.map(value=>Math.round(value*1e4)/1e4),[.68,.18]);
+
+  // Robot point selection independently retains its original reach limits.
   await get("editor-mode-place").dispatch("click");
+  const placeOutline=boundary();
+  eq(Math.round((placeOutline[1][0]-placeOutline[0][0])/(placeOutline[0][1]-placeOutline[3][1])*1e6),1000000);
   await map.dispatch("pointerdown",pointerAt([.55,0],state.scene.placement.bounds));
   eq(editor.selection(),null);
   has(get("editor-error").textContent,/超出可选桌面范围/);

@@ -105,13 +105,18 @@ class CatalogEditor:
     The execution layer still performs its normal measured planning/IK checks.
     """
 
-    def __init__(self, world, pick_polygon):
+    def __init__(self, world, pick_polygon, *, edit_polygon=None):
         polygon = parse_polygon(pick_polygon)
-        if polygon is None:
+        editable = parse_polygon(edit_polygon) if edit_polygon is not None else polygon
+        if polygon is None or editable is None:
             raise ValueError('摆场区域不能为空。')
         self.world = world
+        # The taught pick area is task metadata. Human edits may use a larger
+        # supporting table and must not inherit a task's completion boundary.
         self.pick_polygon = polygon.copy()
+        self.edit_polygon = editable.copy()
         self._metadata = {'catalog': catalog_entries(), 'pick_polygon': self.pick_polygon.tolist(),
+                          'edit_polygon': self.edit_polygon.tolist(),
                           'max_objects': MAX_OBJECTS, 'min_gap_m': MIN_OBJECT_GAP,
                           'one_per_class': True}
 
@@ -122,10 +127,10 @@ class CatalogEditor:
         lo, hi = candidate.aabb()
         corners = np.array([[lo[0], lo[1]], [lo[0], hi[1]],
                             [hi[0], hi[1]], [hi[0], lo[1]]])
-        if (not np.all(points_in_polygon(corners, self.pick_polygon, margin=1e-9))
+        if (not np.all(points_in_polygon(corners, self.edit_polygon, margin=1e-9))
                 or any(_segment_in_rectangle(a, b, lo, hi)
-                       for a, b in zip(self.pick_polygon, np.roll(self.pick_polygon, -1, axis=0)))):
-            raise ValueError('物品完整轮廓必须位于抓取区内，请向区域中央移动。')
+                       for a, b in zip(self.edit_polygon, np.roll(self.edit_polygon, -1, axis=0)))):
+            raise ValueError('物品完整轮廓超出可摆放桌面，请移回桌面内。')
         for other in objects:
             a, b = other.aabb()
             delta = np.maximum(np.maximum(a[:2] - hi[:2], lo[:2] - b[:2]), 0.0)

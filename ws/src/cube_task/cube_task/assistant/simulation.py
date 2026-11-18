@@ -176,7 +176,10 @@ class SimulationSession:
         self._placement = placement_metadata(self.cfg, self.info['pick_polygon'])
         self._placement_center = None
         self._destination_views = {}
-        self.editor = CatalogEditor(self.world, self.info['pick_polygon'])
+        table = self._placement['table_bounds']
+        table_polygon = [[table['x'][0], table['y'][0]], [table['x'][1], table['y'][0]],
+                         [table['x'][1], table['y'][1]], [table['x'][0], table['y'][1]]]
+        self.editor = CatalogEditor(self.world, self.info['pick_polygon'], edit_polygon=table_polygon)
         # Fail closed even if a future scenario overlay changes its backend.
         if self.cfg.get('robot.backend') != 'sim' or self.cfg.get('camera.backend') != 'sim':
             raise ValueError('the assistant only supports the kinematic simulation')
@@ -293,10 +296,7 @@ class SimulationSession:
                 xy = request.get('xy', obj.center_xy())
                 candidate.place_upright(float(xy[0]), float(xy[1]),
                                        float(request.get('yaw', obj.yaw())), self.world.table_z)
-                table = self._placement['table_bounds']
-                polygon = [[table['x'][0], table['y'][0]], [table['x'][1], table['y'][0]],
-                           [table['x'][1], table['y'][1]], [table['x'][0], table['y'][1]]]
-                CatalogEditor(self.world, polygon)._check_placement(
+                self.editor._check_placement(
                     candidate, [o for o in self.world.objects if o is not obj and not
                                 (o is self.world.held and
                                  float(o.aabb()[0][2]) > float(candidate.aabb()[1][2]) + .008)])

@@ -54,10 +54,8 @@ def test_running_move_reaches_all_table_corners_outside_robot_and_pick_area(
     xy = [table['x'][x_side] + (.04 if x_side == 0 else -.04),
           table['y'][y_side] + (.04 if y_side == 0 else -.04)]
     # This human placement is outside the robot's work area; it must still be
-    # supported on the table. Ordinary scene editing keeps its pick-area rule.
+    # supported on the table, just like an ordinary manual scene edit.
     assert not sim._placement['bounds']['x'][0] <= xy[0] <= sim._placement['bounds']['x'][1]
-    with pytest.raises(ValueError, match='抓取区'):
-        sim.editor.apply(dict(action='move', object_id=target.name, xy=xy, yaw=math.pi / 4))
     identity = id(target)
     apply_while_running(sim, dict(action='move', object_id=target.name, xy=xy, yaw=math.pi / 4))
     np.testing.assert_allclose(target.center_xy(), xy, atol=1e-10)

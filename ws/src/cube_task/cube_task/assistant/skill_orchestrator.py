@@ -62,6 +62,87 @@ class SkillOrchestrator:
         return bool(result and result.get('verified_revision') == self._revision()
                     and not self._pending_interventions())
 
+    def _reusable(self, result):
+        """A revision alone is insufficient: robot moves do not increment it."""
+        snap = self.session.snapshot()
+        return bool(result and result.get('ok') is True
+                    and result.get('camera_verified') is True
+                    and result.get('truth', {}).get('success') is True
+                    and result.get('verified_revision') is not None
+                    and self._verification_current(result)
+                    and not result.get('holding') and not snap.get('held_object')
+                    and not getattr(self.session.runner, 'has_held_recovery', False)
+                    and not result.get('fault') and not result.get('aborted')
+                    and not self.ctl._cancel.is_set()
+                    and not self.session.cancel_event.is_set())
+
+    @staticmethod
+    def _goal_contract(goal):
+        if goal.get('destination') is not None:
+            return dict(label=goal['label'], zone_name=None,
+                        destination=copy.deepcopy(goal['destination']))
+        return dict(label=goal['label'], zone_name=goal.get('zone_name'))
+
+    def _proof(self, result, goals):
+        if not self._reusable(result):
+            return None
+        contracts = [self._goal_contract(g) for g in goals]
+        items = result.get('items', ())
+        if len(items) != len(contracts):
+            return None
+        if any(item.get('ok') is not True
+               or item.get('truth', {}).get('success') is not True
+               or item.get('verified_revision', result['verified_revision']) != result['verified_revision']
+               for item in items):
+            return None
+        measured = [self._goal_contract(i.get('goal', {})) for i in items]
+        # Camera verification groups shared destinations, so its item order
+        # can differ from the user's goal order. Require one proof per contract.
+        if any(measured.count(goal) != 1 for goal in contracts):
+            return None
+        ordered = [copy.deepcopy(items[measured.index(goal)]) for goal in contracts]
+        return dict(goals=contracts, result=dict(copy.deepcopy(result), items=ordered))
+
+    def _action_proof(self, step, result, goals):
+        if (step['skill'] not in ('move', 'place') or not self._reusable(result)
+                or result.get('controller_ok') is not True
+                or result.get('label') != step.get('label')
+                or not self._final_destination(step, goals)):
+            return None
+        goal = next(g for g in goals if g['label'] == step['label'])
+        contract = self._goal_contract(goal)
+        destination = (goal.get('destination') or
+                       dict(type='named_region', name=goal.get('zone_name')))
+        if result.get('resolved_destination') != destination:
+            return None
+        item = dict(goal=contract, label=step['label'], ok=True,
+                    truth={'success': True}, verified_revision=result['verified_revision'])
+        return self._proof(dict(result, items=[item]), [goal])
+
+    def _cached_verification(self, proof, goals):
+        if not proof or not self._reusable(proof.get('result')):
+            return None
+        contracts = [self._goal_contract(g) for g in goals]
+        if not contracts or any(g not in proof['goals'] for g in contracts):
+            return None
+        items = [copy.deepcopy(proof['result']['items'][proof['goals'].index(g)])
+                 for g in contracts]
+        return dict(copy.deepcopy(proof['result']), items=items, skill='verify',
+                    verification_reused=True, message='现场未变化，复用已通过的相机与落位核验')
+
+    def _paired_place(self, steps, index, goals):
+        """Only an explicit final-place postcondition can make a pick redundant."""
+        for offset in range(index + 1, len(steps)):
+            following = steps[offset]
+            if following['skill'] == 'observe':
+                continue
+            if (following['skill'] == 'place'
+                    and following.get('label') == steps[index].get('label')
+                    and self._final_destination(following, goals)):
+                return offset
+            break
+        return None
+
     def _held_label(self):
         if not self.session.snapshot().get('held_object'):
             return None
@@ -190,7 +271,7 @@ class SkillOrchestrator:
         for name in ('diagnostics', 'observation_mode', 'reason'):
             if isinstance(result.get(name), str):
                 entry[name] = result[name][:1000]
-        for name in ('changed', 'progress'):
+        for name in ('changed', 'progress', 'skipped', 'verification_reused'):
             if type(result.get(name)) is bool:
                 entry[name] = result[name]
         with self.ctl._lock:
@@ -226,8 +307,10 @@ class SkillOrchestrator:
                 return dict(ok=False, error='original_not_measured', message='缺少承诺复位物品的原始测量')
             goals.append(dict(label=label, zone_name=None,
                 destination=dict(type='point', xy=list(originals[0]['center_base'][:2]))))
-        result = (cached if self._verification_current(cached) and not memory['protected_goals'] and not memory['restorations'] else
-            executor.execute(dict(id='final-check', skill='verify'), goals, cancel_event=self.ctl._cancel))
+        result = (self._cached_verification(cached, goals)
+                  if not memory['protected_goals'] and not memory['restorations'] else None)
+        if result is None:
+            result = executor.execute(dict(id='final-check', skill='verify'), goals, cancel_event=self.ctl._cancel)
         if not self._verification_current(result):
             return dict(result, ok=False, error='scene_changed', message='最终核验期间现场变化，结果已过期')
         for label in memory['restorations']:
@@ -378,6 +461,7 @@ class SkillOrchestrator:
                     if not self._approve(steps, question):
                         return self._finish(False, '未获同意，已保留现场并停止本次方案', memory)
                 verified = None
+                skipped_pairs = set()
                 finished = False
                 round_progress = False
                 for index, step in enumerate(steps):
@@ -400,18 +484,49 @@ class SkillOrchestrator:
                     # Stop/driver exceptions must not erase an unpaid restore.
                     self._obligations(step, dict(ok=False), memory, steps)
                     held_before = bool(self.session.snapshot().get('held_object'))
+                    proof_step = step
+                    physical = step['skill'] in ('pick', 'place', 'move')
+                    result = None
+                    checker = getattr(executor, 'check_completed', None)
+                    paired = (self._paired_place(steps, index, memory['goals'])
+                              if step['skill'] == 'pick' else None)
+                    if callable(checker) and (paired is not None or index in skipped_pairs):
+                        placement = steps[paired] if paired is not None else step
+                        result = checker(placement, memory['goals'], cancel_event=ctl._cancel,
+                                         expected_revision=revision)
+                        if result is not None and result.get('ok') and result.get('skipped'):
+                            if paired is not None:
+                                skipped_pairs.add(paired)
+                            proof_step = placement
+                            result = dict(result, skill=step['skill'])
+                        elif index in skipped_pairs and result is None:
+                            result = dict(ok=False, error='completion_changed',
+                                message='已完成状态不再成立，未执行空爪放置，等待重新规划')
+                    # Every actual manipulation invalidates all earlier proofs,
+                    # even when no human edit (and hence no revision) occurred.
+                    if physical and not (result and result.get('skipped') is True):
+                        verified = None
                     if step['skill'] == 'ask':
                         accepted = self._approve(steps[index:], step['question'])
                         result = dict(ok=accepted, message='已获同意' if accepted else '人工拒绝，未继续执行')
                     elif step['skill'] == 'finish':
                         result = self._verify_all(executor, memory, verified)
                         finished = bool(result.get('ok'))
-                    else:
+                    elif step['skill'] == 'verify':
+                        selected = ([memory['goals'][step['goal_index']]]
+                                    if 'goal_index' in step else memory['goals'])
+                        result = self._cached_verification(verified, selected)
+                    if result is None:
                         result = executor.execute(step, memory['goals'],
                             protected_goals=memory['protected_goals'], cancel_event=ctl._cancel,
                             expected_revision=revision)
+                    if (step['skill'] == 'verify' and result.get('ok') is True
+                            and result.get('camera_verified') is True
+                            and 'verified_revision' in result
+                            and not self._verification_current(result)):
+                        result = dict(result, ok=False, error='scene_changed',
+                                      message='核验后现场发生变化，旧结果不能计作步骤完成')
                     self._feedback(step, result, number)
-                    physical = step['skill'] in ('pick', 'place', 'move')
                     if physical and not result.get('ok'):
                         memory['last_action_failure'] = copy.deepcopy(result)
                     if ((physical and result.get('ok'))
@@ -422,10 +537,13 @@ class SkillOrchestrator:
                     step.update(status='succeeded' if result.get('ok') else 'failed', message=result.get('message', ''))
                     self._publish(steps=steps)
                     self._check_stop()
-                    if step['skill'] in ('pick', 'place', 'move'):
-                        verified = None
-                    elif step['skill'] == 'verify' and 'goal_index' not in step and not memory['protected_goals']:
-                        verified = result if result.get('ok') else None
+                    if not memory['protected_goals'] and not memory['restorations']:
+                        if physical:
+                            proof = self._action_proof(proof_step, result, memory['goals'])
+                            if proof is not None:
+                                verified = proof
+                        elif step['skill'] == 'verify':
+                            verified = self._proof(result, selected)
                     if not result.get('ok'):
                         failure = result
                         if step['skill'] == 'ask' or result.get('aborted') or result.get('fault'):

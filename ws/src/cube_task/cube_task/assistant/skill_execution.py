@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import math
 from collections.abc import Mapping
+from contextlib import contextmanager
 
 import numpy as np
 
@@ -66,12 +67,12 @@ class SkillExecutor:
         if not self._plan_current():
             raise _PlanChanged('现场变化使原技能方案失效，请重新规划')
 
-    def execute(self, step, goals, protected_goals=(), cancel_event=None, expected_revision=None):
-        """Run observe/pick/place/move/verify; ask/finish/stop belong to the controller."""
-        step = dict(step)
+    @contextmanager
+    def _guarded_operation(self, cancel_event, expected_revision):
         session = self.session
         with session._operation_lock:
             session._check_open()
+            previous_external = getattr(session.cancel_event, 'external', None)
             session.cancel_event.external = cancel_event
             previous_revision = self._expected_revision
             self._expected_revision = expected_revision
@@ -87,6 +88,40 @@ class SkillExecutor:
 
             if arm_skill is not None and expected_revision is not None:
                 arm_skill.execution_guard = guard
+            try:
+                yield
+            finally:
+                if arm_skill is not None and expected_revision is not None:
+                    arm_skill.execution_guard = previous_guard
+                self._expected_revision = previous_revision
+                session.cancel_event.external = previous_external
+
+    def check_completed(self, step, goals, cancel_event=None, expected_revision=None):
+        """Sense a resolved move's postcondition without dispatching any grasp.
+
+        The controller may also use this for an explicit pick/place pair whose
+        placement postcondition is known. A generic pick has no such condition.
+        """
+        step = dict(step)
+        with self._guarded_operation(cancel_event, expected_revision):
+            try:
+                if self._stopped(cancel_event):
+                    return self._failure(step, 'aborted', '任务已停止')
+                self._check_plan()
+                if self._holding():
+                    return None
+                destination, yaw = self._resolve(step.get('destination'), goals)
+                return self._completed_move(step, destination, yaw, cancel_event)
+            except _PlanChanged as exc:
+                return self._failure(step, 'scene_changed', str(exc))
+            except (ValueError, KeyError) as exc:
+                return self._failure(step, 'invalid_step', str(exc))
+
+    def execute(self, step, goals, protected_goals=(), cancel_event=None, expected_revision=None):
+        """Run observe/pick/place/move/verify; ask/finish/stop belong to the controller."""
+        step = dict(step)
+        session = self.session
+        with self._guarded_operation(cancel_event, expected_revision):
             try:
                 if self._stopped(cancel_event):
                     return self._failure(step, 'aborted', '任务已停止')
@@ -138,11 +173,6 @@ class SkillExecutor:
                 return self._failure(step, 'scene_changed', str(exc))
             except (ValueError, KeyError) as exc:
                 return self._failure(step, 'invalid_step', str(exc))
-            finally:
-                if arm_skill is not None and expected_revision is not None:
-                    arm_skill.execution_guard = previous_guard
-                self._expected_revision = previous_revision
-                session.cancel_event.external = None
 
     @staticmethod
     def _goal(goals, index):
@@ -363,6 +393,139 @@ class SkillExecutor:
                         exact_xy=False)
         return self.session._placement_options(destination)
 
+    def _current_measurement(self, label, *, fresh=True):
+        """A completion claim needs fresh camera data and one scene identity."""
+        session = self.session
+        revision = getattr(session, '_environment_revision', None)
+        if (getattr(session, '_last_observation_purpose', '') == 'consumed_for_pick' or
+                getattr(session, '_interventions', ()) or
+                session.snapshot().get('editor', {}).get('intervention_pending', 0)):
+            return None
+        if fresh and getattr(session, '_observation_revision', None) != revision:
+            return None
+        detections = getattr(session, '_last_fresh' if fresh else '_observed_detections', ())
+        if not fresh:
+            # Older views may prove that a grasp is still needed, but may not
+            # prove completion after a later robot motion in the same revision.
+            detections = [d for d in detections
+                          if d.extra.get('_observed_revision') == revision]
+        det = unique_target(detections, label)
+        matches = [obj for obj in session.scene.get('objects', ())
+                   if obj.get('valid') and obj.get('label') == label
+                   and obj.get('center_base') is not None]
+        if (det is None or len(matches) != 1 or
+                np.linalg.norm(np.asarray(matches[0]['center_base'][:2]) - det.center_base[:2]) >= .025):
+            return None
+        return det, matches[0]
+
+    def _at_destination(self, det, destination, yaw):
+        """Completion is full supported geometry, including requested restore yaw."""
+        from ..perception.grasp import detection_table_z
+        from .batch import whole_footprint_in_zone
+        from .destinations import whole_footprint_at_destination
+
+        session = self.session
+        measured = det.summary()
+        footprint_ok = (whole_footprint_in_zone(measured, session.scene, destination['name'])
+                        if destination['type'] == 'named_region' else
+                        whole_footprint_at_destination(measured, session.scene, destination))
+        if not footprint_ok:
+            return False
+        floor = (session.runner.zones[destination['name']].center[2]
+                 if destination['type'] == 'named_region' else
+                 session.cfg.get('perception.table.expected_z', None))
+        support = detection_table_z(det)
+        if (floor is None or support is None or not math.isfinite(float(floor)) or
+                not math.isfinite(float(support)) or abs(support - float(floor)) > .01 or
+                det.height is None or not math.isfinite(float(det.height)) or det.height <= 0):
+            return False
+        if yaw is not None:
+            from .catalog import catalog_entries
+            entry = next((e for e in catalog_entries() if e['label'] == det.label), {})
+            dims = entry.get('dimensions', [])
+            square = (entry.get('shape') in ('box', 'cube') and len(dims) >= 2
+                      and abs(dims[0] - dims[1]) < .001)
+            period = math.pi / 2 if square else math.pi
+            if (det.yaw is None or not math.isfinite(float(det.yaw)) or
+                    abs(math.remainder(float(det.yaw) - yaw, period)) > math.radians(10)):
+                return False
+        return True
+
+    def _completed_move(self, step, destination, yaw, cancel, *, observe=True):
+        """Prove this step's postcondition before spending work on its grasp."""
+        session = self.session
+        if (destination['type'] == 'auto_free' or self._holding() or
+                not getattr(session, 'scene', None)):
+            return None
+        label = step.get('label')
+        current = self._current_measurement(label)
+        if current is None:
+            known = self._current_measurement(label, fresh=False)
+            if known is not None and not self._at_destination(known[0], destination, yaw):
+                return None
+            if not observe or not hasattr(session, 'observe'):
+                return None
+            if destination['type'] == 'named_region':
+                xy = session.runner.zones[destination['name']].center[:2]
+            elif destination['type'] == 'point':
+                session._ensure_destination_view(destination)
+                xy = destination['xy']
+            else:
+                polygon = np.asarray(session.scene['placement']['pick_polygon'], float)
+                xy = (polygon.min(axis=0) + polygon.max(axis=0)) / 2
+            editor = getattr(session, 'editor', None)
+            one_per_class = bool(editor is not None and editor.metadata().get('one_per_class'))
+            # A human can move the sole class instance outside the old view.
+            # Its previous-revision source memory must not become a second
+            # phantom identity when the destination camera finds it again.
+            # Same-revision duplicates remain ambiguous and are never erased.
+            forget = [d for d in getattr(session, '_observed_detections', ())
+                      if one_per_class and d.label == label
+                      and d.extra.get('_observed_revision') != session._environment_revision]
+            self._check_plan()
+            session.observe(target={'xy': list(xy), 'label': label}, purpose='verify_place', forget=forget)
+            self._check_plan()
+            if self._stopped(cancel):
+                return self._failure(step, 'aborted', '任务已停止')
+            current = self._current_measurement(label)
+        if current is None or not self._at_destination(current[0], destination, yaw):
+            return None
+        det, obj = current
+        revision = session._environment_revision
+        # Camera geometry decides to refrain from grasping. Simulator truth is
+        # only an independent audit; disagreement must not trigger a re-grasp.
+        evaluation = session._evaluation_object(det)
+        truth = None
+        if evaluation is not None:
+            if destination['type'] == 'named_region':
+                zone = session.world.zone_of(evaluation)
+                floor = float(session.runner.zones[destination['name']].center[2])
+                truth = bool(evaluation is not session.world.held and zone is not None
+                             and zone.name == destination['name']
+                             and abs(evaluation.bottom_z() - floor) <= .01)
+            else:
+                truth = bool(session._verify_destination(evaluation, destination))
+        self._check_plan()
+        if self._stopped(cancel):
+            return self._failure(step, 'aborted', '任务已停止')
+        if (session._environment_revision != revision or self._holding() or
+                self._current_measurement(label) is None):
+            raise _PlanChanged('完成核验后现场发生变化，请重新规划')
+        goal = (dict(label=label, zone_name=destination['name'])
+                if destination['type'] == 'named_region' else
+                dict(label=label, zone_name=None, destination=copy.deepcopy(destination)))
+        item = dict(label=label, goal=goal, ok=truth is True,
+                    verified_revision=revision, truth={'success': truth}, yaw_verified=True)
+        result = dict(ok=truth is True, skipped=True, changed=False, skill=step['skill'],
+                      stage='already_satisfied', label=label, object_id=obj['object_id'],
+                      resolved_destination=copy.deepcopy(destination), controller_ok=True,
+                      camera_verified=True, holding=False, verified_revision=revision,
+                      truth={'success': truth}, yaw_verified=True, items=[item],
+                      message='相机确认该步骤已完成，已跳过重复抓取')
+        if truth is not True:
+            result.update(error='completion_not_verified', message='相机显示已完成，但独立核验未确认，已跳过重复抓取')
+        return result
+
     def _candidates(self, target, specification, neighbors):
         """Sample the configured tabletop; no fixed staging anchors or truth."""
         revision = self.session._environment_revision
@@ -512,10 +675,16 @@ class SkillExecutor:
             return self._failure(step, 'holding_object', '请先放置当前物品，再搬动物品')
         destination, yaw = self._resolve(step.get('destination'), goals)
         automatic = destination['type'] == 'auto_free'
+        completed = self._completed_move(step, destination, yaw, cancel)
+        if completed is not None:
+            return completed
         det, obj = self._fresh_target(step.get('label'), 'recover_queued_target')
         self._check_plan()
         if self._stopped(cancel):
             return self._failure(step, 'aborted', '任务已停止')
+        completed = self._completed_move(step, destination, yaw, cancel, observe=False)
+        if completed is not None:
+            return completed
         if destination['type'] == 'auto_free':
             from .obstacle_recovery import _checked_placement
             selected = None

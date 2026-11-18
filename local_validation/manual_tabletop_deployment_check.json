@@ -1,0 +1,61 @@
+{
+  "check": "passed",
+  "object_count": 6,
+  "scene_version": 65,
+  "physical_state_preserved": true,
+  "history_preserved": true,
+  "recorded_measurement_count": 0,
+  "raw_depth_cache_reconstructed": false,
+  "resolved_idle_editor_error_cleared": true,
+  "stop_semantics_preserved": true,
+  "live_preview_available": true,
+  "http_methods_used": [
+    "GET"
+  ],
+  "ok": true,
+  "url": "http://127.0.0.1:8767",
+  "code_commit": "78093720e2136664f889a719ba1beb88abfaea4f",
+  "status": "ready",
+  "messages": 24,
+  "metrics": {
+    "requests": 8,
+    "successes": 3,
+    "model_requests": 16
+  },
+  "manual_edit_polygon": [
+    [
+      -0.3,
+      -0.7
+    ],
+    [
+      0.8999999999999999,
+      -0.7
+    ],
+    [
+      0.8999999999999999,
+      0.7
+    ],
+    [
+      -0.3,
+      0.7
+    ]
+  ],
+  "task_pick_polygon_preserved": true,
+  "all_manual_modes_use_table": true,
+  "static_assets_match": true,
+  "asset_sha256": {
+    "index.html": "a3f09fd155fb1f77ba96553b6fb8db48308ea728018bd3feaaa9455a011c7fd8",
+    "app.js": "5486b7711b5eea1ea90455fb71a9a37e841a807f068a3de8c88c6e6f5d193f02",
+    "editor.js": "828da70a11c0744d35b22eab892a65e0b51504f89ea93adbb4b6a42d0d200785",
+    "style.css": "71fcbb13e4732e29720c5b5ca5727b42b33ae5fe5678b25ab6c35f9ed9ac61d0"
+  },
+  "source_files_checked": 120,
+  "production_matches_tested_worktree": true,
+  "online_api_called": false,
+  "user_approval_submitted": false,
+  "tests": {
+    "python_passed": 147,
+    "ui_assertions_passed": 338
+  },
+  "interaction_check": "HTTP state and static assets; manual drag listeners and real backend independently tested"
+}

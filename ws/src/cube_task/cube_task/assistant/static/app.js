@@ -42,12 +42,12 @@ function setConnection(connected){
 }
 function updateControls(){
   const state=ui.state||{};renderResumeRecovery(state);
-  const awaiting=state.status==="awaiting_approval";const resuming=Boolean(ui.resumeRecovery?.submitting||ui.resumeRecovery?.submitted);const busy=Boolean(state.busy||ui.pending||awaiting||resuming);const ready=ui.connected&&state.status!=="preparing";
+  const awaiting=state.status==="awaiting_approval";const resuming=Boolean(ui.resumeRecovery?.submitting||ui.resumeRecovery?.submitted);const busy=Boolean(state.busy||ui.pending||awaiting||resuming||state.status==="stopping");const ready=ui.connected&&state.status!=="preparing";
   $("send-button").disabled=busy||!ready||Boolean(state.needs_reset);$("instruction").disabled=busy||Boolean(state.needs_reset);
   $("reset-button").disabled=busy||!ready;$("stop-button").disabled=(!state.busy&&!awaiting&&!resuming)||state.status==="stopping";
   document.querySelectorAll("[data-instruction]").forEach(button=>button.disabled=busy||!ready||Boolean(state.needs_reset));
   const skillTask=state.skill_task?.status&&state.skill_task.status!=="idle",resumeLabel=skillTask?"继续未完成任务":"继续处理当前持物";
-  setText("command-hint",awaiting?"操作已暂停，请在恢复方案中选择同意或拒绝":resuming?`正在${resumeLabel}，请等待模型分析`:state.needs_reset?(state.can_resume_recovery?`${skillTask?"原任务":"当前持物"}尚未完成，可选择“${resumeLabel}”`:"任务已停止，请先重置场景"):busy?"指令处理中，请观察执行流程":"Enter 发送 · Shift + Enter 换行");
+  setText("command-hint",state.status==="stopping"?"已请求停止，等待当前计算结束；保持当前夹持与位置。":awaiting?"操作已暂停，请在恢复方案中选择同意或拒绝":resuming?`正在${resumeLabel}，请等待模型分析`:state.needs_reset?(state.can_resume_recovery&&state.status!=="stopped"?`${skillTask?"原任务":"当前持物"}尚未完成，可选择“${resumeLabel}”`:"任务已停止，请先重置场景"):busy?"指令处理中，请观察执行流程":"Enter 发送 · Shift + Enter 换行");
   document.querySelectorAll("[data-speed]").forEach(button=>{button.classList.toggle("active",number(button.dataset.speed)===number(state.speed,1));button.disabled=!ready||ui.pending;});
   renderRecoveryApproval(state);
 }
@@ -116,7 +116,7 @@ function renderResumeRecovery(state){
   const skillTask=state.skill_task?.status&&state.skill_task.status!=="idle";
   const resumeLabel=skillTask?"继续未完成任务":"继续处理当前持物";
   setText("resume-recovery-button",resumeLabel);panel.ariaLabel=resumeLabel;
-  const available=state.can_resume_recovery===true&&!state.busy&&state.status!=="awaiting_approval";
+  const available=state.can_resume_recovery===true&&!state.busy&&!["awaiting_approval","stopping","stopped"].includes(state.status);
   panel.hidden=!available;
   if(!available){ui.resumeRecovery=null;return;}
   // A new terminal event also releases the lock if a very short attempt fell between polls.
@@ -130,7 +130,7 @@ function renderResumeRecovery(state){
 }
 async function resumeRecovery(){
   const state=ui.state||{},local=ui.resumeRecovery;
-  if(state.can_resume_recovery!==true||state.busy||state.status==="awaiting_approval"||!ui.connected||ui.pending||!local||local.submitting||local.submitted)return;
+  if(state.can_resume_recovery!==true||state.busy||["awaiting_approval","stopping","stopped"].includes(state.status)||!ui.connected||ui.pending||!local||local.submitting||local.submitted)return;
   local.submitting=true;local.error="";updateControls();
   try{await api("/api/resume-recovery",{});local.submitted=true;}
   catch(error){
@@ -254,7 +254,7 @@ function renderMessages(state){
   });
   for(const [key,node] of ui.messageNodes)if(!activeKeys.has(key)){node.remove();ui.messageNodes.delete(key);}
   for(const event of Array.isArray(state.events)?state.events:[]){
-    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan"].includes(event.kind)||!event.message)continue;
+    if(!["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan","inspect_place","recovery_observation","placement_planning","placement_progress","placement_refined","placement_changed"].includes(event.kind)||!event.message)continue;
     if(["decision","recovery_result"].includes(event.kind)&&messages.some(message=>message.role==="assistant"&&assistantText(message,String(message.content??message.text??""),false)===event.message))continue;
     const key=String(event.id??event.seq??`${event.time}-${event.message}`);
     if(ui.eventNodes.has(key))continue;
@@ -265,7 +265,33 @@ function renderMessages(state){
   if(nearBottom)conversation.scrollTop=conversation.scrollHeight;
 }
 
+function holdingMessage(state){
+  const sim=state.simulation||{};if(!sim.held_object)return "";
+  const object=(sim.objects||[]).find(item=>String(item.id??item.object_id)===String(sim.held_object));
+  const label=object?.label?displayLabel(object.label):"物品",width=sim.gripper_width;
+  const measured=width!=null&&Number.isFinite(Number(width))?`（实测夹爪 ${(Number(width)*1000).toFixed(1)} mm）`:"";
+  return `当前仍夹持${label}${measured}，尚未释放。`;
+}
+function stoppingMessage(state){
+  if(!["stopping","stopped"].includes(state.status))return "";
+  const text=state.status==="stopping"?"已请求停止，等待当前计算结束；机械臂保持当前位置。":/停止/.test(state.stage||"")?state.stage:"任务已停止，保持当前现场。";
+  return `${text}${holdingMessage(state)}`;
+}
+function placementProgressMessage(state){
+  if(!state.busy||!["executing","recovering"].includes(state.status))return "";
+  const events=Array.isArray(state.events)?state.events:[],latest=events.at(-1);if(!latest)return "";
+  const messages={inspect_place:"正在局部确认放置区域空位",placement_planning:"正在检查安全放置方案",placement_progress:"正在检查安全放置候选",placement_refined:"已确认放置位置",placement_changed:"无法确认安全放置方案，将保持当前状态"};
+  let text=messages[latest.kind]?(latest.message||messages[latest.kind]):"";
+  if(latest.kind==="recovery_observation"&&state.simulation?.held_object){
+    const previous=events.slice(0,-1).findLast(event=>!["grasp_feedback","recovery_observation"].includes(event.kind));
+    if(previous?.kind==="inspect_place"||["stage","skill_step"].includes(previous?.kind)&&previous.stage==="inspect_place")text="静止相机观测已完成，正在检查安全放置方案。";
+  }
+  if(!text)return "";
+  if(latest.kind==="placement_refined")text+=state.simulation?.held_object?"；尚待释放与落位核验。":"；选点确认不代表落位核验通过。";
+  return `${text}${holdingMessage(state)}`;
+}
 function stageIndex(state){
+  if(["stopping","stopped"].includes(state.status))return -1;
   if(!state.busy&&state.status!=="complete")return -1;
   const task=state.skill_task;
   if(task?.status&&task.status!=="idle"){
@@ -299,9 +325,9 @@ function renderRecovery(state){
 }
 function renderPipeline(state){
   let index=stageIndex(state);const result=state.last_result||state.result;
-  const task=state.skill_task,skillTask=task?.status&&task.status!=="idle";
-  const truthSuccess=skillTask?task.status==="complete":Boolean(result?.ok!==false&&result?.truth?.success!==false&&
-    (result?.truth?.success===true||result?.success===true||result?.ok===true&&state.status==="complete"));
+  const task=state.skill_task,skillTask=task?.status&&task.status!=="idle",halted=["stopping","stopped"].includes(state.status);
+  const truthSuccess=!halted&&(skillTask?task.status==="complete":Boolean(result?.ok!==false&&result?.truth?.success!==false&&
+    (result?.truth?.success===true||result?.success===true||result?.ok===true&&state.status==="complete")));
   const completed=!state.busy&&truthSuccess&&(skillTask||result);
   if(completed)index=4;
   document.querySelectorAll("#pipeline li").forEach((node,i)=>{
@@ -309,29 +335,30 @@ function renderPipeline(state){
     node.querySelector(".step-number").textContent=index>i?"✓":String(i+1);
   });
   const events=Array.isArray(state.events)?state.events:[];const latest=events.at(-1);
-  const text=state.message||state.stage||latest?.message||stateLabels[state.status]||"等待一条指令";
+  const text=stoppingMessage(state)||placementProgressMessage(state)||state.message||state.stage||latest?.message||stateLabels[state.status]||"等待一条指令";
   setText("stage-message",text);$("stage-message").title=text;
   renderBatch(state);
   renderSkillTask(state);
   renderRecovery(state);
   renderGraspFeedback(state);
-  const panel=$("task-result");panel.hidden=Boolean(state.busy)||(skillTask?!["complete","failed","stopped","declined"].includes(task.status):!result);
+  const panel=$("task-result");panel.hidden=Boolean(state.busy)||state.status==="stopping"||(skillTask?!halted&&!["complete","failed","stopped","declined"].includes(task.status):!result);
   if(!panel.hidden){
-    const failed=skillTask?task.status!=="complete":result.ok===false||result.truth?.success===false||state.status==="error";
+    const failed=halted||(skillTask?task.status!=="complete":result.ok===false||result.truth?.success===false||state.status==="error");
     panel.classList.toggle("error",failed);panel.replaceChildren(svgIcon(failed?"focus":"check"));
     const description=document.createElement("span");
-    description.textContent=skillTask?(task.message||(truthSuccess?"原任务所有目标已通过最终核验。":"原任务尚未完成，请查看技能执行反馈。")):result.message||result.summary||result.truth?.message||state.stage||(truthSuccess?"抓取与落位验证通过":failed?"本次任务未完成，请查看执行反馈":"模型回复已完成");
+    description.textContent=stoppingMessage(state)||(skillTask?(task.message||(truthSuccess?"原任务所有目标已通过最终核验。":"原任务尚未完成，请查看技能执行反馈。")):result.message||result.summary||result.truth?.message||state.stage||(truthSuccess?"抓取与落位验证通过":failed?"本次任务未完成，请查看执行反馈":"模型回复已完成"));
     panel.append(description);
   }
 }
 function renderSkillTask(state){
   const task=state.skill_task||{},panel=$("skill-panel");if(!panel)return;
-  const status=String(task.status||"idle");panel.hidden=status==="idle";
+  const halted=["stopping","stopped"].includes(state.status),status=String(halted&&task.status&&task.status!=="idle"?state.status:task.status||"idle");panel.hidden=status==="idle";
   if(panel.hidden){ui.skillSignature=null;return;}
-  const signature=JSON.stringify(task);if(signature===ui.skillSignature)return;ui.skillSignature=signature;
+  const stop=stoppingMessage(state),progress=placementProgressMessage(state);
+  const signature=JSON.stringify([task,state.status,state.busy,stop,progress,holdingMessage(state)]);if(signature===ui.skillSignature)return;ui.skillSignature=signature;
   panel.dataset.status=status;
   const names={observe:"观察",pick:"抓取保持",place:"放置",move:"搬移",verify:"验证",ask:"询问人工",finish:"最终核验"};
-  const labels={thinking:"模型规划中",executing:"逐步执行中",awaiting_approval:"等待人工确认",replanning:"根据反馈重规划",complete:"原任务已核验完成",failed:"任务尚未完成",stopped:"已停止",declined:"已拒绝并停止"};
+  const labels={thinking:"模型规划中",executing:"逐步执行中",awaiting_approval:"等待人工确认",replanning:"根据反馈重规划",complete:"原任务已核验完成",failed:"任务尚未完成",stopping:"正在停止",stopped:"已停止",declined:"已拒绝并停止"};
   const stepLabels={pending:"等待",executing:"执行中",succeeded:"步骤通过",failed:"失败",cancelled:"已取消"};
   const zoneName=name=>({zone_red:"红色区域",zone_green:"绿色区域",zone_yellow:"黄色区域"})[name]||String(name||"默认区域");
   const goals=Array.isArray(task.goals)?task.goals:[];
@@ -349,7 +376,7 @@ function renderSkillTask(state){
   setText("skill-budget",`计划 ${number(task.plan_number)} / ${number(task.max_plans,5)} · 已执行 ${number(task.executed)} / ${number(task.max_executed,64)} 步`);
   setText("skill-goals",goals.length?`最终目标：${goals.map(goal=>`${displayLabel(goal.label)} → ${goalDestination(goal)}`).join("；")}`:"等待模型明确最终目标。");
   const steps=Array.isArray(task.steps)?task.steps:[],current=Number.isInteger(task.current_index)?steps[task.current_index]:null;
-  setText("skill-message",task.message||(current?`当前第 ${task.current_index+1} / ${steps.length} 步：${names[current.skill]||current.skill}`:status==="complete"?"所有原目标已通过最终核验。":"等待技能计划或后续反馈。"));
+  setText("skill-message",stop||progress||task.message||(current?`当前第 ${task.current_index+1} / ${steps.length} 步：${names[current.skill]||current.skill}`:status==="complete"?"所有原目标已通过最终核验。":"等待技能计划或后续反馈。"));
   $("skill-steps").replaceChildren(...steps.map((step,index)=>{
     const row=document.createElement("li");row.dataset.status=step.status||"pending";
     const active=index===task.current_index&&["executing","awaiting_approval"].includes(status);
@@ -358,7 +385,7 @@ function renderSkillTask(state){
     const copy=document.createElement("div");copy.className="batch-item-copy";
     const title=document.createElement("strong");title.textContent=`${names[step.skill]||step.skill}${step.label?` · ${displayLabel(step.label)}`:""}${step.destination?` → ${destination(step.destination)}`:""}`;copy.append(title);
     const message=step.message||step.question;if(message){const note=document.createElement("small");note.textContent=String(message);copy.append(note);}
-    const badge=document.createElement("span");badge.className="batch-item-status";badge.textContent=stepLabels[step.status]||"等待";
+    const badge=document.createElement("span");badge.className="batch-item-status";badge.textContent=halted&&step.status==="executing"?(status==="stopping"?"停止中":"已停止"):stepLabels[step.status]||"等待";
     row.append(order,copy,badge);return row;
   }));
   const history=Array.isArray(task.history)?task.history:[];
@@ -402,7 +429,7 @@ function renderGraspFeedback(state){
   const feedback=state.simulation?.feedback||{},plan=feedback.grasp_plan||{};
   const checks=Array.isArray(feedback.checks)?feedback.checks:[];
   const panel=$("grasp-feedback");if(!panel)return;
-  panel.hidden=!Object.keys(plan).length&&!checks.length;
+  const holding=holdingMessage(state);panel.hidden=!Object.keys(plan).length&&!checks.length&&!holding;
   const mm=value=>value!=null&&Number.isFinite(Number(value))?`${(Number(value)*1000).toFixed(1)} mm`:"—";
   const parts=[];
   if(plan.label)parts.push(displayLabel(plan.label));
@@ -411,6 +438,7 @@ function renderGraspFeedback(state){
   if(plan.open_width!=null)parts.push(`张开 ${mm(plan.open_width)}`);
   if(plan.close_width!=null)parts.push(`闭合目标 ${mm(plan.close_width)}`);
   if(plan.closing_angle_deg!=null)parts.push(`夹持角 ${number(plan.closing_angle_deg).toFixed(1)}°`);
+  if(holding)parts.push(holding);
   setText("grasp-plan-feedback",parts.join(" · "));
   const nodes=checks.map(check=>{
     const li=document.createElement("li");li.className=check.ok===false?"failed":check.ok===true?"passed":"pending";

@@ -25,7 +25,7 @@ _DESCRIPTIONS = {
     'yellow': ('黄色方块', 'zone_yellow', '50 mm 方块'),
     'apple': ('苹果', 'zone_red', '直径约 62 mm 的球形苹果'),
     'banana': ('香蕉', 'zone_yellow', '带果柄的弯曲香蕉，长约 180 mm'),
-    'pear': ('梨', 'zone_green', '带颈部与果柄的梨，腹部直径约 85 mm'),
+    'pear': ('梨', 'zone_green', '带颈部与果柄的梨，腹部直径约 85 mm，一体平底直径 48 mm'),
 }
 
 

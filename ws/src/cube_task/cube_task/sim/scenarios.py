@@ -417,7 +417,12 @@ def official_parts(label: str) -> List[Dict[str, Any]]:
                 {'shape': 'ellipsoid', 'size': [0.027, 0.027, 0.030], 'pos': [0.0, 0.0, 0.078]},
                 {'shape': 'ellipsoid', 'size': [0.020, 0.020, 0.020], 'pos': [0.0, 0.0, 0.097]},
                 {'shape': 'cylinder', 'size': [0.0025, 0.012], 'pos': [0.0, 0.0, 0.119],
-                 'color_bgr': (40, 75, 95)}]
+                 'color_bgr': (40, 75, 95)},
+                # The original spherical bottom had point support below the
+                # high neck's COM. Fill its lowest 8 mm into an integral,
+                # same-colour flat base, shared by camera and collision
+                # geometry. Mass remains 100 g; no pose constraint is added.
+                {'shape': 'cylinder', 'size': [0.024, 0.008], 'pos': [0.0, 0.0, 0.004]}]
     if label == 'potato':
         return [{'shape': 'ellipsoid', 'size': [0.050, 0.035, 0.0275], 'pos': [0.0, 0.0, 0.0275]}]
     if label == 'persimmon':

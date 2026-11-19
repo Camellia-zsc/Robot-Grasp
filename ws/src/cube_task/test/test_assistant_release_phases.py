@@ -88,6 +88,49 @@ def test_proven_geometric_capacity_failure_does_not_move_to_another_view(monkeyp
     assert 'no_clear_supported_release' in result.detail['placement_planning_reason']
 
 
+def test_timed_slice_with_completed_rejections_continues_before_camera_motion(monkeypatch):
+    session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
+    states = []
+
+    def replan(*args, cancelled=None, search_state=None, **kwargs):
+        states.append(search_state)
+        assert search_state is not None
+        if len(states) == 1:
+            search_state['avoided'] = [(.17, .34), (.155, .34), (.185, .34)]
+            while not cancelled():
+                now[0] += 1.
+            return None, 'placement_planning_budget_exceeded'
+        assert search_state['avoided'] == [(.17, .34), (.155, .34), (.185, .34)]
+        now[0] += .5
+        return place, ''
+
+    session.runner.replan_release = replan
+    result = PickResult(False, detail={'holding': True})
+    assert session._before_release(grasp, place, .05, result) is place
+    assert len(states) == 2 and states[0] is states[1]
+    assert not moves and now[0] < 17.
+
+
+def test_release_search_rejections_do_not_survive_a_new_camera_measurement(monkeypatch):
+    session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
+    states = []
+
+    def replan(*args, cancelled=None, search_state=None, **kwargs):
+        states.append(search_state)
+        assert search_state is not None
+        if moves:
+            assert search_state == {}
+            return place, ''
+        search_state['avoided'] = [(.17, .34)]
+        return None, 'leaned finger blocked'
+
+    session.runner.replan_release = replan
+    result = PickResult(False, detail={'holding': True})
+    assert session._before_release(grasp, place, .05, result) is place
+    assert len(states) == 2 and states[0] is not states[1]
+    assert len(moves) == 1
+
+
 def test_geometry_capacity_checks_do_not_run_ik_or_return_an_executable_plan(monkeypatch):
     from test_runner_local_release import scene
     runner, target, grasp, place = scene()

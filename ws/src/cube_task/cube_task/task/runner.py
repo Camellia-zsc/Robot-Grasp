@@ -1370,11 +1370,14 @@ class TaskRunner:
 
     def replan_release(self, det, gp, pp, width, neighbors, placement_zone=None,
                        placement_polygon=None, exact_xy=False, observation_filter=None,
-                       cancelled=None, progress=None, max_attempts=None):
+                       cancelled=None, progress=None, max_attempts=None, search_state=None):
         """Plan a held release with every geometric, reach and visibility check.
 
         max_attempts bounds one computation phase; its default retains the
         existing retry count. The physically held grasp is never replanned.
+        An optional search_state retains only fully rejected candidates across
+        computation slices of the SAME measurements and robot pose. Callers
+        must discard it before recapturing, moving or applying an intervention.
         """
         from .reach import adjust_plan_poses, release_workspace_reason
 
@@ -1417,7 +1420,9 @@ class TaskRunner:
             return (not interrupted() and
                     allowed(x, y, closing) and
                     (observation_filter is None or observation_filter(x, y, closing)))
-        avoided, avoided_poses = [], []
+        state = {} if search_state is None else search_state
+        avoided = state.setdefault('avoided', [])
+        avoided_poses = state.setdefault('avoided_poses', [])
         why = 'no clear reachable position in the requested destination'
         for attempt in range(attempt_limit):
             if interrupted():

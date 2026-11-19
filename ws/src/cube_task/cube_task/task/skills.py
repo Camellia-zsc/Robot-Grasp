@@ -163,6 +163,9 @@ class PickPlaceSkill:
         # Explicit execution hooks may refuse motion; display observers above cannot.
         self.execution_guard = None
         self.before_release = None
+        # Interactive recovery may start at another camera pose. The optional
+        # planner returns fully checked linear waypoints ending at T_pre.
+        self.before_held_transit = None
 
     # ------------------------------------------------------------------ public
     def execute(self, grasp: GraspPlan, place: PlacePlan, dry_run: bool = False) -> PickResult:
@@ -217,7 +220,9 @@ class PickPlaceSkill:
             if not math.isfinite(float(grasp_width)) or grasp_width < self.empty_width:
                 raise _StepFailed('retry_place', 'no_gripper_feedback', 'invalid held width',
                                   fault=True)
-            self._verify_held(r, 'dropped_before_retry')
+            measured = self._verify_held(r, 'dropped_before_retry')
+            if measured is not None:
+                r.grasp_width = measured
             current = self.arm.get_tcp_pose()
             if (current is None or current.value is None or
                     self.clock.now() - float(current.stamp) > self.feedback_max_age):
@@ -227,13 +232,16 @@ class PickPlaceSkill:
             if lift.shape != (4, 4) or not np.all(np.isfinite(lift)):
                 raise _StepFailed('retry_place', 'no_pose_feedback', 'invalid current TCP',
                                   fault=True)
-            height = float(place.T_pre[2, 3])
-            if float(lift[2, 3]) < height - 1e-4:
-                lift[2, 3] = height
-                self._move(r, 'retry_lift', lift, True)
-                self._verify_held(r, 'dropped')
-            self._move(r, 'transit', place.T_pre, False)
-            self._verify_held(r, 'dropped_in_transit')
+            if self.before_held_transit is not None:
+                self._checked_held_transit(r, grasp, place)
+            else:
+                height = float(place.T_pre[2, 3])
+                if float(lift[2, 3]) < height - 1e-4:
+                    lift[2, 3] = height
+                    self._move(r, 'retry_lift', lift, True)
+                    self._verify_held(r, 'dropped')
+                self._move(r, 'transit', place.T_pre, False)
+                self._verify_held(r, 'dropped_in_transit')
             self._inspect_release(r, grasp, place)
             self._guard('release')
             self._move(r, 'release', place.T_release, self.linear_moves)
@@ -502,6 +510,61 @@ class PickPlaceSkill:
             error = self.execution_guard(stage)
             if error:
                 raise _StepFailed(stage, error, 'scene changed; camera confirmation required')
+
+    def _checked_held_transit(self, r, grasp, place):
+        """Execute only the entry path checked for this measured held opening."""
+        checked_width = r.grasp_width
+        route = self.before_held_transit(grasp, place, checked_width, r)
+        self._check_abort('held_transit')
+
+        def held_width():
+            measured = self._verify_held(r, 'dropped_in_transit')
+            # A checked route needs feedback even when legacy grasp
+            # verification has been disabled by configuration.
+            if measured is None:
+                measured = self._read_width()
+            if measured is None:
+                raise _StepFailed('transit', 'no_gripper_feedback', 'while holding', fault=True)
+            if measured < self.empty_width:
+                raise _Lost('dropped_in_transit', measured)
+            r.grasp_width = measured
+            return measured
+
+        # A failed path search must not hide a drop or lost feedback that
+        # occurred during its camera capture or calculation.
+        held_width()
+        why = r.detail.get('held_transit_planning_reason', 'no safe held transit route')
+        valid = isinstance(route, (list, tuple)) and bool(route)
+        if valid:
+            try:
+                route = [np.array(pose, dtype=float, copy=True) for pose in route]
+                valid = (all(pose.shape == (4, 4) and np.all(np.isfinite(pose))
+                             and is_rotation(pose[:3, :3])
+                             and np.allclose(pose[3], [0., 0., 0., 1.], atol=1e-7, rtol=0)
+                             for pose in route)
+                         and np.allclose(route[-1], place.T_pre, atol=1e-5, rtol=0))
+            except (TypeError, ValueError):
+                valid = False
+        if not valid:
+            raise _StepFailed('transit', 'placement_changed', why)
+        uncertainty = r.detail.get('held_transit_opening_uncertainty', .001)
+        try:
+            uncertainty = float(uncertainty)
+        except (TypeError, ValueError):
+            uncertainty = float('nan')
+        if not math.isfinite(uncertainty) or not 0. <= uncertainty <= .001:
+            raise _StepFailed('transit', 'placement_changed', 'invalid checked opening envelope')
+        for waypoint in route:
+            self._check_abort('held_transit')
+            self._guard('held_transit')
+            width = held_width()
+            if abs(width - checked_width) > uncertainty:
+                raise _StepFailed('transit', 'placement_changed',
+                                  'held opening is outside the checked transit sweep')
+            self._move(r, 'transit', waypoint, True)
+            if abs(held_width() - checked_width) > uncertainty:
+                raise _StepFailed('transit', 'placement_changed',
+                                  'held opening is outside the checked transit sweep')
 
     def _inspect_release(self, r, grasp, place):
         if self.before_release is None:

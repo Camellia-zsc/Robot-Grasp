@@ -267,6 +267,8 @@ class SimulationSession:
         self.runner.skill.on_stage = self._on_stage
         self.runner.skill.execution_guard = self._execution_guard
         self.runner.skill.before_release = self._before_release
+        if self._physics is not None:
+            self.runner.skill.before_held_transit = self._before_held_transit
         try:
             self.arm.connect()
             if not self.arm.enable():
@@ -430,10 +432,70 @@ class SimulationSession:
         if (stage in ('descend', 'close') and
                 self._environment_revision != self._active_revision):
             return 'scene_changed'
-        if (stage in ('release', 'open_release') and
+        if (stage in ('release', 'open_release', 'held_transit') and
                 self._environment_revision != self._active_revision):
             return 'scene_changed'
         return None
+
+    def _before_held_transit(self, grasp, place, width, result):
+        """Precheck the actual held entry path after an arbitrary inspected pose."""
+        from .observation_policy import merge_local_detections, measurement_visible
+        from .placement_observation import safe_inspection_route
+        from ..core.extrinsics import camera_pose_in_base
+
+        budget = _PlacementBudget(self.arm, self.cancel_event, seconds=15.)
+        uncertainty = .001
+        def reject(reason):
+            result.detail['held_transit_planning_reason'] = reason
+            return None
+        try:
+            self._apply_interventions()
+            revision = self._environment_revision
+            if revision != self._active_revision:
+                return reject('scene_changed')
+            try:
+                fresh = budget.run(self._stationary_recovery_observation)
+            except RuntimeError as exc:
+                # Missing camera evidence is a reason to hold and reobserve,
+                # not to discard an otherwise valid measured held grasp.
+                return reject('fresh_observation_unavailable: ' + str(exc))
+            self._apply_interventions()
+            if revision != self._environment_revision:
+                return reject('scene_changed')
+            context, measured_width, why = self.runner._held_transfer_feedback(grasp.target)
+            if context is None:
+                return reject(why)
+            if abs(measured_width - width) > uncertainty:
+                return reject('held_opening_changed')
+            current = self.arm.get_tcp_pose()
+            if (current is None or current.value is None or
+                    self.clock.now() - float(current.stamp) > self.runner.skill.feedback_max_age):
+                return reject('no_fresh_pose_feedback')
+            frame = self.camera._last
+            pose = camera_pose_in_base(self.runner.ext, self.arm.get_flange_pose().value,
+                                       self.runner.T_flange_tcp)
+            neighbors = merge_local_detections(self._observed_detections,
+                [d for d in fresh if d.center_base is not None and d.label != grasp.target.label],
+                lambda d: measurement_visible(d, frame, pose), forget=[grasp.target])
+            self._emit('placement_progress', {
+                'message': '正在按当前夹持姿态检查搬运路径，保持夹持'})
+            route, why = budget.run(safe_inspection_route, self.arm, grasp,
+                np.asarray(current.value).copy(), place.T_pre, neighbors, width,
+                table_z=float(self.cfg.get('perception.table.expected_z', 0.) or 0.),
+                nominal=self.runner.nominal.get(grasp.target.label),
+                neighbor_nominal=self.runner.nominal, free_tilt_deg=self.runner.free_tilt,
+                opening_uncertainty=uncertainty, cancelled=budget.cancelled)
+            self._apply_interventions()
+            if revision != self._environment_revision:
+                return reject('scene_changed')
+            if not route:
+                return reject(why)
+            self._observed_detections = copy.deepcopy(neighbors)
+            result.detail['held_transit_opening_uncertainty'] = uncertainty
+            return route
+        except _PlacementInterrupted:
+            return reject('aborted' if self.cancel_event.is_set()
+                          else 'held_transit_planning_budget_exceeded')
 
     def _before_release(self, grasp, place, width, result):
         if self.cancel_event.is_set():
@@ -555,10 +617,27 @@ class SimulationSession:
                         nominal=self.runner.nominal.get(target.label),
                         max_open_width=self.runner.placer.open_width,
                         observations=support_views[:-1])
+            # A fresh measurement owns these exclusions. A timed slice must
+            # not restart the same expensive, fully rejected edge slots; nor
+            # may those rejections survive a new view or changed scene/seed.
+            search_state = {}
             updated, why = phase(self.runner.replan_release,
                               target, grasp, place, width, neighbors, seconds=8.,
-                              observation_filter=visible,
+                              observation_filter=visible, search_state=search_state,
                               progress=progress, **options)
+            if (updated is None and why == 'placement_planning_budget_exceeded'
+                    and (search_state.get('avoided') or search_state.get('avoided_poses'))
+                    and not budget.cancelled()):
+                self._apply_interventions()
+                if revision != self._environment_revision:
+                    support_views.clear()
+                    return None, 'scene_changed', revision
+                # One continuation rewards completed work while retaining
+                # computation for a checked new view if this one is deficient.
+                updated, why = phase(self.runner.replan_release,
+                    target, grasp, place, width, neighbors, seconds=8.,
+                    observation_filter=visible, search_state=search_state,
+                    progress=progress, **options)
             return updated, why, revision
         updated, why, revision = budget.run(measure)
         if why == 'scene_changed':

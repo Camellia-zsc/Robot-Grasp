@@ -81,6 +81,50 @@ def test_region_final_tilt_failure_retries_another_center():
     assert len(visited) == 2 and visited[0] != visited[1]
 
 
+def test_interrupted_release_search_resumes_completed_rejections_in_same_measurement(monkeypatch):
+    runner, target, grasp, previous = scene()
+    visited, stopped = [], [False]
+    state = {}
+
+    def final_check(det, gp, pp, neighbors, polygon, desired, held, **kwargs):
+        visited.append(tuple(desired))
+        return False, 'leaned finger blocked'
+
+    def progress(fields):
+        # One complete rejection, then the next candidate is interrupted.
+        if fields['attempt'] == 2:
+            stopped[0] = True
+
+    runner._adjust_strict_release = final_check
+    updated, why = runner.replan_release(target, grasp, previous, .05, [target],
+        cancelled=lambda: stopped[0], progress=progress, search_state=state)
+    assert updated is None and why == 'placement_planning_budget_exceeded'
+    assert visited == [(.4, 0.)]
+    assert state['avoided'] == [(.4, 0.)]
+
+    stopped[0] = False
+    runner._adjust_strict_release = lambda *a, **k: (True, '')
+    updated, why = runner.replan_release(target, grasp, previous, .05, [target],
+        search_state=state)
+    assert updated is not None, why
+    assert tuple(runner.placer.last_info['xy']) != visited[0]
+
+
+def test_interrupted_candidate_is_not_saved_as_a_completed_rejection(monkeypatch):
+    runner, target, grasp, previous = scene()
+    state, stopped = {}, [False]
+
+    def interrupted_reach(*args, **kwargs):
+        stopped[0] = True
+        return False, 'aborted', {}
+
+    monkeypatch.setattr('cube_task.task.reach.adjust_plan_poses', interrupted_reach)
+    updated, why = runner.replan_release(target, grasp, previous, .05, [target],
+        cancelled=lambda: stopped[0], search_state=state)
+    assert updated is None and why == 'placement_planning_budget_exceeded'
+    assert not state.get('avoided') and not state.get('avoided_poses')
+
+
 def test_point_final_tilt_failure_retries_angle_at_the_same_center():
     runner, target, grasp, previous = scene()
     visited = []

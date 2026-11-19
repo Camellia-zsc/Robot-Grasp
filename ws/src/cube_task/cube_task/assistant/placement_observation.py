@@ -342,7 +342,8 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
 
 def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
                           table_z=0., nominal=None, neighbor_nominal=None,
-                          free_tilt_deg=40., *, cancelled=None, progress=None, max_checks=None):
+                          free_tilt_deg=40., *, cancelled=None, progress=None, max_checks=None,
+                          opening_uncertainty=0.):
     """Return a fully prechecked linear held-camera route, or hold position.
 
     Endpoint reachability alone does not establish a reachable lift or a safe
@@ -350,9 +351,16 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
     the carried box and both finger boxes through the actual interpolated TCP
     path, and invokes the arm's normal linear-path preflight before any motion.
     The small interval padding bounds translation plus rotation between samples.
+    Each finger also covers half of the permitted total opening variation.
     """
     if _planning_cancelled(arm, cancelled):
         return [], 'aborted'
+    try:
+        opening_uncertainty = float(opening_uncertainty)
+    except (ValueError, TypeError):
+        return [], 'inspection route has invalid opening uncertainty'
+    if not math.isfinite(opening_uncertainty) or opening_uncertainty < 0.:
+        return [], 'inspection route has invalid opening uncertainty'
     import cv2
     from ..robot.kinematics import rot_log
     from ..robot.safety import interpolate_pose
@@ -371,7 +379,7 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
     signs = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
     for sign in (-1, 1):
         center = np.array([0., sign * (float(opening) / 2 + .006), -.025])
-        local_boxes.append(center + signs * [.010, .006, .025])
+        local_boxes.append(center + signs * [.010, .006 + opening_uncertainty / 2, .025])
     radius = max(float(np.max(np.linalg.norm(b, axis=1))) for b in local_boxes)
     obstacles = []
     for other in neighbors:

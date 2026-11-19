@@ -15,6 +15,11 @@ from .placement_observation import (iter_safe_inspection_poses, safe_inspection_
                                     inspection_history, remember_inspection)
 
 
+# The route's finger sweep includes this total opening variation, so normal
+# contact settling does not invalidate a route checked for the whole envelope.
+_INSPECTION_OPENING_UNCERTAINTY = .001
+
+
 def measurements_changed(before, after):
     """New complete objects or material measured movement count as information."""
     def valid(items):
@@ -119,7 +124,8 @@ def inspect_held(session, xy, polygon, stationary, check_current):
             route, last_reason = budget.run(safe_inspection_route,
                 session.arm, grasp, current, pose, neighbors, width, table_z=table,
                 nominal=session.runner.nominal.get(target.label), neighbor_nominal=session.runner.nominal,
-                free_tilt_deg=session.runner.free_tilt, cancelled=budget.cancelled)
+                free_tilt_deg=session.runner.free_tilt, cancelled=budget.cancelled,
+                opening_uncertainty=_INSPECTION_OPENING_UNCERTAINTY)
             if not route:
                 continue
             for waypoint in route:
@@ -128,12 +134,19 @@ def inspect_held(session, xy, polygon, stationary, check_current):
                 if session.cancel_event.is_set():
                     raise _PlacementInterrupted()
                 current_context, current_width, feedback_why = session.runner._held_transfer_feedback(target)
-                if current_context is None or abs(current_width - width) > 1e-6:
+                if current_context is None:
                     return dict(ok=False, changed=False, views=views,
                         holding=bool(session.snapshot().get('held_object')),
                         error='held_feedback_changed', fault=True,
-                        reason=feedback_why or 'measured_opening_changed',
+                        reason=feedback_why,
                         message='夹持反馈发生变化，已停止尚未执行的观察路径并保留现场')
+                if (current_context is not context
+                        or abs(current_width - width) > _INSPECTION_OPENING_UNCERTAINTY):
+                    return dict(ok=False, changed=False, views=views, holding=True,
+                        error='held_feedback_changed', fault=False,
+                        reason=('held_grasp_context_changed' if current_context is not context
+                                else 'opening_outside_checked_sweep'),
+                        message='夹持仍有效，但已超出本次路径的检查范围，需重新规划观察路径')
                 move_inspection = getattr(session, '_move_inspection_waypoint', None)
                 if move_inspection is not None:
                     if not move_inspection(result, waypoint):

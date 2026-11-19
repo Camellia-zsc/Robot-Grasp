@@ -105,7 +105,7 @@ def test_unknown_observation_label_requires_a_measured_location():
 @pytest.fixture
 def active_harness(monkeypatch):
     """Exercise the real active executor without a simulator, IK, or motion."""
-    h = SimpleNamespace(moves=[], verifies=[], routes=[], feedback_ok=True,
+    h = SimpleNamespace(moves=[], verifies=[], routes=[], feedback_ok=True, feedback_width=.05,
                         on_move=lambda: None, on_apply=lambda: None,
                         on_route=lambda: None, on_verify=lambda: None,
                         coverage_calls=0, gain_coverage=False)
@@ -133,7 +133,7 @@ def active_harness(monkeypatch):
         T_flange_tcp=np.eye(4), free_tilt=40., nominal={'green': [.05, .05, .05]})
 
     def feedback(target):
-        return ((runner._held_recovery_context, .05, '') if h.feedback_ok else
+        return ((runner._held_recovery_context, h.feedback_width, '') if h.feedback_ok else
                 (None, None, 'held grasp feedback missing or changed'))
 
     runner._held_transfer_feedback = feedback
@@ -229,6 +229,38 @@ def test_changed_held_feedback_prevents_unexecuted_motion(active_harness, when, 
     result = h.execute()
     assert not result['ok']
     assert len(h.moves) == expected_moves
+
+
+def test_normal_submillimetre_grip_feedback_is_included_in_the_checked_finger_sweep(active_harness):
+    h = active_harness
+    h.gain_coverage = True
+    h.on_route = lambda: setattr(h, 'feedback_width', .05007)
+    result = h.execute()
+    assert result['ok'] and result['holding'], result
+    assert len(h.moves) == 2
+    assert h.routes[0][1]['opening_uncertainty'] == pytest.approx(.001)
+
+
+@pytest.mark.parametrize('width', [.0489, .0511])
+def test_width_outside_checked_geometry_requires_replan_without_moving_or_faulting(active_harness, width):
+    h = active_harness
+    h.on_route = lambda: setattr(h, 'feedback_width', width)
+    result = h.execute()
+    assert not result['ok'] and result['holding'], result
+    assert result['error'] == 'held_feedback_changed'
+    assert result['reason'] == 'opening_outside_checked_sweep'
+    assert not result.get('fault')
+    assert h.moves == []
+    assert h.session.runner._held_recovery_context is h.context
+
+
+def test_changed_grasp_context_cannot_reuse_an_old_checked_route(active_harness):
+    h = active_harness
+    h.on_route = lambda: setattr(h.session.runner, '_held_recovery_context', copy.deepcopy(h.context))
+    result = h.execute()
+    assert not result['ok'] and result['holding'], result
+    assert result['reason'] == 'held_grasp_context_changed'
+    assert h.moves == []
 
 
 def test_lost_grip_stops_route_and_expires_measured_recovery(active_harness):

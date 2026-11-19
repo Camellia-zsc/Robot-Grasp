@@ -173,6 +173,20 @@ def test_no_inspection_motion_is_offered_when_every_native_path_is_rejected():
     assert not route and why == 'joint path unavailable'
 
 
+def test_inspection_opening_feedback_envelope_keeps_nearby_fingers_out_of_obstacles():
+    _target, grasp, _frame, _camera = inputs()
+    obstacle = Detection('green', 1., center_base=np.array([.0522, 0., .20]),
+                         top_z=.20, height=.20, length=.006, width=.006, yaw=0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                         _check_linear_path=lambda *a: (True, ''))
+    start, end = top_down_T(0., 0., .15, 0.), top_down_T(0., .4, .15, 0.)
+    nominal, why = safe_inspection_route(arm, grasp, start, end, [obstacle], .05)
+    assert nominal and not why
+    guarded, why = safe_inspection_route(arm, grasp, start, end, [obstacle], .05,
+                                         opening_uncertainty=.001)
+    assert not guarded and 'overlaps' in why
+
+
 def test_already_measured_view_is_skipped_before_ik_for_same_held_scene():
     _target, grasp, _frame, _camera = inputs()
     checks = []

@@ -280,9 +280,22 @@ class SkillExecutor:
     def _active_observe(self, step, goals):
         from .active_observation import inspect_held
         xy, polygon = self._observation_focus(step, goals)
-        result = inspect_held(self.session, xy, polygon, self._stationary, self._check_plan)
-        self.session._status = 'stopped' if self.session.cancel_event.is_set() else 'ready'
-        self.session._publish_snapshot()
+        # Camera inspection moves the carried target just like transport.
+        # Physics must still invalidate moved obstacles, while the commanded
+        # held body is checked by the normal grip-feedback guards instead.
+        self.session._status = 'executing'
+        def stationary():
+            try:
+                return self._stationary()
+            finally:
+                # Publishing a fresh scene normally marks it ready. This
+                # camera capture is inside an unfinished held-motion action.
+                self.session._status = 'executing'
+        try:
+            result = inspect_held(self.session, xy, polygon, stationary, self._check_plan)
+        finally:
+            self.session._status = 'stopped' if self.session.cancel_event.is_set() else 'ready'
+            self.session._publish_snapshot()
         return dict(result, skill='observe', scene=copy.deepcopy(self.session.scene))
 
     def _observe(self, step, goals):

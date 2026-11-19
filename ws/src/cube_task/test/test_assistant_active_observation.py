@@ -1,7 +1,7 @@
 """Observation modes must execute the requested capability, never silently downgrade."""
 import copy
 import threading
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 
 import numpy as np
 import pytest
@@ -239,6 +239,78 @@ def test_normal_submillimetre_grip_feedback_is_included_in_the_checked_finger_sw
     assert result['ok'] and result['holding'], result
     assert len(h.moves) == 2
     assert h.routes[0][1]['opening_uncertainty'] == pytest.approx(.001)
+
+
+@pytest.mark.parametrize('case', ['carried_only', 'obstacle_moved', 'dropped',
+                                 'stopped', 'capture_exception'])
+def test_prepared_physics_observation_keeps_motion_state_across_real_scene_publication(active_harness, case):
+    from cube_task.assistant.simulation import SimulationSession
+    h = active_harness
+    carried = SimpleNamespace(name='held-green', label='green', T_base_obj=np.eye(4))
+    obstacle = SimpleNamespace(name='other-banana', label='banana', T_base_obj=np.eye(4))
+    session = h.session
+    session.world = SimpleNamespace(objects=[carried, obstacle])
+    session._prepared = True
+    session._status = 'ready'
+    session._physics = SimpleNamespace(expected_labels=set())
+    session._remember_physics = MethodType(SimulationSession._remember_physics, session)
+    session._remember_physics()
+    session._observed_detections, session._scan_stats, session._placement = [], {}, {}
+    session._scene_version, session.backend = 0, 'mujoco'
+    session._zones = lambda: []
+    session._publish_scene = MethodType(SimulationSession._publish_scene, session)
+    publications = []
+    session._publish_snapshot = lambda: publications.append(session._status)
+    session.arm.get_flange_pose = lambda: SimpleNamespace(value=np.eye(4))
+    session.camera._last = None
+    session.runner._last_stamp, session.runner.class_to_zone = 0., {}
+
+    def capture():
+        if case == 'capture_exception':
+            raise RuntimeError('camera unavailable')
+        return []
+
+    session._stationary_recovery_observation = capture
+    # Retain the real capture -> merge -> scene publication call chain. Scene
+    # publication sets ready even though the held observation is still moving.
+    h.executor._stationary = MethodType(SkillExecutor._stationary, h.executor)
+
+    def physics_tick():
+        carried.T_base_obj[0, 3] += .02
+        if case == 'obstacle_moved':
+            obstacle.T_base_obj[0, 3] += .02
+        if case == 'stopped':
+            session.cancel_event.set()
+        SimulationSession._check_physical_changes(session)
+
+    h.on_move = physics_tick
+    if case == 'dropped':
+        def lost():
+            raise _Lost('dropped_in_transit', .001)
+        h.on_verify = lost
+    if case == 'capture_exception':
+        with pytest.raises(RuntimeError, match='camera unavailable'):
+            h.execute()
+        assert not h.moves and session._status == 'ready'
+        assert publications[-1] == 'ready'
+        assert session.runner._held_recovery_context is h.context
+        return
+
+    result = h.execute()
+    if case == 'obstacle_moved':
+        assert result['error'] == 'scene_changed' and len(h.moves) == 1
+        assert session._environment_revision == 2
+    elif case == 'dropped':
+        assert result['error'] == 'dropped_in_transit' and len(h.moves) == 1
+        assert not result['holding'] and session.runner._held_recovery_context is None
+    elif case == 'stopped':
+        assert result['error'] == 'aborted' and len(h.moves) == 1
+        assert result['holding'] and session.runner._held_recovery_context is h.context
+    else:
+        assert result['ok'] and len(h.moves) == 2
+        assert session._environment_revision == 1
+    expected_status = 'stopped' if case == 'stopped' else 'ready'
+    assert session._status == publications[-1] == expected_status
 
 
 @pytest.mark.parametrize('width', [.0489, .0511])

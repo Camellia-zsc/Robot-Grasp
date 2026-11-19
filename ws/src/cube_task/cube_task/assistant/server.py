@@ -45,6 +45,8 @@ class DashboardController:
         self._preview_factory = preview_factory or (LivePreview if session_factory is None else None)
         self._lock = threading.RLock()
         self._cancel = threading.Event()
+        self._stop_complete = threading.Event()
+        self._stop_complete.set()
         self._worker = None
         self._session = None
         self._preview = None
@@ -67,6 +69,7 @@ class DashboardController:
         self._batch = idle_batch()
         self._speed = 1.0
         self._needs_reset = False
+        self._stop_faulted = False
         self._recovery = {'attempt': 0, 'max_attempts': 3, 'status': 'idle',
                           'reason': '', 'message': '', 'history': []}
         self._metrics = {'requests': 0, 'successes': 0, 'model_requests': 0}
@@ -282,7 +285,7 @@ class DashboardController:
         with self._lock:
             session = self._session
             saved = self._skill_memory
-            if saved and self._skill_task.get('status') not in ('failed', 'declined'):
+            if saved and self._skill_task.get('status') not in ('failed', 'declined', 'stopped'):
                 raise ValueError('当前技能任务无需继续；请等待完成或发送新指令')
             legacy_held = bool(session is not None and session.snapshot().get('held_object')
                 and getattr(getattr(session, 'runner', None), 'has_held_recovery', False))
@@ -317,7 +320,13 @@ class DashboardController:
             names = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块',
                      'apple': '苹果', 'banana': '香蕉', 'pear': '梨'}
             label = names.get(pending.get('label'), '临时移开的物品')
-            return '任务已停止；%s尚未复位，已保留原位置与朝向，可以重置场景' % label
+            return ('任务已停止；%s尚未复位，已保留原位置与朝向；可继续未完成任务'
+                    if not self._needs_reset else
+                    '任务已停止；%s尚未复位，已保留原位置与朝向，可以重置场景') % label
+        if not self._needs_reset:
+            held = self._session is not None and self._session.snapshot().get('held_object')
+            return ('任务已停止，保持当前夹持；可继续未完成任务或干预其他物品'
+                    if held else '任务已停止，现场已保留；可调整摆场、发送新指令或继续未完成任务')
         return '任务已停止，可以重置场景'
 
     def _launch(self, fn, status, stage):
@@ -327,6 +336,7 @@ class DashboardController:
             if self._busy:
                 raise BusyError('上一项任务还在进行，请等待完成或先停止')
             self._cancel.clear()
+            self._stop_faulted = False
             self._busy = True
             self._status, self._stage = status, stage
             self._error = ''
@@ -355,11 +365,36 @@ class DashboardController:
                                 self._needs_reset = True
                     self._event('stopped' if cancelled else 'error', {'message': self._stage})
                 finally:
+                    # Keep ownership until the previous operation and all its
+                    # cancellation cleanup have finished. Rearm outside the
+                    # controller lock: idle physics callbacks can need it.
                     with self._lock:
-                        if self._cancel.is_set():
+                        cancelled = self._cancel.is_set()
+                        session = self._session
+                    if cancelled:
+                        self._stop_complete.wait()
+                    with self._lock:
+                        result = self._last_result or {}
+                        faulted = self._stop_faulted or bool(result.get('fault') and not result.get('aborted'))
+                        rearm = (getattr(session, 'resume_after_stop', None)
+                                 if cancelled and not self._closed and not faulted else None)
+                    rearmed = False
+                    if rearm is not None:
+                        try:
+                            rearmed = bool(rearm())
+                        except Exception as exc:
+                            _LOG.warning('rearming stopped simulation failed (%s)', type(exc).__name__)
+                    with self._lock:
+                        if cancelled:
+                            self._needs_reset = not (rearmed and not self._closed)
+                            if not self._needs_reset:
+                                self._cancel.clear()
+                                self._scene = session.scene
+                                self._error = ''
                             self._status, self._stage = 'stopped', self._stopped_message()
-                            self._needs_reset = True
                         self._busy = False
+                    if cancelled:
+                        self._event('stopped', {'message': self._stage})
                     if self._closed:
                         self._dispose_session()
 
@@ -977,17 +1012,27 @@ class DashboardController:
 
     def stop(self):
         with self._lock:
-            if not self._busy:
+            if not self._busy or self._cancel.is_set():
                 return
+            self._stop_complete.clear()
             self._cancel.set()
+            previous = self._last_result or {}
+            self._stop_faulted = self._stop_faulted or bool(previous.get('fault') and not previous.get('aborted'))
             self._approval_event.set()
             self._needs_reset = True
             self._status, self._stage = 'stopping', '正在停止当前任务'
             if self._recovery['status'] != 'idle':
                 self._recovery.update(status='stopped', message='恢复已停止，保留当前夹持与位置')
             session = self._session
-        if session is not None:
-            session.stop()
+        try:
+            if session is not None:
+                session.stop()
+        except Exception:
+            with self._lock:
+                self._stop_faulted = True
+            raise
+        finally:
+            self._stop_complete.set()
 
     def set_speed(self, speed):
         if isinstance(speed, bool) or speed not in (0.5, 1, 2, 4):
@@ -1023,7 +1068,7 @@ class DashboardController:
             if (hasattr(self._client, 'plan_skills') and self._skill_memory
                     and self._skill_memory.get('goals') and not self._busy and session is not None
                     and not self._cancel.is_set() and not session.cancel_event.is_set()
-                    and self._skill_task.get('status') in ('failed', 'declined')):
+                    and self._skill_task.get('status') in ('failed', 'declined', 'stopped')):
                 state['can_resume_recovery'] = True
             editor = state['simulation'].setdefault('editor', {})
             editor['editable'] = bool(

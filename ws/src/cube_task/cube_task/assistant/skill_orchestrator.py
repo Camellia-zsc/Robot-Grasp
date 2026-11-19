@@ -385,7 +385,8 @@ class SkillOrchestrator:
             selected_destination=None, resume=False, conversation=()):
         ctl = self.ctl
         previous = getattr(ctl, '_skill_memory', None)
-        if resume and previous and previous.get('goals'):
+        resuming = bool(resume and previous and previous.get('goals'))
+        if resuming:
             memory = previous
         else:
             scene = self.session.scene
@@ -415,8 +416,9 @@ class SkillOrchestrator:
             self._check_stop()
             if not self.session.scene.get('objects') and not self.session.snapshot().get('held_object'):
                 self.session.observe()
-                memory['originals'] = [copy.deepcopy(o) for o in self.session.scene.get('objects', []) if o.get('valid')]
-                executor.originals = copy.deepcopy(memory['originals'])
+                if not resuming:
+                    memory['originals'] = [copy.deepcopy(o) for o in self.session.scene.get('objects', []) if o.get('valid')]
+                    executor.originals = copy.deepcopy(memory['originals'])
             number = 0
             while number < ctl._skill_task['max_plans']:
                 number += 1

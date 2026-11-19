@@ -47,7 +47,7 @@ function updateControls(){
   $("reset-button").disabled=busy||!ready;$("stop-button").disabled=(!state.busy&&!awaiting&&!resuming)||state.status==="stopping";
   document.querySelectorAll("[data-instruction]").forEach(button=>button.disabled=busy||!ready||Boolean(state.needs_reset));
   const skillTask=state.skill_task?.status&&state.skill_task.status!=="idle",resumeLabel=skillTask?"继续未完成任务":"继续处理当前持物";
-  setText("command-hint",state.status==="stopping"?"已请求停止，等待当前计算结束；保持当前夹持与位置。":awaiting?"操作已暂停，请在恢复方案中选择同意或拒绝":resuming?`正在${resumeLabel}，请等待模型分析`:state.needs_reset?(state.can_resume_recovery&&state.status!=="stopped"?`${skillTask?"原任务":"当前持物"}尚未完成，可选择“${resumeLabel}”`:"任务已停止，请先重置场景"):busy?"指令处理中，请观察执行流程":"Enter 发送 · Shift + Enter 换行");
+  setText("command-hint",state.status==="stopping"?"已请求停止，等待当前计算结束；保持当前夹持与位置。":awaiting?"操作已暂停，请在恢复方案中选择同意或拒绝":resuming?`正在${resumeLabel}，请等待模型分析`:state.needs_reset?(state.can_resume_recovery&&state.status!=="stopped"?`${skillTask?"原任务":"当前持物"}尚未完成，可选择“${resumeLabel}”`:"任务已停止，请先重置场景"):busy?"指令处理中，请观察执行流程":state.status==="stopped"?(state.can_resume_recovery?`已停止并保留现场；点击“${resumeLabel}”可继续，也可干预未夹持物品。`:"已停止并保留现场；可调整摆场或发送新指令。 "):"Enter 发送 · Shift + Enter 换行");
   document.querySelectorAll("[data-speed]").forEach(button=>{button.classList.toggle("active",number(button.dataset.speed)===number(state.speed,1));button.disabled=!ready||ui.pending;});
   renderRecoveryApproval(state);
 }
@@ -116,7 +116,7 @@ function renderResumeRecovery(state){
   const skillTask=state.skill_task?.status&&state.skill_task.status!=="idle";
   const resumeLabel=skillTask?"继续未完成任务":"继续处理当前持物";
   setText("resume-recovery-button",resumeLabel);panel.ariaLabel=resumeLabel;
-  const available=state.can_resume_recovery===true&&!state.busy&&!["awaiting_approval","stopping","stopped"].includes(state.status);
+  const available=state.can_resume_recovery===true&&!state.busy&&!["awaiting_approval","stopping"].includes(state.status)&&!(state.status==="stopped"&&state.needs_reset);
   panel.hidden=!available;
   if(!available){ui.resumeRecovery=null;return;}
   // A new terminal event also releases the lock if a very short attempt fell between polls.
@@ -130,7 +130,7 @@ function renderResumeRecovery(state){
 }
 async function resumeRecovery(){
   const state=ui.state||{},local=ui.resumeRecovery;
-  if(state.can_resume_recovery!==true||state.busy||["awaiting_approval","stopping","stopped"].includes(state.status)||!ui.connected||ui.pending||!local||local.submitting||local.submitted)return;
+  if(state.can_resume_recovery!==true||state.busy||["awaiting_approval","stopping"].includes(state.status)||(state.status==="stopped"&&state.needs_reset)||!ui.connected||ui.pending||!local||local.submitting||local.submitted)return;
   local.submitting=true;local.error="";updateControls();
   try{await api("/api/resume-recovery",{});local.submitted=true;}
   catch(error){

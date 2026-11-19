@@ -223,5 +223,23 @@ function pointerAt(xy,table=state.scene.placement.table_bounds){
   await map.dispatch("pointerdown",pointerAt([.55,0],state.scene.placement.bounds));
   eq(editor.selection(),null);
   has(get("editor-error").textContent,/超出可选桌面范围/);
+  // Once a normal stop relinquishes the worker, holding a pear must not
+  // prevent the user from moving a different tabletop object.
+  update({...state,status:"stopped",busy:false,needs_reset:false,
+    simulation:{...state.simulation,held_object:"held-pear",
+      editor:{...state.simulation.editor,editable:false,intervention_available:true}}});
+  eq(get("editor-mode-edit").disabled,true);
+  eq(get("editor-mode-intervene").disabled,false);
+  await get("editor-mode-intervene").dispatch("click");
+  eq(map.attributes["aria-disabled"],"false");
+  const beforeStoppedMove=requests.filter(item=>item.url==="/api/scene-intervene").length;
+  await map.dispatch("pointerdown",pointerAt([.30,0]));
+  await map.dispatch("pointermove",pointerAt([.35,.05]));
+  await map.dispatch("pointerup",pointerAt([.35,.05]));
+  await new Promise(resolve=>setImmediate(resolve));
+  eq(requests.filter(item=>item.url==="/api/scene-intervene").length,beforeStoppedMove+1);
+  const stoppedMove=requests.filter(item=>item.url==="/api/scene-intervene").at(-1);
+  eq(stoppedMove.payload.object_id,"truth-apple");
+  deep(stoppedMove.payload.xy.map(value=>Math.round(value*1e4)/1e4),[.35,.05]);
   console.log("Intervention UI real listeners: "+checks+" assertions passed.");
 })().catch(error=>{console.error(error);process.exitCode=1;});

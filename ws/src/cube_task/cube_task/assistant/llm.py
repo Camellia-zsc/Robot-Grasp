@@ -13,9 +13,11 @@ import http.client
 import json
 import math
 import os
+import queue
 from pathlib import Path
 import re
 import socket
+import threading
 import time
 from typing import Callable, Mapping
 import urllib.error
@@ -358,6 +360,72 @@ def _open(request, timeout):
     return urllib.request.build_opener(_NoRedirect()).open(request, timeout=timeout)
 
 
+class _CancellableStream:
+    """Keep blocking socket I/O out of the robot's single owning worker.
+
+    Only the caller parses output, invokes callbacks or records decisions.
+    An abandoned I/O thread can only finish/close its existing request; it
+    cannot publish late output, move the robot, or retry a billed POST.
+    """
+
+    def __init__(self, request, timeout, check_cancel):
+        self.request, self.timeout, self.check_cancel = request, timeout, check_cancel
+        self._reads = queue.Queue()
+        self._results = queue.Queue()
+        self._abandoned = threading.Event()
+        self._worker = threading.Thread(target=self._io, name='model-stream-io', daemon=True)
+
+    def _io(self):
+        try:
+            with _open(self.request, self.timeout) as response:
+                self._results.put((True, None))
+                reader = getattr(response, 'read1', response.read)
+                while not self._abandoned.is_set():
+                    size = self._reads.get()
+                    if size is None or self._abandoned.is_set():
+                        break
+                    chunk = reader(size)
+                    if not self._abandoned.is_set():
+                        self._results.put((True, chunk))
+        except Exception as exc:
+            if not self._abandoned.is_set():
+                self._results.put((False, exc))
+
+    def _receive(self):
+        while True:
+            self.check_cancel()
+            try:
+                ok, value = self._results.get(timeout=.025)
+            except queue.Empty:
+                continue
+            self.check_cancel()
+            if not ok:
+                raise value
+            return value
+
+    def __enter__(self):
+        self._worker.start()
+        try:
+            self._receive()
+        except BaseException:
+            self.__exit__()
+            raise
+        return self
+
+    def read(self, size):
+        self._reads.put(size)
+        return self._receive()
+
+    read1 = read
+
+    def __exit__(self, *_args):
+        self._abandoned.set()
+        self._reads.put(None)
+        # Normal completion closes immediately. A socket already blocked in
+        # connect/read retains its configured timeout without blocking Stop.
+        self._worker.join(.075)
+
+
 def _iter_sse(response, check_cancel):
     """Decode UTF-8 and SSE across arbitrary network chunk boundaries."""
     decoder = codecs.getincrementaldecoder('utf-8-sig')()
@@ -541,7 +609,7 @@ class ModelClient:
 
         completed, done, stopped = False, False, False
         try:
-            with _open(request, self.settings.timeout) as response:
+            with _CancellableStream(request, self.settings.timeout, check_cancel) as response:
                 for event, data in _iter_sse(response, check_cancel):
                     if data.strip() == '[DONE]':
                         done = True

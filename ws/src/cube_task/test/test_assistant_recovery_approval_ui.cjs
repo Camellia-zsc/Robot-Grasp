@@ -202,6 +202,15 @@ const accept=get("recovery-approval-accept"),decline=get("recovery-approval-decl
   update({status:"error",busy:false,can_resume_recovery:1});eq(resumePanel.hidden,true);
   update({...waiting("unrelated-pause",14),can_resume_recovery:true,busy:false});eq(resumePanel.hidden,true);
   await resume.dispatch("click");eq(requests.length,stoppedRequests);
+  // A normal stop rearms only after the old worker exits; it then permits
+  // editing/new commands and an explicit continuation without resetting.
+  update({status:"stopped",busy:false,can_resume_recovery:true,needs_reset:false,
+    simulation:{held_object:"pear"},events:[{id:30,kind:"stopped"}]});
+  eq(resumePanel.hidden,false);eq(resume.disabled,false);
+  eq(get("instruction").disabled,false);eq(get("send-button").disabled,false);
+  response=async()=>({ok:true});
+  await resume.dispatch("click");
+  deep(requests.at(-1),{url:"/api/resume-recovery",payload:{}});
   has(html,/id="resume-recovery-button"[^>]*>继续处理当前持物/);
   has(html,/id="resume-recovery-status"[^>]*aria-live="polite"/);
   console.log(`Recovery approval UI: ${checks} assertions passed.`);

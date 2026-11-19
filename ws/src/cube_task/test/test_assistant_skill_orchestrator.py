@@ -193,6 +193,38 @@ def test_decline_preserves_scene_and_resume_does_not_imply_approval(create):
     assert ctl.wait_idle(3)
 
 
+def test_resume_after_stop_rescan_keeps_task_start_restore_position_and_yaw(create):
+    def compose(c, n):
+        return [step(1, 'move', 'pear', {'type': 'original', 'label': 'pear'}),
+                step(2, 'move', 'apple', {'type': 'goal', 'index': 0}), step(3, 'finish')]
+    ctl, session, client = create(compose)
+    originals = session.scene['objects']
+    original = copy.deepcopy(next(o for o in originals if o['label'] == 'pear'))
+    displaced = session.scene
+    pear = next(o for o in displaced['objects'] if o['label'] == 'pear')
+    pear['center_base'][0] += .04
+    pear['yaw'] += .4
+    session._scene['objects'] = []  # stop invalidates old observations, not task obligations
+    def fresh_observation():
+        session._scene = copy.deepcopy(displaced)
+        return session.scene
+    session.observe = fresh_observation
+    ctl._skill_memory = dict(instruction='苹果放红区，再将临时移开的梨复位',
+        goals=copy.deepcopy(GOALS), protected_goals=[], originals=copy.deepcopy(originals),
+        obligations={'pear': 'pending'}, restorations=[])
+    ctl._skill_task['status'] = 'stopped'
+    ctl._last_result = dict(ok=False, aborted=True, pending_obligations={'pear': 'pending'})
+    ctl.resume_recovery()
+    pending(ctl)
+    approve(ctl)
+    assert ctl.wait_idle(3)
+    measured = next(o for o in session.scene['objects'] if o['label'] == 'pear')
+    assert measured['center_base'] == original['center_base']
+    assert measured['yaw'] == original['yaw']
+    assert ctl._skill_memory['originals'] == originals
+    assert ctl.snapshot()['last_result']['ok'], ctl.snapshot()['last_result']
+
+
 def test_model_can_ask_mid_plan_and_continue_after_button_answer(create):
     def ask(c, n):
         return [step(1, 'observe', 'apple'), step(2, 'ask', question='是否继续本次操作？', affected_goals=[0])] + normal(c, n)

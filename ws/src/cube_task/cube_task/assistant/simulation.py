@@ -1717,6 +1717,51 @@ class SimulationSession:
             if self._snapshot:
                 self._snapshot = dict(self._snapshot, status='stopped')
 
+    def resume_after_stop(self) -> bool:
+        """Rearm an idle, healthy simulation without executing the old route.
+
+        The dashboard calls this only after its previous worker has unwound.
+        No homing, finger opening, pose edit or motion command is issued here.
+        """
+        with self._operation_lock:
+            if self._closed or not self._prepared:
+                return False
+            health = self.arm.health()
+            if not getattr(health, 'ok', False) or not getattr(health, 'enabled', False):
+                return False
+            joints, tcp, width = self.arm.get_joints(), self.arm.get_tcp_pose(), self.arm.gripper_width()
+            try:
+                now = float(self.clock.now())
+                max_age = float(self.runner.skill.feedback_max_age)
+                for sample, shape in ((joints, (6,)), (tcp, (4, 4)), (width, ())):
+                    value = np.asarray(sample.value, float)
+                    age = now - float(sample.stamp)
+                    if (value.shape != shape or not np.all(np.isfinite(value))
+                            or not math.isfinite(age) or not -1e-6 <= age <= max_age):
+                        return False
+                transform = np.asarray(tcp.value, float)
+                rotation = transform[:3, :3]
+                if (not np.allclose(transform[3], [0., 0., 0., 1.], atol=1e-6)
+                        or not np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-5)
+                        or not np.isclose(np.linalg.det(rotation), 1., atol=1e-5)):
+                    return False
+            except (AttributeError, TypeError, ValueError):
+                return False
+            with self._intervention_lock:
+                pending = list(self._interventions)
+                self._interventions.clear()
+            for request_id, _request in pending:
+                self._emit('scene_intervention_rejected', dict(request_id=request_id,
+                    message='任务已停止，尚未生效的旧干预已取消'))
+            self.cancel_event.external = None
+            self.cancel_event.clear()
+            self._environment_revision += 1
+            self._observed_detections = []
+            self._invalidate_scene('上次任务已停止；下一项操作将重新确认当前现场')
+            self._status, self._stage = 'ready', ''
+            self._publish_snapshot()
+            return True
+
     def _publish_snapshot(self) -> None:
         joints = self.arm.get_joints()
         tcp = self.arm.get_tcp_pose()

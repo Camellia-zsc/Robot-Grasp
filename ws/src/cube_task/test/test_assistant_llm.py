@@ -256,6 +256,51 @@ def test_cancel_during_stream_closes_connection(monkeypatch, scene):
     assert stream.closed
 
 
+@pytest.mark.parametrize('phase', ['connect', 'read'])
+def test_stop_interrupts_blocked_network_wait_without_late_output(monkeypatch, scene, phase):
+    entered, release, done, cancelled = [threading.Event() for _ in range(4)]
+    deltas, failures, calls = [], [], []
+
+    class BlockingStream(FakeStream):
+        def read(self, size):
+            if phase == 'read':
+                entered.set()
+                release.wait(3)
+            return super().read(size)
+
+    stream = BlockingStream([completed('{}')])
+
+    def blocked_open(*args):
+        calls.append(1)
+        if phase == 'connect':
+            entered.set()
+            release.wait(3)
+        return stream
+
+    monkeypatch.setattr(llm, '_open', blocked_open)
+
+    def request():
+        try:
+            llm.ModelClient(settings()).decide('抓红色', scene, deltas.append, cancelled)
+        except llm.LLMError as exc:
+            failures.append(exc.code)
+        finally:
+            done.set()
+
+    worker = threading.Thread(target=request)
+    worker.start()
+    try:
+        assert entered.wait(2)
+        cancelled.set()
+        assert done.wait(.5), 'stop must not wait for the provider socket timeout'
+        assert failures == ['cancelled']
+        assert not deltas and calls == [1]
+    finally:
+        release.set()
+        worker.join(3)
+    assert not deltas
+
+
 def test_output_and_duration_are_bounded(monkeypatch, scene):
     install_stream(monkeypatch, FakeStream([
         sse({'type': 'response.output_text.delta', 'delta': 'x' * 12001})]))

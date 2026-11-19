@@ -57,6 +57,13 @@ _MAX_GEOMETRY = {
 
 def configure_sandbox(cfg) -> None:
     """Configure a general-shape task while keeping L1 block semantics intact."""
+    # The interactive physical task lowers to the measured support, rather
+    # than using the competition fruit's 10 mm drop and per-label lowering.
+    # RGB-D/support and seated-grip error need a few mm of allowance: a 2 mm
+    # command compressed the pear against the table before opening and slid it.
+    # Applying the old 5 mm pear offset here would penetrate the support.
+    cfg.set('place.release_height_flat', 0.004)
+    cfg.set('place.release_lower', {})
     entries = catalog_entries()
     cfg.set('tasks.L1.labels', ['red', 'green', 'yellow'])
     cfg.set('tasks.Sandbox', {'labels': [entry['label'] for entry in entries],

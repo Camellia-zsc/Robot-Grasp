@@ -169,7 +169,7 @@ def test_release_stalled_near_release_opens_there():
     def fn(kind, target, linear, idx):
         if idx == 4:                                    # descent into the zone
             T = np.array(p.T_release)
-            T[2, 3] += 0.02                             # stopped 2 cm above release
+            T[2, 3] += 0.001                            # stopped 1 mm above release
             arm.tcp = T
             return MotionResult(ok=False, error='stalled')
         return None

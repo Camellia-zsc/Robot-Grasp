@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from ..core.types import GraspPlan, MotionResult, PickResult, PlacePlan
+from ..core.transforms import is_rotation, rotation_angle
 from ..perception.grasp import RELEASE_OPEN_EXTRA, max_gripper_width
 
 _LOG = logging.getLogger('cube_task.task.skills')
@@ -38,9 +39,13 @@ FAULT_GRIPPER_ERRORS = ('comm', 'fault', 'aborted')
 #: measured opening must exceed the expected object width by this before descending.
 OPEN_CLEARANCE = 0.002
 #: a stopped release move still counts as "at release" within these limits (m).
-RELEASE_XY_TOL = 0.02
-RELEASE_Z_ABOVE_TOL = 0.08
-RELEASE_Z_BELOW_TOL = 0.01
+RELEASE_XY_TOL = 0.005
+RELEASE_Z_ABOVE_TOL = 0.002
+RELEASE_Z_BELOW_TOL = 0.002
+RELEASE_ROT_TOL = math.radians(3.0)
+RELEASE_SETTLE_S = 0.12
+RELEASE_MAX_SPEED = 0.01
+RELEASE_MAX_ANGULAR_SPEED = math.radians(6.0)
 #: at the release the fingers must open this far past the held width (m).
 RELEASE_OPEN_MARGIN = 0.01
 #: ... but never more than the commanded opening minus this (m): a gripper opened to
@@ -511,6 +516,35 @@ class PickPlaceSkill:
         place.__dict__.update(updated.__dict__)
 
     def _release_and_retreat(self, r: PickResult, g: GraspPlan, p: PlacePlan) -> None:
+        # A successful motion flag is insufficient: recovery and continuation
+        # use this same gate, and no failed descent may turn into a high drop.
+        self._check_abort('open_release')
+        before, why = self._release_feedback(p)
+        after = None
+        if before is not None:
+            start = self.clock.now()
+            self.clock.sleep(RELEASE_SETTLE_S)
+            self._check_abort('open_release')
+            after, why = self._release_feedback(p)
+            if after is not None:
+                elapsed = self.clock.now() - start
+                speed = (float(np.linalg.norm(after[:3, 3] - before[:3, 3])) / elapsed
+                         if elapsed > 0 else math.inf)
+                angular = (rotation_angle(before[:3, :3].T @ after[:3, :3]) / elapsed
+                           if elapsed > 0 else math.inf)
+                if speed > RELEASE_MAX_SPEED or angular > RELEASE_MAX_ANGULAR_SPEED:
+                    why = 'release pose is still moving'
+        if why or after is None:
+            r.ok = False
+            r.stage, r.error = 'release', 'release_pose_unconfirmed'
+            r.detail.update(holding=True, reason=why or 'release pose is unavailable')
+            return
+        r.detail['release_feedback'] = dict(
+            target=_xyz(p.T_release), actual=_xyz(after),
+            height_error_m=float(after[2, 3] - p.T_release[2, 3]),
+            linear_speed_m_s=speed, angular_speed_rad_s=angular,
+            settled_s=elapsed)
+        self._guard('open_release')
         held = r.grasp_width or 0.0
         width = p.open_width
         if r.grasp_width is not None:
@@ -562,22 +596,35 @@ class PickPlaceSkill:
             r.detail['recovery'] = 'failed: %s' % e.error
             r.detail['fault'] = True
 
-    def _near_release(self, p: PlacePlan) -> bool:
+    def _release_feedback(self, p: PlacePlan):
+        """Fresh actual tool pose close enough to open over the measured support."""
         try:
             s = self.arm.get_tcp_pose()
-        except Exception:  # noqa: B902
-            return False
-        if s is None or s.value is None:
-            return False
-        if self.clock.now() - float(s.stamp) > self.feedback_max_age:
-            return False
-        cur = np.asarray(s.value, dtype=float)[:3, 3]
-        if not np.all(np.isfinite(cur)):
-            return False
-        tgt = np.asarray(p.T_release)[:3, 3]
-        dz = float(cur[2] - tgt[2])
-        return (float(np.linalg.norm(cur[:2] - tgt[:2])) <= RELEASE_XY_TOL
-                and -RELEASE_Z_BELOW_TOL <= dz <= RELEASE_Z_ABOVE_TOL)
+            if s is None or s.value is None:
+                return None, 'release TCP feedback is missing'
+            age = self.clock.now() - float(s.stamp)
+            if not math.isfinite(age) or not -.05 <= age <= self.feedback_max_age:
+                return None, 'release TCP feedback is stale'
+            actual = np.asarray(s.value, dtype=float)
+            target = np.asarray(p.T_release, dtype=float)
+            if (actual.shape != (4, 4) or not np.all(np.isfinite(actual))
+                    or not is_rotation(actual[:3, :3], 1e-3)
+                    or not np.allclose(actual[3], [0., 0., 0., 1.])):
+                return None, 'release TCP feedback is invalid'
+            delta = actual[:3, 3] - target[:3, 3]
+            rotation = rotation_angle(target[:3, :3].T @ actual[:3, :3])
+            if (np.linalg.norm(delta[:2]) > RELEASE_XY_TOL
+                    or not -RELEASE_Z_BELOW_TOL <= delta[2] <= RELEASE_Z_ABOVE_TOL
+                    or rotation > RELEASE_ROT_TOL):
+                return None, ('release pose not reached: xyz error %s m, angle %.2f deg'
+                              % (np.round(delta, 4).tolist(), math.degrees(rotation)))
+            return actual.copy(), ''
+        except Exception:  # noqa: B902 - unavailable feedback must never open
+            return None, 'release TCP feedback is unavailable'
+
+    def _near_release(self, p: PlacePlan) -> bool:
+        actual, _why = self._release_feedback(p)
+        return actual is not None
 
     def _recover_release(self, r: PickResult, g: GraspPlan, p: PlacePlan) -> None:
         """Descent into the zone stopped while holding the object."""

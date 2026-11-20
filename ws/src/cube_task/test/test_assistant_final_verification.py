@@ -11,6 +11,8 @@ def verifier(objects):
     session = object.__new__(SimulationSession)
     zone = Zone('zone_red', np.array([.17, -.35, 0]), (.2, .2), label='red')
     session.runner = SimpleNamespace(zones={'zone_red': zone})
+    session._physics = None
+    session._evaluation_object = lambda d: None
     session._environment_revision = session._observation_revision = 1
     scene = {'zones': [dict(name=zone.name, center=zone.center.tolist(),
                            size=list(zone.size), yaw=0)]}
@@ -40,8 +42,9 @@ def test_old_cached_goal_never_substitutes_a_missing_fresh_object():
     session, calls = verifier([])
     session._scene = {'objects': [block('red', [.17, -.35]).summary()]}
     result = session.verify_goals([dict(label='red', zone_name='zone_red')])
-    assert not result['ok'] and len(calls) == 2
+    assert not result['ok'] and len(calls) == 1
     assert all(call['purpose'] == 'verify_place' for call in calls)
+    assert calls[0]['target']['verify_goals'] == [dict(label='red', zone_name='zone_red')]
 
 
 def test_object_moved_out_of_goal_during_later_task_fails_final_verification():

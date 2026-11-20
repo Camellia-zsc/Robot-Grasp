@@ -870,6 +870,7 @@ class SimulationSession:
                     self._observation_views = {}
                     self._observation_jpegs = {}
             views, warnings, coverage = {}, [], []
+            verified_merge = None
             revision = self._environment_revision
             for step, view in enumerate(order, 1):
                 self._emit_scan_view(view, step=step, total=len(order), local=local)
@@ -888,7 +889,23 @@ class SimulationSession:
                 flange = self.arm.get_flange_pose()
                 pose = camera_pose_in_base(self.runner.ext, flange.value, self.runner.T_flange_tcp)
                 coverage.append((frame, pose))
+                for measured in views[view]:
+                    measured.extra['_capture_stamp'] = float(frame.stamp)
+                    measured.extra['_capture_flange'] = np.asarray(flange.value, float).copy()
                 if local:
+                    goals = target.get('verify_goals')
+                    if goals:
+                        verified_merge = merge_observations(views, dist=self.runner.view_merge,
+                            partial=lambda d: not d.valid or self.runner._partial(d))
+                        if all(self._camera_goal_confirmed(goal, verified_merge[0], revision) for goal in goals):
+                            break
+                        if purpose == 'verify_place' and step == 2:
+                            extra_view = self._stack_verification_view(goals, verified_merge[0], revision)
+                            if extra_view is not None:
+                                # One purposeful view of the same stack; never
+                                # restart a whole-table search for verification.
+                                order.append(extra_view)
+                        continue
                     label = target.get('label')
                     measured = unique_target(views[view], label,
                         partial=lambda d: self._target_partial(d, target)) if label else None
@@ -917,7 +934,7 @@ class SimulationSession:
                         continue
                     if (reliable and (geometry_ready or purpose == 'verify_place')) or (not label and len(coverage) >= 1):
                         break
-            detections, diagnostics = merge_observations(
+            detections, diagnostics = verified_merge or merge_observations(
                 views, dist=self.runner.view_merge,
                 partial=lambda d: not d.valid or self.runner._partial(d))
             if require_grasp:
@@ -965,6 +982,47 @@ class SimulationSession:
                        'stats': copy.deepcopy(self._scan_stats)})
             return self._publish_scene(detections, warnings, diagnostics, result.frame_stamp)
 
+    def _reusable_target(self, reference):
+        """Reuse only a still-fresh complete capture from the unchanged camera pose."""
+        from .observation_policy import unique_target
+        # A release-verification view proves a completed placement, not a new
+        # grasp observation. Keep that boundary even if its frame is recent.
+        if (getattr(self, '_last_observation_purpose', '') not in
+                ('skill_observe', 'skill_pick', 'recover_target', 'recover_queued_target', 'confirm_pick') or
+                self._observation_revision != self._environment_revision or
+                getattr(self, '_interventions', ()) or self.cancel_event.is_set()):
+            return False
+        label = reference.get('label')
+        det = unique_target(self._last_fresh, label,
+                            partial=lambda d: self._target_partial(d, reference))
+        if det is None or (label in ('banana', 'pear') and det.extra.get('_cloud_views', 0) < 2):
+            return False
+        stamp, pose = det.extra.get('_capture_stamp'), det.extra.get('_capture_flange')
+        flange = self.arm.get_flange_pose()
+        if (stamp is None or pose is None or flange is None or
+                not 0 <= self.clock.now() - float(stamp) <= self.runner.max_frame_age or
+                not np.allclose(flange.value, pose, atol=1e-5, rtol=0)):
+            return False
+        from .obstacle_recovery import _grasp
+        peers = [d for d in self._observed_detections if d.label != label]
+        _candidate, plan = _grasp(self, det, peers)
+        return bool(plan.feasible)
+
+    def _camera_goal_confirmed(self, goal, fresh, revision):
+        """Evaluate the whole visual postcondition while a local scan is in progress."""
+        from .batch import whole_footprint_at_goal
+        from .observation_policy import unique_target
+        if revision != self._environment_revision or getattr(self, '_interventions', ()):
+            return False
+        if (goal.get('destination') or {}).get('type') == 'on_object':
+            from .stacking import camera_confirmed
+            evidence = SimpleNamespace(_last_fresh=fresh, _observation_revision=revision,
+                _environment_revision=self._environment_revision,
+                _interventions=getattr(self, '_interventions', ()), world=self.world)
+            return camera_confirmed(evidence, goal['label'], goal['destination'])
+        det = unique_target(fresh, goal['label'])
+        return bool(det is not None and whole_footprint_at_goal(det.summary(), self._scene, goal))
+
     def _stable_cloud(self, det, revision):
         if det is None or det.center_base is None:
             return None
@@ -1001,8 +1059,11 @@ class SimulationSession:
         T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
         cameras = [self.arm.kin.fk(q) @ T_fc for q in self.runner.views]
         point = target.get('center_base') or target.get('xy') or [.26, 0]
+        # A fully covering current named view wins over an older recorded view.
+        # rank_views still puts complete coverage ahead of this preference.
+        preferred = (self.runner._at_view if self.runner._at_observe else target.get('view'))
         return rank_views(cameras, self.camera.intrinsics(), point[:2],
-                          preferred=target.get('view'),
+                          preferred=preferred,
                           half_extent=max(.04, float(target.get('length') or .08) / 2),
                           target_z=float(target.get('top_z') or .04))
 
@@ -1305,9 +1366,129 @@ class SimulationSession:
                     self._view_labels.append('桌面目标点视角')
                 else:
                     self.runner.views[view] = q.tolist()
+                    self._view_labels[view] = '桌面目标点视角'
+                    if self.runner._at_view == view:
+                        self.runner._at_observe = False
                 self.runner.multi_view = True
                 self._destination_views = {key: view}
                 return view
+
+    def _safe_observation_joints(self, q, detections):
+        """Check an empty-gripper joint sweep against measured object envelopes."""
+        import cv2
+        from .destinations import footprint_corners
+        from ..task.runner import footprint_dims
+
+        if self.world.held is not None or self.cancel_event.is_set() or self._interventions:
+            return False
+        joints, width = self.arm.get_joints(), self.arm.gripper_width()
+        table_z = self.arm.table_z
+        if joints is None or width is None or table_z is None or not math.isfinite(float(table_z)):
+            return False
+        current, target = np.asarray(joints.value, float), np.asarray(q, float)
+        if current.shape != (6,) or target.shape != (6,) or not np.all(np.isfinite(np.r_[current, target, width.value])):
+            return False
+        obstacles = []
+        for det in detections:
+            values = [det.length, det.width, det.height, det.top_z, det.yaw]
+            if (det.center_base is None or any(v is None for v in values) or
+                    not np.all(np.isfinite(np.r_[det.center_base, values])) or min(values[:3]) <= 0):
+                return False
+            length, breadth = footprint_dims(det, getattr(self.runner, 'nominal', {}).get(det.label))
+            obstacles.append((footprint_corners(det.center_base[:2], length, breadth, det.yaw),
+                              float(det.top_z)))
+        if not obstacles:
+            return False
+        signs = np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)])
+        fingers = [np.array([0., side * (float(width.value) / 2 + .006), -.025]) +
+                   signs * [.010, .006, .025] for side in (-1, 1)]
+        # Include the palm/connector above the finger pads as a conservative box.
+        tool = np.vstack(fingers + [np.array([0., 0., -.10]) + signs * [.04, .055, .05]])
+        count = max(25, int(math.ceil(float(np.max(np.abs(target-current))) / math.radians(1))))
+        swept = []
+        for sample in np.linspace(current, target, count + 1):
+            if self.cancel_event.is_set() or self._interventions:
+                return False
+            pose = self.arm.kin.fk(sample) @ self.runner.T_flange_tcp
+            if not self.arm.guard.check_tcp(pose, self.arm.table_z, check_tilt=False)[0]:
+                return False
+            swept.append(tool @ pose[:3, :3].T + pose[:3, 3])
+        def overlaps(a, b):
+            for polygon in (a, b):
+                for edge in np.roll(polygon, -1, axis=0) - polygon:
+                    axis = np.array([-edge[1], edge[0]])
+                    if np.linalg.norm(axis) < 1e-9:
+                        continue
+                    u, v = a @ axis, b @ axis
+                    if u.max() < v.min() or v.max() < u.min():
+                        return False
+            return True
+        for start, end in zip(swept, swept[1:]):
+            corners = np.vstack([start, end])
+            xy = (corners[:, None, :2] + np.array([[-.005, -.005], [-.005, .005],
+                                                  [.005, .005], [.005, -.005]])).reshape(-1, 2)
+            hull = cv2.convexHull(xy.astype(np.float32)).reshape(-1, 2)
+            low = float(corners[:, 2].min()) - .005
+            if low <= float(table_z) + .005:
+                return False
+            if any(low <= top + .015 and overlaps(hull, footprint) for footprint, top in obstacles):
+                return False
+        return True
+
+    def _stack_verification_view(self, goals, fresh, revision):
+        """Offer one safely reachable local view when the upper body hides its base."""
+        from .observation_policy import unique_target
+        from ..sim.scenarios import look_at
+
+        if (revision != self._environment_revision or self.world.held is not None or
+                getattr(self, '_interventions', ()) or not hasattr(self.arm, 'kin')):
+            return None
+        for goal in goals:
+            destination = goal.get('destination') or {}
+            if destination.get('type') != 'on_object' or self._camera_goal_confirmed(goal, fresh, revision):
+                continue
+            # A cropped upper body is still a camera aiming hint, never a grasp
+            # target or proof of support. Require one unambiguous measured hint.
+            upper = [d for d in fresh if d.label == goal['label'] and d.center_base is not None]
+            base = unique_target(self._observed_detections, destination['label'])
+            if len(upper) != 1 or base is None or base.top_z is None or upper[0].top_z is None:
+                continue
+            upper = upper[0]
+            if upper.top_z <= base.top_z + .01:
+                continue
+            gaze_z = min(float(base.top_z) + .05, (float(base.top_z) + float(upper.top_z)) / 2)
+            gaze = np.r_[upper.center_base[:2], gaze_z]
+            radial = gaze[:2] / max(float(np.linalg.norm(gaze[:2])), 1e-6)
+            ext = self.runner.ext
+            T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
+            neighbors = list(fresh) + [d for d in self._observed_detections
+                                      if d.label not in {item.label for item in fresh}]
+            for angle, distance, height in ((5., .18, .22), (-5., .18, .22),
+                                            (5., .16, .22), (-5., .16, .22)):
+                if self.cancel_event.is_set() or self._interventions or revision != self._environment_revision:
+                    return None
+                c, s = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+                direction = np.array([[c, -s], [s, c]]) @ radial
+                eye = np.r_[gaze[:2] - distance * direction, gaze_z + height]
+                q, _ep, _er = self.arm.kin.ik(look_at(eye, gaze) @ inv_T(T_fc),
+                    q_seed=self.arm.get_joints().value, cancelled=self.cancel_event.is_set)
+                if q is None or not self._safe_observation_joints(q, neighbors):
+                    continue
+                if self.cancel_event.is_set() or self._interventions or revision != self._environment_revision:
+                    return None
+                view = self._base_view_count
+                if len(self.runner.views) == view:
+                    self.runner.views.append(q.tolist())
+                    self._view_labels.append('叠放支撑局部视角')
+                else:
+                    self.runner.views[view] = q.tolist()
+                    self._view_labels[view] = '叠放支撑局部视角'
+                self.runner._at_observe = False
+                self.runner.multi_view = True
+                self._destination_views = {}
+                self._emit('stack_observation', {'message': '顶面被遮挡，正在从一个安全局部视角确认支撑关系'})
+                return view
+        return None
 
     def _verify_zone(self, obj, zone_name):
         """Independent full-zone and stable-posture audit after execution."""
@@ -1367,7 +1548,18 @@ class SimulationSession:
             groups.setdefault(key, (xy, []))[1].append(goal)
         items = []
         for xy, group in groups.values():
-            scene = self.observe(target={'xy': xy}, purpose='verify_place')
+            query = {'xy': xy, 'verify_goals': copy.deepcopy(group)}
+            if len(group) == 1:
+                query['label'] = group[0]['label']
+            for goal in group:
+                if (goal.get('destination') or {}).get('type') == 'on_object':
+                    base = next((d for d in self._observed_detections
+                        if d.label == goal['destination']['label'] and d.top_z is not None), None)
+                    upper = next((d for d in self._observed_detections
+                        if d.label == goal['label'] and d.height is not None), None)
+                    if base is not None and upper is not None:
+                        query['top_z'] = max(query.get('top_z', 0.), float(base.top_z + upper.height))
+            scene = self.observe(target=query, purpose='verify_place')
             fresh = list(self._last_fresh)
             for goal in group:
                 def confirmed():
@@ -1389,9 +1581,6 @@ class SimulationSession:
                         d.valid and d.label == goal['label'] and
                         whole_footprint_at_goal(d.summary(), scene, goal) and
                         physically_settled(d) for d in fresh))
-                if not confirmed():
-                    scene = self.observe(target={'xy': xy, 'label': goal['label']}, purpose='verify_place')
-                    fresh = list(self._last_fresh)
                 items.append({'label': goal['label'], 'ok': confirmed(),
                               'verified_revision': self._observation_revision,
                               'goal': copy.deepcopy(goal)})
@@ -1411,7 +1600,8 @@ class SimulationSession:
             summary['diagnostics'] = str(result.detail.get('last_motion_detail') or
                                          result.detail.get('placement_planning_reason') or
                                          result.detail.get('reason') or why or '')[:500]
-        if self._physics is not None and not self.cancel_event.is_set() and self.world.held is None:
+        if (result is not None and self._physics is not None and
+                not self.cancel_event.is_set() and self.world.held is None):
             self._status = 'settling'
             self._emit('settling', {'message': '正在等待物品在重力和接触作用下落稳'})
             self._physics.settle(.8)
@@ -1437,13 +1627,25 @@ class SimulationSession:
             try:
                 if destination is not None:
                     xy = (self._placement_center or destination.get('xy') or [.26, 0])
+                    support = None
+                    if destination['type'] == 'on_object':
+                        from .observation_policy import unique_target
+                        support = unique_target(self._observed_detections, destination['label'])
+                        if self._placement_center is None and support is not None:
+                            xy = support.center_base[:2].tolist()
                     if destination['type'] == 'point':
                         self._ensure_destination_view(destination)
                     query = {'xy': xy}
+                    if support is not None and support.top_z is not None and det.height is not None:
+                        query['top_z'] = float(support.top_z + det.height)
                 else:
                     query = {'xy': self.runner.zones[zone_name].center[:2].tolist()}
                 if result is not None and result.ok:
                     query.update(label=det.label, height=det.height)
+                    goal = {'label': det.label, 'zone_name': zone_name}
+                    if destination is not None:
+                        goal['destination'] = destination
+                    query['verify_goals'] = [goal]
                 self.observe(target=query, purpose='verify_place',
                              forget=[det] if result is not None and result.ok else [])
             except RuntimeError as exc:
@@ -1508,13 +1710,22 @@ class SimulationSession:
                 names.get(det.label, det.label), destination_label(destination) if destination else
                 colors.get(zone_label, zone_label or zone_name) + '区域')
         elif summary['controller_ok']:
-            summary['message'] = ('梨子已放下但未保持直立，需要重新观察并调整放置姿态'
-                                  if summary['error'] == 'pear_not_upright' else
-                                  '叠放未通过支撑与落稳核验，物品可能滑落、倾倒或支撑已移动'
-                                  if destination is not None and destination['type'] == 'on_object' and not truth_success else
-                                  '抓放动作已结束，但无法唯一核对目标物品'
-                                  if evaluation_object is None else
-                                  '抓放动作已结束，但目标物品没有位于指定区域')
+            if summary['error'] == 'pear_not_upright':
+                summary['message'] = '梨子已放下但未保持直立，需要重新观察并调整放置姿态'
+            elif truth_success and not camera_success:
+                relation = ('目标物品与指定底座的支撑关系' if destination is not None and
+                            destination['type'] == 'on_object' else '目标物品的落位')
+                summary['message'] = '抓放动作已完成，物理检查通过，但相机尚未确认' + relation
+            elif destination is not None and destination['type'] == 'on_object':
+                support = summary['truth'].get('support', {})
+                summary['message'] = ('物品已放下，但未检测到与指定底座的接触'
+                    if support.get('contact') is False else
+                    '物品已放下，但物品或底座仍在运动，尚未落稳'
+                    if support.get('stable') is False and support.get('contact') is True else
+                    '叠放尚未通过支撑与落稳核验，需要重新确认目标与底座')
+            else:
+                summary['message'] = ('抓放动作已结束，但无法唯一核对目标物品'
+                    if evaluation_object is None else '抓放动作已结束，但目标物品没有位于指定区域')
         else:
             summary['message'] = '本次抓取未完成，请查看执行记录并重新观察场景'
         self._append_check('placement', truth_success,

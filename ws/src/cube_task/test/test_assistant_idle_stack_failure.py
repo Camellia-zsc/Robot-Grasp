@@ -59,6 +59,8 @@ def test_idle_upper_or_support_motion_invalidates_success_and_allows_manual_resu
     assert state['last_result']['items'][0]['ok'] is False
     assert state['last_result']['error'] == 'stack_scene_changed'
     assert state['can_resume_recovery']
+    assert not state['needs_reset']
+    assert state['simulation']['editor']['editable']
     assert ctl._skill_memory == memory
     assert session.calls == []
 

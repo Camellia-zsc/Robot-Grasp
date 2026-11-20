@@ -2,6 +2,7 @@
 import copy
 import socket
 import threading
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,6 +31,15 @@ class Session(BaseSession):
         self.completion_checks = []
         self.result_hook = None
         self.completion_hook = None
+        self.world = SimpleNamespace(held=None, objects=[SimpleNamespace(name=o['label'], label=o['label'])
+                                                       for o in self._scene['objects']])
+        self.support_stable = True
+        self._physics = SimpleNamespace(sync=lambda: None, support_status=self._support_status)
+
+    def _support_status(self, object_id, support_label):
+        target = next(o for o in self._scene['objects'] if o['label'] == object_id)
+        contact = target.get('support_label') == support_label
+        return dict(success=contact and self.support_stable, contact=contact, stable=self.support_stable)
 
     def snapshot(self):
         snap = super().snapshot()
@@ -58,10 +68,25 @@ class Executor(BaseExecutor):
             s._environment_revision += 1
         selected = ([goals[action['goal_index']]]
                     if action['skill'] == 'verify' and 'goal_index' in action else goals)
-        result = super().execute(action, selected, *args, **kwargs)
+        if action['skill'] == 'verify' and any(
+                (g.get('destination') or {}).get('type') == 'on_object' for g in selected):
+            s.calls.append(copy.deepcopy(action))
+            items = []
+            for goal in selected:
+                target = next(o for o in s._scene['objects'] if o['label'] == goal['label'])
+                ok = target.get('support_label') == goal['destination']['label']
+                items.append(dict(goal=copy.deepcopy(goal), ok=ok, truth={'success': ok}))
+            ok = all(item['ok'] for item in items)
+            result = dict(ok=ok, camera_verified=ok, truth={'success': ok}, items=items,
+                          verified_revision=s._environment_revision, holding=False)
+        else:
+            result = super().execute(action, selected, *args, **kwargs)
         if action['skill'] in ('move', 'place') and result['ok']:
             result.update(label=action['label'], controller_ok=True,
                           resolved_destination=resolved(action, goals))
+            if result['resolved_destination'].get('type') == 'on_object':
+                target = next(o for o in s._scene['objects'] if o['label'] == action['label'])
+                target['support_label'] = result['resolved_destination']['label']
         if s.result_hook:
             s.result_hook(action, result)
         return result
@@ -135,6 +160,84 @@ def test_verified_place_supplies_goal_and_finish_without_duplicate_camera_pass(c
         step(3, 'verify', goal_index=0), step(4, 'finish')])
     run(ctl)
     assert [s['skill'] for s in session.calls] == ['pick', 'place']
+
+
+@pytest.mark.parametrize('actions', [('move',), ('pick', 'place')])
+def test_settled_stack_action_supplies_verify_and_finish_without_duplicate_scan(create, actions):
+    goals = [dict(label='apple', zone_name=None,
+                  destination=dict(type='on_object', label='pear'))]
+    def compose(c, n):
+        steps = [step(i, skill, 'apple', {'type': 'goal', 'index': 0}
+                      if skill != 'pick' else None) for i, skill in enumerate(actions)]
+        return steps + [step(8, 'verify'), step(9, 'finish')]
+    ctl, session, _ = create(compose, goals)
+    state = run(ctl)
+    assert [s['skill'] for s in session.calls] == list(actions)
+    assert state['last_result']['verification_reused']
+    assert state['last_result']['items'][0]['goal'] == goals[0]
+
+
+def test_stack_verify_proof_is_not_scanned_again_by_finish(create):
+    goals = [dict(label='apple', zone_name=None,
+                  destination=dict(type='on_object', label='pear'))]
+    ctl, session, _ = create(lambda c, n: [step(1, 'verify'), step(2, 'finish')], goals)
+    session._scene['objects'][0]['support_label'] = 'pear'
+    run(ctl)
+    assert [s['skill'] for s in session.calls] == ['verify']
+
+
+@pytest.mark.parametrize('change', ['lost_contact', 'unstable'])
+def test_stack_camera_proof_rechecks_physics_without_a_revision_change(create, change):
+    goals = [dict(label='apple', zone_name=None,
+                  destination=dict(type='on_object', label='pear'))]
+    ctl, session, _ = create(normal, goals)
+    orchestrator, executor = SkillOrchestrator(ctl, Executor), Executor(session)
+    action = step(1, 'move', 'apple', {'type': 'goal', 'index': 0})
+    proof = orchestrator._action_proof(action, executor.execute(action, goals), goals)
+    assert orchestrator._cached_verification(proof, goals) is not None
+    if change == 'lost_contact':
+        session._scene['objects'][0]['support_label'] = None
+    else:
+        session.support_stable = False
+    assert session._environment_revision == proof['result']['verified_revision']
+    assert orchestrator._cached_verification(proof, goals) is None
+
+
+def test_stack_support_is_checked_again_when_final_success_is_published(create):
+    goals = [dict(label='apple', zone_name=None,
+                  destination=dict(type='on_object', label='pear'))]
+    ctl, session, _ = create(normal, goals)
+    original_event = ctl._event
+    def change_after_verification(kind, payload=None):
+        original_event(kind, payload)
+        if kind == 'skill_feedback' and payload['feedback']['skill'] == 'finish':
+            session.support_stable = False
+    ctl._event = change_after_verification
+    ctl.submit('把苹果放在梨上')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert not state['last_result']['ok']
+    assert state['last_result']['truth']['success'] is False
+    assert state['metrics']['successes'] == 0
+    assert [s['skill'] for s in session.calls] == ['move']
+
+
+@pytest.mark.parametrize('change', ['physics_revision', 'queued_intervention', 'new_support'])
+def test_stack_proof_is_not_reused_after_physical_change_or_for_another_support(create, change):
+    goals = [dict(label='apple', zone_name=None,
+                  destination=dict(type='on_object', label='pear'))]
+    ctl, session, _ = create(normal, goals)
+    orchestrator, executor = SkillOrchestrator(ctl, Executor), Executor(session)
+    action = step(1, 'move', 'apple', {'type': 'goal', 'index': 0})
+    proof = orchestrator._action_proof(action, executor.execute(action, goals), goals)
+    assert proof is not None
+    if change == 'physics_revision':
+        session._environment_revision += 1
+    elif change == 'queued_intervention':
+        session._interventions.append({'label': 'pear'})
+    else:
+        goals[0]['destination']['label'] = 'banana'
+    assert orchestrator._cached_verification(proof, goals) is None
 
 
 @pytest.mark.parametrize('field,value', [

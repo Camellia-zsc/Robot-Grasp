@@ -203,7 +203,12 @@ class SkillExecutor:
         session = self.session
         reference = self._reference(label)
         reference.update(label=label, require_grasp=True)
-        scene = session.observe(target=reference, purpose=purpose)
+        reusable = getattr(session, '_reusable_target', lambda target: False)(reference)
+        if reusable:
+            scene = session.scene
+            session._last_observation_purpose = purpose
+        else:
+            scene = session.observe(target=reference, purpose=purpose)
         det = unique_target(session._last_fresh, label,
                             partial=lambda d: session._target_partial(d, reference))
         if det is None or session._observation_revision != session._environment_revision:

@@ -45,6 +45,8 @@ def _prefer_pear_neck_views(merged, views, dist, partial):
                 for candidate in items:
                     if (not candidate.valid or candidate.label != det.label
                             or view_of(candidate) == view_of(det)
+                            or ((det.extra or {}).get('support_observed') is True
+                                and (candidate.extra or {}).get('support_observed') is not True)
                             or (partial is not None and partial(candidate))):
                         continue
                     measured = geometry(candidate)

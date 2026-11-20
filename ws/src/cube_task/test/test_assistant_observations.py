@@ -192,9 +192,10 @@ def test_actual_six_view_scan_does_not_publish_a_second_pear(tmp_path):
         assert {o['label'] for o in scene['objects'] if o['valid']} == {
             'red', 'green', 'yellow', 'apple', 'banana', 'pear'}
         assert len(session.observation_views()) == 6
-        assert any(d['label'] == 'pear' for d in scene['observation_diagnostics'])
+        # Clean per-view association needs no duplicate-pruning diagnostic.
+        # The observable contract is one complete pear, including invalid rows.
         # The model's selectable table and executor must use the same consolidated set.
         assert len(session._detections) == len(scene['objects'])
         assert sum(d.label == 'pear' for d in session._detections.values()) == 1
         assert pears[0]['height'] > .11  # Preserve the more complete neck view.
-        np.testing.assert_allclose(pears[0]['center_base'][:2], [.197, -.002], atol=.003)
+        np.testing.assert_allclose(pears[0]['center_base'][:2], [.2115300883, -.0026151822], atol=.003)

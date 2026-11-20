@@ -237,6 +237,10 @@ def test_model_can_ask_mid_plan_and_continue_after_button_answer(create):
     assert [s['skill'] for s in session.calls] == ['observe']
     approve(ctl)
     assert ctl.wait_idle(3) and ctl.snapshot()['last_result']['ok']
+    approval_feedback = next(item for item in ctl.snapshot()['skill_task']['history']
+                             if item['skill'] == 'ask')
+    assert approval_feedback['changed'] is False
+    assert approval_feedback['reason'] == 'approval_only_no_scene_change'
 
 
 def test_failed_place_replans_with_real_holding_and_unchanged_final_goal(create):
@@ -353,6 +357,106 @@ def test_three_observe_only_rounds_without_information_stop_and_preserve_hold(cr
     assert state['last_result']['error'] == 'planning_stagnation'
     assert state['last_result']['holding'] and session.holding == 'apple'
     assert state['metrics']['successes'] == 0 and state['can_resume_recovery']
+    assert state['needs_reset'] and not state['simulation']['editor']['editable']
+
+
+def test_planning_stagnation_without_held_object_or_fault_allows_scene_adjustment(create):
+    ctl, session, client = create(lambda c, n: [step(n, 'observe')])
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert state['last_result']['error'] == 'planning_stagnation'
+    assert not state['last_result']['ok'] and state['metrics']['successes'] == 0
+    assert state['can_resume_recovery'] and ctl._skill_memory['goals'] == GOALS
+    assert not state['needs_reset']
+    assert state['simulation']['editor']['editable']
+    adjusted = []
+    def edit(request):
+        adjusted.append(request)
+        session._scene['scene_version'] += 1
+        session._environment_revision += 1
+        return session.scene
+    session.edit_scene = edit
+    ctl.edit_scene(dict(action='move', object_id='v4-apple', xy=[.3, .04]))
+    assert ctl.wait_idle(3)
+    assert adjusted and ctl.snapshot()['simulation']['editor']['editable']
+    assert ctl.snapshot()['can_resume_recovery']
+    assert ctl._skill_memory['goals'] == GOALS
+
+
+@pytest.mark.parametrize('fault', [False, True])
+def test_model_stop_after_unheld_geometry_failure_preserves_task_and_only_locks_real_faults(create, fault):
+    ctl, session, client = create(normal)
+    def failure(action, result):
+        if action['skill'] == 'move':
+            result.update(ok=False, fault=fault, stage='plan',
+                          error='no_clear_supported_release', message='当前落点不可行')
+    session.hook = failure
+    original_plan = client.plan_skills
+    def plan(*args, **kwargs):
+        result = original_plan(*args, **kwargs)
+        if len(client.contexts) > 1:
+            result.update(action='stop', message='请先调整现场，再继续原任务', steps=[])
+        return result
+    client.plan_skills = plan
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert state['skill_task']['status'] == 'failed' and not state['last_result']['ok']
+    assert ctl._skill_memory['goals'] == GOALS
+    assert state['can_resume_recovery'] is not fault
+    assert state['needs_reset'] is fault
+    assert state['simulation']['editor']['editable'] is not fault
+
+
+def test_real_fault_cannot_be_cleared_by_resuming_a_model_request(create):
+    ctl, session, client = create(normal)
+    def failure(action, result):
+        if action['skill'] == 'move':
+            result.update(ok=False, fault=True, error='comm', message='机械臂通信故障')
+    session.hook = failure
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    calls = len(client.contexts)
+    assert ctl.snapshot()['needs_reset']
+    assert not ctl.snapshot()['can_resume_recovery']
+    with pytest.raises(ValueError, match='故障'):
+        ctl.resume_recovery()
+    with pytest.raises(ValueError):
+        ctl.edit_scene(dict(action='move', object_id='v4-apple', xy=[.3, .04]))
+    assert len(client.contexts) == calls
+    assert not ctl.snapshot()['simulation']['editor']['editable']
+
+
+@pytest.mark.parametrize('fault', [False, True])
+@pytest.mark.parametrize('source', ['memory', 'incoming'])
+def test_recovery_model_error_preserves_only_a_recorded_real_fault(create, fault, source):
+    ctl, session, client = create(lambda c, n: [step(n, 'observe')])
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    recorded = dict(ok=False, fault=fault, skill='move', error='comm' if fault else 'placement_infeasible')
+    ctl._skill_memory['last_action_failure'] = recorded if source == 'memory' else {}
+    def unavailable(*args, **kwargs):
+        raise RuntimeError('模型连接中断')
+    client.plan_skills = unavailable
+    # Exercise the orchestrator seam directly: the public resume entry rejects
+    # known real faults before launching any model request.
+    SkillOrchestrator(ctl, Executor).run('把苹果放红区', resume=True, failure=recorded)
+    state = ctl.snapshot()
+    assert state['last_result']['error'] == 'skill_task_error'
+    assert state['needs_reset'] is fault
+    assert bool(state['last_result'].get('fault')) is fault
+    assert state['simulation']['editor']['editable'] is not fault
+
+
+def test_successful_final_verification_clears_historical_action_failure(create):
+    ctl, session, client = create(normal)
+    ctl._skill_memory = dict(instruction='把苹果放红区', goals=copy.deepcopy(GOALS),
+        protected_goals=[], originals=session.scene['objects'], obligations={}, restorations=[],
+        last_action_failure=dict(ok=False, fault=True, error='old_fault'))
+    result = SkillOrchestrator(ctl, Executor).run('把苹果放红区', resume=True)
+    assert result['ok'] and not ctl.snapshot()['needs_reset']
+    assert not ctl._skill_memory['last_action_failure']
 
 
 def test_actual_observation_information_resets_stagnation(create, monkeypatch):

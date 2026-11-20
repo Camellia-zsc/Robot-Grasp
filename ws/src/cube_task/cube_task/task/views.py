@@ -78,6 +78,22 @@ def tag_view(dets: Iterable[Detection], view: int) -> List[Detection]:
     return out
 
 
+def separate_height_layers(a: Detection, b: Detection) -> bool:
+    """Distinct measured vertical intervals must not merge at the same XY.
+
+    Depth noise can overlap adjacent support/upper surfaces by a few mm.
+    Missing height evidence retains the historical association rule.
+    """
+    try:
+        at, ah, bt, bh = (float(v) for v in (a.top_z, a.height, b.top_z, b.height))
+    except (TypeError, ValueError):
+        return False
+    if not all(math.isfinite(v) for v in (at, ah, bt, bh)) or min(ah, bh) <= .006:
+        return False
+    overlap = min(at, bt) - max(at - ah, bt - bh)
+    return overlap <= .006 and abs((at - ah/2) - (bt - bh/2)) > .012
+
+
 def merge_view_detections(scene: Dict[int, Sequence[Detection]], stale: Set[int] = frozenset(),
                           dist: float = MERGE_DIST,
                           partial: Optional[Callable[[Detection], bool]] = None
@@ -86,17 +102,20 @@ def merge_view_detections(scene: Dict[int, Sequence[Detection]], stale: Set[int]
     Return one detection per object over the views' latest detections.
 
     scene: view -> its valid detections (base frame). Detections of different
-    views closer than dist (m, base XY, any label) are one object; the kept
+    views closer than dist (m, base XY, any label) in the same measured height
+    layer are one object; the kept
     one is a whole view of it if possible (partial(d) False), then from a view
     not in stale (captured after the last arm action), then the one with more
-    depth points (the more complete view). Detections without a base position
+    support evidence, then more depth points. Detections without a base position
     are dropped.
     """
     kept: List[Tuple[Tuple[float, float], Detection]] = []
 
-    def rank(d: Detection) -> Tuple[int, int, int]:
+    def rank(d: Detection) -> Tuple[int, int, int, int]:
         return (0 if partial is not None and partial(d) else 1,
-                0 if view_of(d) in stale else 1, int(d.n_points))
+                0 if view_of(d) in stale else 1,
+                int(bool(d.valid and (d.extra or {}).get('support_observed') is True)),
+                int(d.n_points))
 
     for v in sorted(scene):
         for d in scene[v]:
@@ -105,7 +124,8 @@ def merge_view_detections(scene: Dict[int, Sequence[Detection]], stale: Set[int]
                 continue
             hit = None
             for i, (q, _o) in enumerate(kept):
-                if math.hypot(p[0] - q[0], p[1] - q[1]) <= dist:
+                if (math.hypot(p[0] - q[0], p[1] - q[1]) <= dist
+                        and not separate_height_layers(d, _o)):
                     hit = i
                     break
             if hit is None:

@@ -138,7 +138,8 @@ class DashboardController:
         self._last_result = result
         self._skill_task.update(status='failed', message=message, current_index=None)
         self._status, self._stage, self._error = 'error', message, message
-        self._needs_reset = True
+        # A fallen stack revokes completion, but does not itself fault the arm
+        # or prevent the user from adjusting the scene before resuming.
         self._event('result', dict(message=message, result=result))
 
     def _set_status(self, status, stage):
@@ -280,11 +281,18 @@ class DashboardController:
                 self._event('result', {'message': self._stage, 'result': self._last_result})
             self._launch(run, 'observing', '继续核对当前持物，保留原任务与现场')
 
+    def _has_controller_fault(self):
+        failures = (self._last_result or {},
+                    (self._skill_memory or {}).get('last_action_failure', {}))
+        return any(result.get('fault') and not result.get('aborted') for result in failures)
+
     def _resume_skills(self):
         from .skill_orchestrator import SkillOrchestrator
         with self._lock:
             session = self._session
             saved = self._skill_memory
+            if self._has_controller_fault():
+                raise ValueError('机械臂故障尚未清除，请先重置场景再继续')
             if saved and self._skill_task.get('status') not in ('failed', 'declined', 'stopped'):
                 raise ValueError('当前技能任务无需继续；请等待完成或发送新指令')
             legacy_held = bool(session is not None and session.snapshot().get('held_object')
@@ -1070,6 +1078,8 @@ class DashboardController:
                     and not self._cancel.is_set() and not session.cancel_event.is_set()
                     and self._skill_task.get('status') in ('failed', 'declined', 'stopped')):
                 state['can_resume_recovery'] = True
+            if self._has_controller_fault():
+                state['can_resume_recovery'] = False
             editor = state['simulation'].setdefault('editor', {})
             editor['editable'] = bool(
                 editor.get('editable', True) and session is not None and self._scene

@@ -275,3 +275,89 @@ def test_backend_exception_is_contained():
     r = skill.execute(g, p)
     assert r.detail['fault'] and 'driver bug' in r.error
     assert arm.commands[-1][0] == 'stop'
+
+
+def test_inspection_motion_returns_to_hover_even_when_release_plan_is_unchanged():
+    import copy
+    from cube_task.core.transforms import top_down_T
+    for moved in ('translation', 'orientation'):
+        _cfg, _clock, _world, arm, log, skill, grasp, place = _setup()
+        def inspect(g, p, width, result):
+            pose = p.T_pre.copy()
+            if moved == 'translation':
+                pose[:3, 3] += [.08, -.10, -.03]
+            else:
+                pose[:3, :3] = top_down_T(0., 0., 0., .6)[:3, :3]
+            skill._move(result, 'inspect_place', pose, True)
+            return copy.deepcopy(p)
+        skill.before_release = inspect
+        result = skill.execute(grasp, place)
+        assert result.ok, result
+        steps = log.kinds('skill_step')
+        index = next(i for i, step in enumerate(steps) if step['stage'] == 'inspect_place')
+        assert [step['stage'] for step in steps[index + 1:index + 3]] == ['transit', 'release']
+        np.testing.assert_allclose(steps[index + 1]['target'], place.T_pre[:3, 3], atol=.0001)
+
+
+def test_stationary_inspection_does_not_repeat_completed_hover_move():
+    import copy
+    _cfg, _clock, _world, _arm, log, skill, grasp, place = _setup()
+    skill.before_release = lambda g, p, width, result: copy.deepcopy(p)
+    result = skill.execute(grasp, place)
+    assert result.ok
+    assert [s['stage'] for s in log.kinds('skill_step')].count('transit') == 1
+
+
+def test_inspection_return_requires_current_feedback_and_verified_arrival():
+    import copy
+    from cube_task.core.types import Stamped
+    for failure in ('missing', 'stale', 'invalid', 'return_not_reached', 'scene_changed'):
+        _cfg, clock, _world, arm, log, skill, grasp, place = _setup()
+        def inspect(g, p, width, result):
+            pose = p.T_pre.copy()
+            pose[:3, 3] += [.08, -.10, -.03]
+            skill._move(result, 'inspect_place', pose, True)
+            if failure == 'missing':
+                arm.get_tcp_pose = lambda: None
+            elif failure == 'stale':
+                arm.get_tcp_pose = lambda: Stamped(pose, clock.now() - 10.)
+            elif failure == 'invalid':
+                pose[0, 0] = np.nan
+                arm.get_tcp_pose = lambda: Stamped(pose, clock.now())
+            elif failure == 'return_not_reached':
+                original_move = arm.move_tcp
+                def inaccurate_move(T, linear=False, **kwargs):
+                    moved = original_move(T, linear=linear, **kwargs)
+                    arm.tcp[0, 3] += .02
+                    return moved
+                arm.move_tcp = inaccurate_move
+            else:
+                skill.execution_guard = lambda stage: 'scene_changed' if stage == 'held_transit' else None
+            return copy.deepcopy(p)
+        skill.before_release = inspect
+        result = skill.execute(grasp, place)
+        assert not result.ok and result.detail['holding'], (failure, result)
+        assert not any(step['stage'] in ('release', 'open_release') for step in log.kinds('skill_step'))
+        assert len(arm.gripper_cmds()) == 2
+        if failure == 'scene_changed':
+            assert result.error == 'scene_changed'
+        else:
+            assert result.detail['fault']
+
+
+def test_held_continuation_returns_from_inspection_with_unchanged_plan():
+    import copy
+    _cfg, _clock, _world, arm, log, skill, grasp, place = _setup()
+    picked = skill.pick_only(grasp)
+    assert picked.ok and picked.detail['holding']
+    def inspect(g, p, width, result):
+        pose = p.T_pre.copy()
+        pose[:3, 3] += [.07, -.08, -.02]
+        skill._move(result, 'inspect_place', pose, True)
+        return copy.deepcopy(p)
+    skill.before_release = inspect
+    result = skill.place_held(grasp, place, picked.grasp_width)
+    assert result.ok, result
+    steps = log.kinds('skill_step')
+    index = next(i for i, step in enumerate(steps) if step['stage'] == 'inspect_place')
+    assert [step['stage'] for step in steps[index + 1:index + 3]] == ['transit', 'release']

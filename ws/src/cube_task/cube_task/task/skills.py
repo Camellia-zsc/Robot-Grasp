@@ -573,9 +573,36 @@ class PickPlaceSkill:
         if updated is None or not updated.feasible:
             raise _StepFailed('inspect_place', 'placement_changed',
                               'fresh destination observation has no safe release')
-        if not np.allclose(updated.T_pre, place.T_pre, atol=1e-5):
+        def at_hover():
+            # The camera callback can move the held object to an inspection
+            # pose while returning the exact same placement plan. Plan equality
+            # cannot establish where the robot is now, or permit a low diagonal
+            # descent from that inspection pose toward the support.
+            try:
+                current = self.arm.get_tcp_pose()
+                actual = None if current is None else np.asarray(current.value, float)
+                age = math.inf if current is None else self.clock.now() - float(current.stamp)
+                valid = (actual is not None and actual.shape == (4, 4)
+                         and np.all(np.isfinite(actual))
+                         and is_rotation(actual[:3, :3], 1e-3)
+                         and np.allclose(actual[3], [0., 0., 0., 1.])
+                         and math.isfinite(age) and -.05 <= age <= self.feedback_max_age)
+            except Exception:
+                valid = False
+            if not valid:
+                raise _StepFailed('inspect_place', 'no_pose_feedback',
+                                  'fresh current TCP is required after inspection', fault=True)
+            return (np.linalg.norm(actual[:3, 3] - updated.T_pre[:3, 3]) <= .002
+                    and rotation_angle(updated.T_pre[:3, :3].T @ actual[:3, :3])
+                        <= math.radians(1.))
+
+        if not at_hover():
+            self._guard('held_transit')
             self._move(r, 'transit', updated.T_pre, False)
             self._verify_held(r, 'dropped_in_transit')
+            if not at_hover():
+                raise _StepFailed('inspect_place', 'hover_pose_unconfirmed',
+                                  'return to the release hover was not confirmed', fault=True)
         place.__dict__.update(updated.__dict__)
 
     def _release_and_retreat(self, r: PickResult, g: GraspPlan, p: PlacePlan) -> None:

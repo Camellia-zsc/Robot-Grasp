@@ -70,6 +70,8 @@ class DashboardPhysics:
     """
 
     backend = 'mujoco'
+    REST_NOSLIP_ITERATIONS = 30
+    REST_NOSLIP_TOLERANCE = 1e-10
 
     def __init__(self, cfg, geometry_world, info, clock, on_event=None):
         self.world = geometry_world
@@ -126,6 +128,11 @@ class DashboardPhysics:
         current_info['objects'] = [obj.to_dict() for obj in source.objects]
         self.mujoco_world = mw = build_scene(current_info, self.cfg, world=source,
                                             clock=self.clock)
+        # Keep the compiled user configuration separate from temporary rest
+        # precision. Rebuilding the model never copies the previous mode.
+        self._contact_solver_config = (int(mw.model.opt.noslip_iterations),
+                                       float(mw.model.opt.noslip_tolerance))
+        self._rest_contact_precision = False
         if not hasattr(mw.data, 'qM'):
             raise RuntimeError('当前物理驱动需要 MuJoCo 3.3.7，请安装 requirements-physics.txt')
         self.cfg = Config(deep_merge(self.cfg.data, mw.config_overlay()), self.cfg.root,
@@ -315,12 +322,33 @@ class DashboardPhysics:
         self.clock.sleep(float(seconds))
         return self.sync()
 
+    def set_rest_contact_precision(self, eligible):
+        """Reduce released-stack creep without changing manipulation dynamics.
+
+        Called after sync and before the next clock advance. Real contacts only
+        select numerical precision; they do not supply a placement or success.
+        No body state, forces, friction or contact constraints are modified.
+        """
+        with self._lock, self.mujoco_world._locked():
+            active = bool(eligible and self.world.held is None and any(
+                relation['support'] not in ('table', 'floor') for relation in self._supports))
+            iterations, tolerance = self._contact_solver_config
+            if active:
+                iterations = max(iterations, self.REST_NOSLIP_ITERATIONS)
+                tolerance = min(tolerance, self.REST_NOSLIP_TOLERANCE)
+            options = self.mujoco_world.model.opt
+            options.noslip_iterations, options.noslip_tolerance = iterations, tolerance
+            self._rest_contact_precision = active
+
     def state(self):
         return dict(backend='mujoco', gravity=self.mujoco_world.model.opt.gravity.tolist(),
                     settling=self._settling, support_relations=copy.deepcopy(self._supports),
                     last_event=copy.deepcopy(self._last_event),
                     grip_model='physical_finger_contacts',
                     gripper_max_width=float(self.mujoco_world.max_width),
+                    contact_solver=dict(rest_precision=self._rest_contact_precision,
+                        noslip_iterations=int(self.mujoco_world.model.opt.noslip_iterations),
+                        noslip_tolerance=float(self.mujoco_world.model.opt.noslip_tolerance)),
                     physics_steps=self.mujoco_world.sim.n_steps)
 
     def support_status(self, object_id, support_label):
@@ -378,6 +406,7 @@ class DashboardPhysics:
     def close(self):
         if self._closed:
             return
+        self.set_rest_contact_precision(False)
         self._closed = True
         self._remove_engine_listener()
         self.clock._listeners[:] = [fn for fn in self.clock._listeners if fn != self._after_advance]

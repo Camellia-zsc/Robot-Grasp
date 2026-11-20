@@ -70,12 +70,14 @@ FLOOR_GEOM = 'floor'
 # Physics. Elliptic cones with impratio 10 make friction stiff; Newton converges
 # in a few iterations, the limits only cap bad steps. The noslip pass removes
 # the creep of soft contacts: without it a lemon (ellipsoid on its side) rolls
-# ~2 mm/s from rest and held fruit slide out of the pads faster. It costs about
-# +40 % per step (60 us per step with 6 L2 objects).
+# ~2 mm/s from rest and held fruit slide out of the pads faster. The dashboard
+# separately increases precision for released stacks during observation/rest;
+# manipulation retains these configured dynamics.
 TIMESTEP = 0.002
 SOLVER_ITERATIONS = 50
 LS_ITERATIONS = 20
 NOSLIP_ITERATIONS = 5
+NOSLIP_TOLERANCE = 1e-6
 
 # Table (box, top at table_z) and the floor below it, base frame (m).
 TABLE_X = (-0.45, 0.95)
@@ -569,7 +571,8 @@ def _set_gripper_width(root: ET.Element, max_width: float) -> None:
 
 
 def _setup_robot(root: ET.Element, tcp_z: float, timestep: float, noslip: int,
-                 max_width: Optional[float] = None) -> List[str]:
+                 max_width: Optional[float] = None,
+                 noslip_tolerance: float = NOSLIP_TOLERANCE) -> List[str]:
     """
     Set physics options, name the finger pads, add the tcp / flange sites. Return pad names.
 
@@ -582,6 +585,7 @@ def _setup_robot(root: ET.Element, tcp_z: float, timestep: float, noslip: int,
         opt = _el(root, 'option')
     for k, v in (('timestep', timestep), ('iterations', SOLVER_ITERATIONS),
                  ('ls_iterations', LS_ITERATIONS), ('noslip_iterations', int(noslip)),
+                 ('noslip_tolerance', noslip_tolerance),
                  ('impratio', 10), ('cone', 'elliptic'), ('integrator', 'implicitfast')):
         opt.set(k, v if isinstance(v, str) else _f(v))
     for key in root.findall('keyframe'):      # qpos size changes with the objects
@@ -730,6 +734,7 @@ def build_scene(info: Dict[str, Any], cfg: Any = None, assets_dir: Optional[str]
     cfg: optional core Config or nested dict; reads robot.poses.home_joints
     (initial arm pose, default zeros), sim.mujoco.assets_dir,
     sim.mujoco.timestep (0.002 s), sim.mujoco.noslip_iterations (5),
+    sim.mujoco.noslip_tolerance (1e-6),
     sim.mujoco.gripper_max_width (null = the model's 0.070 m stroke; 0.100 widens
     the finger joint ranges), sim.mujoco.materials ('legacy' | 'official', see
     scene_materials; info['materials'] wins) and sim.mujoco.card_collision
@@ -760,6 +765,9 @@ def build_scene(info: Dict[str, Any], cfg: Any = None, assets_dir: Optional[str]
     if not 1e-4 <= timestep <= 0.01:
         raise ValueError('sim.mujoco.timestep must be in [0.0001, 0.01] s, got %r' % timestep)
     noslip = int(_cfg_get(cfg, 'sim.mujoco.noslip_iterations', NOSLIP_ITERATIONS))
+    noslip_tolerance = float(_cfg_get(cfg, 'sim.mujoco.noslip_tolerance', NOSLIP_TOLERANCE))
+    if not math.isfinite(noslip_tolerance) or noslip_tolerance < 0:
+        raise ValueError('sim.mujoco.noslip_tolerance must be finite and nonnegative')
     width = _cfg_get(cfg, 'sim.mujoco.gripper_max_width', None)
     if width is not None:
         width = float(width)
@@ -786,7 +794,8 @@ def build_scene(info: Dict[str, Any], cfg: Any = None, assets_dir: Optional[str]
 
     root = ET.parse(str(assets / PIPER_XML)).getroot()
     root.set('model', 'cube_task_%s_%s_s%d' % (task, difficulty, seed))
-    pads = _setup_robot(root, tcp_z, timestep, noslip, max_width=width)
+    pads = _setup_robot(root, tcp_z, timestep, noslip, max_width=width,
+                        noslip_tolerance=noslip_tolerance)
     if mount == 'eye_in_hand':
         _wrist_camera(root, np.asarray(info['T_flange_camera'], dtype=float), fovy)
     asset, wb = _add_environment(root, table_z, sim_world.table_color_bgr)

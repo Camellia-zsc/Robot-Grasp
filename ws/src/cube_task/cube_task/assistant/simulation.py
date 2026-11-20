@@ -296,6 +296,9 @@ class SimulationSession:
     def _tick(self):
         if getattr(self, '_physics', None) is not None:
             self._physics.sync()
+            self._physics.set_rest_contact_precision(
+                self._status in ('settling', 'ready', 'error', 'observing')
+                and not self.runner.has_held_recovery)
             self._check_physical_changes()
         revision = self._environment_revision
         self._apply_interventions()

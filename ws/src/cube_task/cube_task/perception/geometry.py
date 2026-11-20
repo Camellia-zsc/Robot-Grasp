@@ -26,6 +26,31 @@ _GRID_CACHE_MAX = 8
 _GRID_LOCK = threading.Lock()
 
 
+def object_footprint(xy, length, width, yaw, *, label='', resting_pose=None):
+    """Conservative measured/nominal envelope, independent of simulator poses.
+
+    A round fruit's uncertain PCA yaw must not create diagonal square corners.
+    Only a pear measured upright has a round horizontal envelope; side/unknown
+    pears and other objects keep their complete oriented bounding rectangle.
+    The 32-gon circumscribes the disk, so its edges never cut into the body.
+    """
+    center = np.asarray(xy, float)
+    if label == 'apple' or (label == 'pear' and resting_pose == 'upright'):
+        angles = np.arange(32) * (2 * np.pi / 32)
+        radius = max(length, width) / (2 * np.cos(np.pi / 32))
+        return center + radius * np.column_stack([np.cos(angles), np.sin(angles)])
+    local = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1]], float) * [length / 2, width / 2]
+    c, s = np.cos(yaw), np.sin(yaw)
+    return local @ np.array([[c, -s], [s, c]]).T + center
+
+
+def object_prism(xy, length, width, yaw, bottom, height, *, label='', resting_pose=None):
+    """Extrude the same complete footprint used by planar collision checks."""
+    footprint = object_footprint(xy, length, width, yaw, label=label, resting_pose=resting_pose)
+    return np.vstack([np.column_stack([footprint, np.full(len(footprint), z)])
+                      for z in (bottom, bottom + height)])
+
+
 def has_distortion(intrinsics: CameraIntrinsics) -> bool:
     """Return True when the intrinsics carry non-zero distortion coefficients."""
     d = np.asarray(intrinsics.dist, dtype=float).ravel()

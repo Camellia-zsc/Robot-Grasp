@@ -44,14 +44,14 @@ def measured_session():
         _placement={'table_bounds': {'x': [.08, .6], 'y': [-.4, .4]}})
 
 
-def test_planning_uses_only_measured_base_top_and_exact_center():
+def test_planning_uses_only_measured_base_top_and_support_center():
     session = measured_session()
     options, support = planning_options(session, DESTINATION)
     zone = options['placement_zone']
     assert zone.name == 'on_object_red'
     np.testing.assert_allclose(zone.center, [.35, 0., .05])
     assert zone.release_height > 0.
-    assert options['exact_xy'] is True
+    assert options['exact_xy'] is False
     assert support['label'] == 'red' and support['top_z'] == .05
     assert support['xy'] == [.35, 0.]
     # This larger polygon bounds the real table. It must not force a 62 mm
@@ -223,3 +223,75 @@ def test_missing_current_support_measurement_cannot_be_an_intentional_contact():
     polygon = np.array([[.08, -.35], [.6, -.35], [.6, .35], [.08, .35]])
     allowed = runner._strict_place_filter(target, grasp, [target], polygon)
     assert not allowed(.4, 0., 0., gripper_pose=top_down_T(.4, 0., .09, 0.))
+
+
+def test_round_upright_pear_release_does_not_invent_diagonal_square_corners():
+    runner, _old, grasp, place = release_scene()
+    runner.arm.guard = SimpleNamespace(x=(.08, .6), y=(-.4, .4), r_max=.62)
+    target = make_det('pear', .19, .324, size=.075, height=.113)
+    target.yaw = np.pi / 4
+    target.extra['resting_pose'] = 'upright'
+    runner.nominal['pear'] = (.085, .085)
+    grasp.target = target
+    grasp.closing_angle = 0.
+    grasp.T_grasp = top_down_T(.19, .324, .09, 0.)
+    grasp.expected_width = .05
+    base = make_det('green', .121, .36, size=.05, height=.05)
+    annotate(target, measured_support([base], 'green'))
+    polygon = np.array([[.08, -.4], [.6, -.4], [.6, .4], [.08, .4]])
+    allowed = runner._strict_place_filter(target, grasp, [target, base], polygon)
+    assert allowed(.132, .349, 0.)
+    # The unchanged physical table/workspace edges still reject a true overhang.
+    assert not allowed(.121, .36, 0.)
+    place.T_release = top_down_T(.132, .349, .144, 0.)
+    place.T_pre = top_down_T(.132, .349, .2, 0.)
+    place.T_retreat = top_down_T(.132, .349, .24, 0.)
+    ok, why = runner._adjust_strict_release(target, grasp, place, [target, base],
+        polygon, [.132, .349], .09)
+    assert ok, why
+
+
+def test_stack_planner_can_offset_inside_measured_support_at_workspace_edge():
+    from cube_task.task.runner import held_shape
+    runner, _old, grasp, _place = release_scene()
+    runner.arm.guard = SimpleNamespace(x=(.08, .6), y=(-.4, .4), r_max=.62)
+    target = make_det('pear', .19, .324, size=.075, height=.113)
+    target.extra['resting_pose'] = 'upright'
+    target.yaw = np.pi / 4
+    runner.nominal['pear'] = (.085, .085)
+    grasp.target = target
+    grasp.T_grasp = top_down_T(.19, .324, .09, 0.)
+    grasp.expected_width = .05
+    base = make_det('green', .121, .36, size=.05, height=.05)
+    session = measured_session()
+    session._observed_detections = [target, base]
+    options, support = planning_options(session, dict(type='on_object', label='green'))
+    annotate(target, support)
+    allowed = runner._strict_place_filter(target, grasp, [target, base], options['placement_polygon'])
+    shape = held_shape(target, grasp, runner.nominal['pear'])
+    plan = runner.placer.plan(options['placement_zone'], .09, .2,
+        held=shape, strict=True, fixed_xy=options['exact_xy'], pose_filter=allowed)
+    assert plan.feasible, plan.reason
+    xy = runner.placer.last_info['xy']
+    assert center_supported(xy, support)
+    assert np.linalg.norm(np.asarray(xy) - support['xy']) > .004
+
+
+def test_small_support_retries_finger_angle_without_banning_neighboring_centers():
+    runner, target, grasp, previous = release_scene()
+    base = make_det('green', .4, 0., size=.05, height=.05)
+    session = measured_session()
+    session._observed_detections = [target, base]
+    options, support = planning_options(session, dict(type='on_object', label='green'))
+    annotate(target, support)
+    visited = []
+    previous.zone = options['placement_zone'].name
+    def check_final(det, gp, candidate, neighbors, polygon, desired, held, **kwargs):
+        visited.append(tuple(desired))
+        return (False, 'final finger blocked') if len(visited) < 3 else (True, '')
+    runner._adjust_strict_release = check_final
+    updated, why = runner.replan_release(target, grasp, previous, .05,
+        [target, base], **options)
+    assert updated is not None, why
+    assert len(visited) == 3
+    assert visited[0] == visited[1] == visited[2]

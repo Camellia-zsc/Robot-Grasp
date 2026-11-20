@@ -134,15 +134,9 @@ def footprint_in_destination(corners, scene, destination):
 
 def completion_outline(target, length, width, yaw):
     """Conservative nominal outline without inventing corners on round fruit."""
-    center = np.asarray(target['center_base'], float)[:2]
-    if target.get('label') in ('apple', 'pear'):
-        # A circumscribed polygon encloses the disk at every angle. PCA yaw of
-        # a near-circular belly is unstable and must not rotate an 85 mm square
-        # into a fictitious 120 mm obstacle at verification time.
-        angles = np.arange(32) * (2 * math.pi / 32)
-        radius = max(length, width) / (2 * math.cos(math.pi / 32))
-        return center + radius * np.column_stack([np.cos(angles), np.sin(angles)])
-    return footprint_corners(center, length, width, yaw)
+    from ..perception.geometry import object_footprint
+    return object_footprint(np.asarray(target['center_base'], float)[:2], length, width, yaw,
+                            label=target.get('label'), resting_pose=target.get('resting_pose'))
 
 
 def whole_footprint_at_destination(target, scene, destination):

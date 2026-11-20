@@ -1483,7 +1483,11 @@ class PlacePlanner:
                 required = float(held['_required_closing'])
                 if not math.isfinite(required):
                     return None
-                angles = [(required + axis_offset if held.get('elongated') else None, required)]
+                required_angles = [required]
+                if held.get('_restore_quarter_turns') is True:
+                    required_angles += [required + math.pi / 2, required - math.pi / 2, required + math.pi]
+                angles = [(closing + axis_offset if held.get('elongated') else None, closing)
+                          for closing in required_angles]
             for axis, closing in angles:
                 if cancelled is not None and cancelled():
                     return None

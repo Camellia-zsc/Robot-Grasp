@@ -41,7 +41,10 @@ def planning_options(session, destination, detections=None):
     # whether that release actually remains stable.
     zone = Zone('on_object_' + support['label'], np.r_[support['xy'], support['top_z']],
                 (.30, .30), release_height=.004, label=support['label'] + '顶面')
-    return dict(placement_zone=zone, placement_polygon=polygon, exact_xy=True), support
+    # Search small offsets too: a fully supported center need not coincide with
+    # the top-face center. The runner still checks center_supported(), the whole
+    # upper body, real finger clearance and reachable release orientation.
+    return dict(placement_zone=zone, placement_polygon=polygon, exact_xy=False), support
 
 
 def annotate(target, support):

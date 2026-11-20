@@ -177,6 +177,57 @@ def test_restore_yaw_restricts_the_release_to_the_original_object_orientation():
     assert closing == pytest.approx(.6)
 
 
+@pytest.mark.parametrize('label,symmetric', [
+    ('red', True), ('green', True), ('yellow', True),
+    ('pear', False), ('banana', False), ('unknown', False),
+])
+def test_restore_uses_quarter_turn_alternatives_only_for_catalog_square_blocks(label, symmetric):
+    runner, target, grasp, previous = scene()
+    target.label, target.yaw = label, .3
+    target.extra['_restore_yaw'] = .9
+    attempted = []
+    def reachable(pose, **kwargs):
+        if pose[2, 3] >= .05:
+            return True, ''
+        closing = np.arctan2(pose[1, 1], pose[0, 1])
+        attempted.append(closing)
+        # The original absolute wrist angle is unavailable. A quarter turn
+        # preserves a catalog cube's pose and still needs this real IK gate.
+        okay = abs(np.remainder(closing - .6 + np.pi, 2 * np.pi) - np.pi) > .1
+        return okay, '' if okay else 'unreachable original wrist angle'
+    runner.arm.check_reachable = reachable
+    updated, why = runner.replan_release(target, grasp, previous, .05, [target], exact_xy=True)
+    assert (updated is not None) is symmetric, why
+    assert attempted
+    if symmetric:
+        closing = np.arctan2(updated.T_release[1, 1], updated.T_release[0, 1])
+        assert abs(closing - .6) > .1
+        assert np.remainder(closing - .6 + np.pi / 4, np.pi / 2) - np.pi / 4 == pytest.approx(0.)
+        np.testing.assert_allclose(updated.T_release[:2, 3], previous.T_release[:2, 3], atol=.0002)
+    else:
+        assert all(a == pytest.approx(.6) for a in attempted)
+
+
+def test_square_restore_never_substitutes_a_non_equivalent_yaw():
+    runner, target, grasp, previous = scene()
+    target.yaw = .3
+    target.extra['_restore_yaw'] = .9
+    attempted = []
+    def reachable(pose, **kwargs):
+        if pose[2, 3] >= .05:
+            return True, ''
+        closing = np.arctan2(pose[1, 1], pose[0, 1])
+        attempted.append(closing)
+        okay = abs(np.remainder(closing - .6 + np.pi / 4, np.pi / 2) - np.pi / 4) > .1
+        return okay, '' if okay else 'all original-equivalent wrist angles blocked'
+    runner.arm.check_reachable = reachable
+    updated, _why = runner.replan_release(target, grasp, previous, .05, [target], exact_xy=True)
+    assert updated is None
+    assert len(attempted) >= 4
+    assert all(abs(np.remainder(a - .6 + np.pi / 4, np.pi / 2) - np.pi / 4) < 1e-8
+               for a in attempted)
+
+
 @pytest.mark.parametrize('error', ['scene_changed', 'placement_changed'])
 def test_scene_change_while_holding_retains_a_bounded_recovery_context(error):
     runner, target, grasp, previous = scene()

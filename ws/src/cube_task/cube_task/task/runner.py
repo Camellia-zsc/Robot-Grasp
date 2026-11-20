@@ -70,6 +70,9 @@ MIN_APPROACH_CLEARANCE = 0.02
 TRANSIT_OBJECT_CLEARANCE = 0.03
 #: release positions tried after an unreachable one (task/runner._attempt).
 RELEASE_RETRIES = 6
+# A small measured support has nearby centers and useful alternate finger
+# angles. Reject individual poses there, not a 12 mm disk of valid support.
+STACK_RELEASE_RETRIES = 30
 #: an object counts as near that line within its and the held object's half footprints
 #: plus this (m).
 LINE_MARGIN = 0.03
@@ -151,10 +154,22 @@ def held_shape(det: Detection, gp, nominal: Optional[Sequence[float]] = None
         return None
     tz = detection_table_z(det)
     kind = (det.extra.get('grasp') or {}).get('kind', '') if det.extra else ''
-    return {'length': dims[0], 'width': dims[1], 'elongated': kind == 'elongated',
-            'axis_offset': float(det.yaw or 0.) - float(gp.closing_angle),
-            'grip_width': float(gp.expected_width),
-            'grip_z': 0.0 if tz is None else max(0.0, float(gp.T_grasp[2, 3]) - tz)}
+    shape = {'length': dims[0], 'width': dims[1], 'elongated': kind == 'elongated',
+             'axis_offset': float(det.yaw or 0.) - float(gp.closing_angle),
+             'grip_width': float(gp.expected_width),
+             'grip_z': 0.0 if tz is None else max(0.0, float(gp.T_grasp[2, 3]) - tz)}
+    desired_yaw = (det.extra or {}).get('_restore_yaw')
+    if desired_yaw is not None:
+        shape['_required_closing'] = gp.closing_angle + float(desired_yaw) - float(det.yaw or 0)
+        # Match the restoration verifier's catalog-backed square symmetry.
+        # A nearly square measured silhouette alone is not such evidence.
+        from ..assistant.catalog import catalog_entries
+        entry = next((e for e in catalog_entries() if e['label'] == det.label), {})
+        known_dims = entry.get('dimensions', [])
+        if (entry.get('shape') in ('box', 'cube') and len(known_dims) >= 2
+                and abs(known_dims[0] - known_dims[1]) < .001):
+            shape['_restore_quarter_turns'] = True
+    return shape
 
 
 def _seg_point_dist(p, a, b) -> float:
@@ -892,9 +907,6 @@ class TaskRunner:
                 return None, None
             shape['center_offset'] = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
             shape['grasp_closing'] = gp.closing_angle
-            desired_yaw = (det.extra or {}).get('_restore_yaw')
-            if desired_yaw is not None:
-                shape['_required_closing'] = gp.closing_angle + float(desired_yaw) - float(det.yaw or 0)
             place_options = dict(strict=True, fixed_xy=exact_xy,
                                  avoid_poses=avoided_poses,
                                  candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
@@ -923,10 +935,12 @@ class TaskRunner:
             ok, why = self._adjust_strict_release(det, gp, pp, neighbors,
                                                  placement_polygon, place_info['xy'], held)
         avoid: List[Tuple[float, float]] = []
-        while not ok and footprint is not None and len(avoid) + len(avoided_poses) < RELEASE_RETRIES:
+        stacked = (det.extra or {}).get('_stack_support') is not None
+        retry_limit = STACK_RELEASE_RETRIES if stacked else RELEASE_RETRIES
+        while not ok and footprint is not None and len(avoid) + len(avoided_poses) < retry_limit:
             # That release position is out of reach: the next free one, not on top of
             # an object already in the zone unless nothing else is left.
-            if strict and exact_xy:
+            if strict and (exact_xy or stacked):
                 avoided_poses.append((*place_info['xy'], place_info['closing_angle']))
             elif strict:
                 # A region can use another center after the final leaned pose
@@ -1206,7 +1220,8 @@ class TaskRunner:
                                   avoid_poses=avoided_poses,
                                   pose_filter=self._strict_place_filter(original, gp, neighbors,
                                                                          placement_polygon))
-        banned = ([] if exact_xy else list(context.get('placement_avoid', context['avoid']))) if saved_zone is not None else list(context['avoid'])
+        stacked = (original.extra or {}).get('_stack_support') is not None
+        banned = ([] if exact_xy or stacked else list(context.get('placement_avoid', context['avoid']))) if saved_zone is not None else list(context['avoid'])
         for point in avoid:
             try:
                 x, y = float(point[0]), float(point[1])
@@ -1216,7 +1231,7 @@ class TaskRunner:
                 return None, 'invalid avoided release position'
             banned.append((x, y))
         pp, why = None, 'no reachable alternative release position'
-        for _ in range(RELEASE_RETRIES + 1):
+        for _ in range((STACK_RELEASE_RETRIES if stacked else RELEASE_RETRIES) + 1):
             candidate = self.placer.plan(
                 saved_zone if saved_zone is not None else self.zones[zone_name], held, transit, footprint=self._footprint(original),
                 occupied=occupied, held=shape, avoid=banned,
@@ -1243,7 +1258,7 @@ class TaskRunner:
             if ok:
                 pp = candidate
                 break
-            if saved_zone is not None and exact_xy:
+            if saved_zone is not None and (exact_xy or stacked):
                 avoided_poses.append((*info['xy'], info['closing_angle']))
             elif saved_zone is not None:
                 banned.append(tuple(info['xy']))
@@ -1300,9 +1315,6 @@ class TaskRunner:
         shape['grip_width'] = max(shape['grip_width'], width)
         shape['center_offset'] = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
         shape['grasp_closing'] = gp.closing_angle
-        desired_yaw = (det.extra or {}).get('_restore_yaw')
-        if desired_yaw is not None:
-            shape['_required_closing'] = gp.closing_angle + (float(desired_yaw) - float(det.yaw or 0))
         neighbors = list(neighbors)
         self._neighbors = neighbors
         held = held_offset_of(planning_grasp)
@@ -1393,7 +1405,9 @@ class TaskRunner:
             return None, 'arm stopped or unhealthy before release'
         if max_attempts is not None and (type(max_attempts) is not int or max_attempts < 1):
             return None, 'invalid release attempt budget'
-        attempt_limit = RELEASE_RETRIES + 1 if max_attempts is None else max_attempts
+        stacked = (det.extra or {}).get('_stack_support') is not None
+        attempt_limit = ((STACK_RELEASE_RETRIES if stacked else RELEASE_RETRIES) + 1
+                         if max_attempts is None else max_attempts)
         search, why = self._release_search_geometry(
             det, gp, pp, width, neighbors, placement_zone, placement_polygon)
         if search is None:
@@ -1473,7 +1487,7 @@ class TaskRunner:
                             changed=not np.allclose(candidate.T_release, pp.T_release, atol=.001),
                             avoided=[[round(float(a), 4), round(float(b), 4)] for a, b in avoided])
                 return candidate, ''
-            if exact_xy:
+            if exact_xy or stacked:
                 avoided_poses.append((*xy, info['closing_angle']))
             else:
                 avoided.append(xy)
@@ -1691,8 +1705,8 @@ class TaskRunner:
         return sum(1 for z in self.class_to_zone.values() if z == zone_name) <= 1
 
     def _strict_place_filter(self, det, gp, neighbors, support_polygon):
-        """Measured rectangles bound every object corner and the open fingers."""
-        from ..perception.geometry import points_in_polygon
+        """Complete body envelopes bound the destination and the open fingers."""
+        from ..perception.geometry import points_in_polygon, object_footprint, object_prism
         from ..perception.grasp import FINGER_OUTER, FINGER_HALF_BAND, RELEASE_OPEN_EXTRA
 
         polygon = np.asarray(support_polygon, dtype=float)
@@ -1730,7 +1744,8 @@ class TaskRunner:
             bottom = detection_table_z(other)
             bottom = 0.0 if bottom is None else float(bottom)
             top = float(other.top_z) if other.top_z is not None else bottom + height
-            obstacles.append((corners(np.asarray(other.center_base[:2]), odims, float(other.yaw)),
+            obstacles.append((object_footprint(other.center_base[:2], *odims, float(other.yaw),
+                              label=other.label, resting_pose=(other.extra or {}).get('resting_pose')),
                               height, bottom, top, _is_stack_base(det, other)))
         offset = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
         margin_offsets = np.array([[.002, .002], [.002, -.002], [-.002, .002], [-.002, -.002]])
@@ -1748,8 +1763,9 @@ class TaskRunner:
             delta = closing - gp.closing_angle
             rotated = np.array([[math.cos(delta), -math.sin(delta)],
                                 [math.sin(delta), math.cos(delta)]]) @ offset
-            obj = corners(np.array([x, y]), dims,
-                          float(det.yaw or 0.0) + delta if final_yaw is None else final_yaw)
+            obj = object_footprint([x, y], *dims,
+                          float(det.yaw or 0.0) + delta if final_yaw is None else final_yaw,
+                          label=det.label, resting_pose=(det.extra or {}).get('resting_pose'))
             if held_projection is not None:
                 import cv2
                 obj = cv2.convexHull(np.vstack((obj, held_projection)).astype(np.float32)).reshape(-1, 2)
@@ -1784,9 +1800,9 @@ class TaskRunner:
                     source_floor = detection_table_z(det)
                     if source_floor is None or det.height is None:
                         return False
-                    source_xy = corners(np.asarray(det.center_base[:2]), dims, float(det.yaw or 0.))
-                    source_box = np.vstack([np.column_stack([source_xy, np.full(4, z)])
-                        for z in (source_floor, source_floor + float(det.height))])
+                    source_box = object_prism(det.center_base[:2], *dims, float(det.yaw or 0.),
+                        source_floor, float(det.height), label=det.label,
+                        resting_pose=(det.extra or {}).get('resting_pose'))
                     rotation = T[:3, :3] @ gp.T_grasp[:3, :3].T
                     released = (source_box - gp.T_grasp[:3, 3]) @ rotation.T + T[:3, 3]
                     if float(released[:, 2].min()) < float(stack_support['top_z']) - .002:
@@ -1805,6 +1821,7 @@ class TaskRunner:
                                held_only=False):
         """Recheck final leaned poses and compensate their measured center shift."""
         from .reach import adjust_plan_poses, _planning_cancelled
+        from ..perception.geometry import object_prism
 
         desired = np.asarray(desired_xy, float)
         table = detection_table_z(det) or 0.0
@@ -1836,10 +1853,9 @@ class TaskRunner:
             yaw = math.atan2(float(axis[1]), float(axis[0]))
             closing = math.atan2(float(pp.T_release[1, 1]), float(pp.T_release[0, 1]))
             length, width = footprint_dims(det, self.nominal.get(det.label))
-            c, s = math.cos(float(det.yaw or 0)), math.sin(float(det.yaw or 0))
-            box = np.array([[i * length / 2, j * width / 2, k * float(det.height or 0) / 2]
-                            for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
-            box = box @ np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]]).T + source_center
+            box = object_prism(det.center_base[:2], length, width, float(det.yaw or 0),
+                table, float(det.height or 0), label=det.label,
+                resting_pose=(det.extra or {}).get('resting_pose'))
             projection = ((box - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3])[:, :2]
             if not allowed(*desired, closing, final_yaw=yaw, tcp_xy=pp.T_release[:2, 3],
                            held_projection=projection, gripper_pose=pp.T_release,

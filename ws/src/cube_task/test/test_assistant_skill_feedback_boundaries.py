@@ -41,6 +41,49 @@ def _assert_never_succeeded(state):
                    for e in state['events'] if e['kind'] == 'result')
 
 
+@pytest.mark.parametrize('detail', [
+    '叠放支撑物必须是当前唯一有效的三维相机测量',
+    '底座未完整观测；' * 250,
+], ids=['support_measurement_reason', 'bounded_long_reason'])
+def test_placement_refusal_detail_survives_observation_and_model_context(create, monkeypatch, detail):
+    from cube_task.assistant.skill_protocol import model_skill_context
+
+    original = Executor.execute
+    refused = []
+
+    def execute(self, action, *args, **kwargs):
+        if action['skill'] == 'move' and not refused:
+            refused.append(True)
+            return dict(ok=False, stage='validation', error='invalid_destination',
+                        message='放置目标无效', detail=detail, holding=False,
+                        truth={'private': 'private-feedback-sentinel'})
+        return original(self, action, *args, **kwargs)
+
+    monkeypatch.setattr(Executor, 'execute', execute)
+
+    def compose(_context, number):
+        if number == 1:
+            return [step(1, 'move', 'apple', {'type': 'goal', 'index': 0})]
+        if number == 2:
+            return [step(2, 'observe', 'apple')]
+        return [step(3, 'move', 'apple', {'type': 'goal', 'index': 0}), step(4, 'finish')]
+
+    ctl, _session, client = create(compose)
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    assert ctl.snapshot()['last_result']['ok']
+    assert len(client.contexts) == 3
+    first_retry = model_skill_context(client.contexts[1])
+    after_observe = model_skill_context(client.contexts[2])
+    expected = detail[:1000]
+    assert first_retry['failure']['detail'] == expected
+    assert after_observe['failure']['error'] == 'goal_not_finished'
+    assert after_observe['last_action_failure']['detail'] == expected
+    assert after_observe['history'][0]['detail'] == expected
+    assert ctl.snapshot()['skill_task']['history'][0]['detail'] == expected
+    assert 'private-feedback-sentinel' not in str(first_retry) + str(after_observe)
+
+
 def test_intervention_after_step_publication_cancels_old_plan_before_dispatch(create):
     ctl, session, client = create(_final_plan('finish'))
     event = ctl._event

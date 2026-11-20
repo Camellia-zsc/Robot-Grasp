@@ -183,8 +183,10 @@ def _destination_summary(value):
 def _failure_summary(value):
     if not isinstance(value, dict):
         raise ValueError('技能执行失败反馈无效。')
+    # Refusals keep the actionable measurement reason in detail, separate from
+    # their short UI message. Forward text only, never structured motion/truth data.
     return _fields(value,
-                   strings=('stage', 'error', 'message', 'diagnostics', 'observation_error'),
+                   strings=('stage', 'error', 'message', 'detail', 'diagnostics', 'observation_error'),
                    flags=('holding', 'fault', 'aborted', 'controller_ok', 'ok', 'progress'),
                    numbers=('duration',))
 
@@ -355,7 +357,7 @@ def model_skill_context(context: dict) -> dict:
             raise ValueError('技能规划历史记录无效。')
         record = _fields(
             item, strings=('id', 'step_id', 'skill', 'label', 'action', 'stage', 'error',
-                           'message', 'diagnostics', 'held_label', 'observation_mode', 'reason'),
+                           'message', 'detail', 'diagnostics', 'held_label', 'observation_mode', 'reason'),
             flags=('ok', 'holding', 'progress', 'camera_verified', 'aborted', 'approved', 'changed'),
             numbers=('attempt', 'scene_version', 'duration'))
         destination = _destination_summary(item.get('destination'))

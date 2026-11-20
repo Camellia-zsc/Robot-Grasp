@@ -292,7 +292,7 @@ class SkillOrchestrator:
                      ok=bool(result.get('ok')), stage=result.get('stage', ''),
                      error=result.get('error', ''), message=result.get('message', ''),
                      holding=bool(self.session.snapshot().get('held_object')))
-        for name in ('diagnostics', 'observation_mode', 'reason'):
+        for name in ('detail', 'diagnostics', 'observation_mode', 'reason'):
             if isinstance(result.get(name), str):
                 entry[name] = result[name][:1000]
         for name in ('changed', 'progress', 'skipped', 'verification_reused'):

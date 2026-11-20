@@ -380,6 +380,18 @@ def test_planning_budget_does_not_coerce_nonfinite_or_noninteger_values(context,
     assert model_skill_context(context)['planning_budget'] == {}
 
 
+@pytest.mark.parametrize('detail', [None, {'truth': 'private-detail-sentinel'},
+                                   ['private-detail-sentinel'], 3, True])
+def test_refusal_detail_only_forwards_text_not_private_structures(context, detail):
+    context['failure'] = {'error': 'invalid_destination', 'detail': detail}
+    context['last_action_failure'] = dict(context['failure'])
+    context['history'] = [dict(context['failure'], skill='move')]
+    visible = model_skill_context(context)
+    for record in (visible['failure'], visible['last_action_failure'], visible['history'][0]):
+        assert record.get('detail') is None
+    assert 'private-detail-sentinel' not in str(visible)
+
+
 def test_capabilities_do_not_forward_nested_or_mistyped_values(context):
     context['capabilities'] = {
         'skills': [{'truth': 'private-sentinel'}], 'observe_modes': 'active',

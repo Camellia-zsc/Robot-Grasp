@@ -1567,20 +1567,36 @@ class SimulationSession:
                                         float(upper.width), float(upper.yaw or 0.))
             lower = footprint_corners(base.center_base[:2], float(base.length),
                                       float(base.width), float(base.yaw or 0.))
+            # A remembered base can be far behind a newly observed moving
+            # stack. Keep it as an obstacle, but do not require one image to
+            # cover its old position and the current target simultaneously.
+            nearby = np.linalg.norm(upper.center_base[:2] - base.center_base[:2]) <= (
+                .5 * (math.hypot(upper.length, upper.width) +
+                      math.hypot(base.length, base.width)) + .02)
             points = np.vstack([np.column_stack([corners, np.full(4, z)])
                                 for z in (float(base.top_z), float(upper.top_z))] +
-                               [np.column_stack([lower, np.full(4, float(base.top_z))])])
+                               ([np.column_stack([lower, np.full(4, float(base.top_z))])]
+                                if nearby else []))
             if not np.all(np.isfinite(points)):
                 return None
         except (TypeError, ValueError):
             return None
-        reference = upper.summary() | {'required_support': base.summary()}
+        reference = upper.summary()
+        if nearby:
+            reference['required_support'] = base.summary()
         anchors = [v for v in self._view_order(reference) if v < self._base_view_count][:2]
-        # A modest side-and-up change creates parallax around the upper body.
-        # These are generic local samples, never saved object coordinates.
+        # Sample both higher and lower elevations and both sides. Prefer a
+        # different line of sight to the measured target, not just different
+        # joint angles that can leave the same support surface hidden.
+        gaze = np.r_[upper.center_base[:2], (float(base.top_z) + float(upper.top_z)) / 2]
+        def direction(q):
+            delta = (self.arm.kin.fk(q) @ T_fc)[:3, 3] - gaze
+            return delta / max(float(np.linalg.norm(delta)), 1e-9)
+        old_directions = [direction(q) for q in attempted]
+        candidates = []
         for view in anchors:
-            for shoulder in (-.32, -.16):
-                for swivel in (-.15, .15, 0.):
+            for shoulder in (-.32, -.16, .08, .16):
+                for swivel in (-.15, .15, 0., -.12, .12):
                     if (self.cancel_event.is_set() or self._interventions
                             or revision != self._environment_revision):
                         return None
@@ -1596,8 +1612,14 @@ class SimulationSession:
                             or np.any(uv[:, 0] > intr.width-9) or np.any(uv[:, 1] < 8)
                             or np.any(uv[:, 1] > intr.height-9)):
                         continue
-                    if self._safe_observation_joints(q, neighbors):
-                        return q
+                    novelty = (min(1. - float(np.clip(direction(q) @ old, -1., 1.))
+                                   for old in old_directions) if old_directions else 0.)
+                    candidates.append((novelty, q))
+        for _, q in sorted(candidates, key=lambda item: -item[0]):
+            if self.cancel_event.is_set() or self._interventions or revision != self._environment_revision:
+                return None
+            if self._safe_observation_joints(q, neighbors):
+                return q
         return None
 
     def _remember_stack_view(self, q):
@@ -1643,6 +1665,14 @@ class SimulationSession:
                                       if d.label not in {item.label for item in fresh}]
             if not any(d.label == base.label for d in neighbors):
                 neighbors.append(base)  # Conservative obstacle only, never fresh evidence.
+            # After one extra optical view, try another viewing direction
+            # before spending the remaining budget on nearly identical IK poses.
+            if len(attempted) > 2:
+                q = self._stack_joint_view(upper, base, neighbors, revision, attempted)
+                if q is not None:
+                    if self.cancel_event.is_set() or self._interventions or revision != self._environment_revision:
+                        return None
+                    return self._remember_stack_view(q)
             for angle, distance, height in ((5., .18, .22), (-5., .18, .22),
                                             (5., .16, .22), (-5., .16, .22)):
                 if self.cancel_event.is_set() or self._interventions or revision != self._environment_revision:

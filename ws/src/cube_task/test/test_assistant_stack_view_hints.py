@@ -102,6 +102,65 @@ def test_joint_fallback_skips_attempted_camera_poses_and_rechecks_each_new_sweep
         np.testing.assert_array_equal(planned, checked)
 
 
+def test_joint_fallback_can_look_from_above_and_both_sides():
+    session = joint_session()
+    session.arm.kin.within_limits = lambda q: q[1] > .5 and abs(abs(q[0]) - .12) < 1e-6
+    session._safe_observation_joints = lambda q, neighbors: q[0] > 0
+    upper, lower = block('apple', top=.11), block('green')
+    q = session._stack_joint_view(upper, lower, [upper, lower], 0)
+    assert q is not None and q[1] > .5 and q[0] == pytest.approx(.12)
+
+
+def test_displaced_stack_does_not_require_covering_old_support_to_aim_camera():
+    session = joint_session()
+    references, obstacles = [], []
+    session._view_order = lambda ref: references.append(ref) or [0]
+    session._safe_observation_joints = lambda q, neighbors: obstacles.extend(neighbors) or True
+    upper = block('apple', xy=(.2, .3), top=.11)
+    old_base = block('green', xy=(1.3, .3))
+    old_base.valid = False
+    q = session._stack_joint_view(upper, old_base, [upper, old_base], 0)
+    assert q is not None
+    assert 'required_support' not in references[0]
+    assert any(item is old_base for item in obstacles)
+    np.testing.assert_array_equal(old_base.center_base[:2], [1.3, .3])
+    assert not old_base.valid and not session._last_fresh
+
+
+def test_joint_candidates_prefer_new_line_of_sight_without_requiring_axis_rotation():
+    session = joint_session()
+    session.arm.kin.fk = lambda q: camera(q[0], .3)
+    session._safe_observation_joints = lambda *args: True
+    upper, lower = block('apple', xy=(.2, .3), top=.11), block('green', xy=(.2, .3))
+    previous = np.array([-.15, .18, -.4, 0., 1., 0.])
+    q = session._stack_joint_view(upper, lower, [upper, lower], 0, [previous])
+    assert q[0] == pytest.approx(.15)
+    np.testing.assert_array_equal(session.arm.kin.fk(q)[:3, :3],
+                                  session.arm.kin.fk(previous)[:3, :3])
+
+
+@pytest.mark.parametrize('changed', [False, True])
+def test_second_extra_view_tries_different_direction_before_similar_optical_pose(changed):
+    session = joint_session()
+    session.on_event = None
+    session._observed_detections = [block('green')]
+    session._view_labels = ['initial']
+    chosen = np.ones(6)
+    def propose(*args):
+        if changed:
+            session._environment_revision += 1
+        return chosen
+    session._stack_joint_view = propose
+    session.arm.kin.ik = lambda *a, **kw: pytest.fail('must not exhaust budget on similar optical views')
+    result = session._stack_verification_view([GOAL], [block('apple', top=.11)], 0,
+                                             [np.zeros(6), np.ones(6) * .1, np.ones(6) * .2])
+    if changed:
+        assert result is None and len(session.runner.views) == 1
+    else:
+        assert result == 1
+        np.testing.assert_array_equal(session.runner.views[result], chosen)
+
+
 def test_exact_stack_view_skips_previously_attempted_joint_solution():
     session = joint_session()
     session._observed_detections = [block('green')]
@@ -133,7 +192,7 @@ def test_joint_fallback_rejects_uncovered_unsafe_or_invalidated_candidates(reaso
         session._interventions.append({})
     upper, lower = block('apple', top=.11), block('green')
     assert session._stack_joint_view(upper, lower, [upper, lower], 0) is None
-    assert len(checks) == (6 if reason == 'sweep' else 0)
+    assert bool(checks) is (reason == 'sweep')
 
 
 @pytest.mark.parametrize('invalidate', [None, 'revision', 'stop'])

@@ -23,11 +23,13 @@ def _xy(det):
 
 
 def rank_views(cameras, intrinsics, target_xy, preferred=None, half_extent=.04,
-               target_z=.04):
+               target_z=.04, required_targets=()):
     """Rank calibrated views by complete target coverage, then image centrality.
 
     ``preferred`` is the last measured target view. It wins among cameras that
     cover the target, but cannot outrank a covering camera when it sees none.
+    ``required_targets`` adds (XY, half-extent, height) measurements, such as
+    a stacking base; a camera covering the whole group outranks a partial view.
     Return all indices so callers may search until a reliable target is found.
     """
     xy = np.asarray(target_xy, float)
@@ -39,6 +41,15 @@ def rank_views(cameras, intrinsics, target_xy, preferred=None, half_extent=.04,
                                       (-half_extent, half_extent),
                                       (half_extent, -half_extent),
                                       (half_extent, half_extent))])
+    for other_xy, other_extent, other_z in required_targets:
+        point = np.asarray(other_xy, float)
+        extent = float(other_extent)
+        if (point.shape != (2,) or not np.all(np.isfinite(point))
+                or not math.isfinite(extent) or extent < 0 or not math.isfinite(float(other_z))):
+            raise ValueError('required camera targets need finite measured geometry')
+        points = np.vstack([points, [[point[0] + dx, point[1] + dy, float(other_z)]
+            for dx, dy in ((0., 0.), (-extent, -extent), (-extent, extent),
+                           (extent, -extent), (extent, extent))]])
     scores = []
     w, h = int(intrinsics.width), int(intrinsics.height)
     for view, T in enumerate(cameras):

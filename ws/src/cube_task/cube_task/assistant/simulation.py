@@ -892,6 +892,10 @@ class SimulationSession:
                 for measured in views[view]:
                     measured.extra['_capture_stamp'] = float(frame.stamp)
                     measured.extra['_capture_flange'] = np.asarray(flange.value, float).copy()
+                if local and target.get('required_support') and (
+                        revision != self._environment_revision or getattr(self, '_interventions', ())
+                        or self.cancel_event.is_set()):
+                    break
                 if local:
                     goals = target.get('verify_goals')
                     if goals:
@@ -929,7 +933,12 @@ class SimulationSession:
                             _candidate, planned = _grasp(self, measured, peers)
                             if planned.feasible:
                                 grasp_target = measured
-                        if grasp_target is not None and geometry_ready:
+                        support_ready = True
+                        if target.get('required_support'):
+                            joint, _diagnostics = merge_observations(views, dist=self.runner.view_merge,
+                                partial=lambda d: not d.valid or self.runner._partial(d))
+                            support_ready = self._support_observed(target, joint, revision)
+                        if grasp_target is not None and geometry_ready and support_ready:
                             break
                         continue
                     if (reliable and (geometry_ready or purpose == 'verify_place')) or (not label and len(coverage) >= 1):
@@ -982,6 +991,30 @@ class SimulationSession:
                        'stats': copy.deepcopy(self._scan_stats)})
             return self._publish_scene(detections, warnings, diagnostics, result.frame_stamp)
 
+    def _support_observed(self, reference, detections, revision, *, check_age=False):
+        """A stack's lower body must be complete in the same observation batch."""
+        from .observation_policy import unique_target
+        from .stacking import measured_support
+        support = reference.get('required_support')
+        if not support:
+            return True
+        if (revision != self._environment_revision or getattr(self, '_interventions', ())
+                or self.cancel_event.is_set()):
+            return False
+        det = unique_target(detections, support.get('label'),
+                            partial=lambda d: self._target_partial(d, support))
+        if det is None:
+            return False
+        try:
+            measured_support(detections, support['label'])
+            if check_age:
+                stamp = float(det.extra['_capture_stamp'])
+                if not 0 <= self.clock.now() - stamp <= self.runner.max_frame_age:
+                    return False
+        except (ValueError, TypeError, KeyError):
+            return False
+        return True
+
     def _reusable_target(self, reference):
         """Reuse only a still-fresh complete capture from the unchanged camera pose."""
         from .observation_policy import unique_target
@@ -996,6 +1029,9 @@ class SimulationSession:
         det = unique_target(self._last_fresh, label,
                             partial=lambda d: self._target_partial(d, reference))
         if det is None or (label in ('banana', 'pear') and det.extra.get('_cloud_views', 0) < 2):
+            return False
+        if reference.get('required_support') and not self._support_observed(
+                reference, self._last_fresh, self._observation_revision, check_age=True):
             return False
         stamp, pose = det.extra.get('_capture_stamp'), det.extra.get('_capture_flange')
         flange = self.arm.get_flange_pose()
@@ -1062,10 +1098,17 @@ class SimulationSession:
         # A fully covering current named view wins over an older recorded view.
         # rank_views still puts complete coverage ahead of this preference.
         preferred = (self.runner._at_view if self.runner._at_observe else target.get('view'))
+        support = target.get('required_support') or {}
+        support_xy = support.get('center_base') or support.get('xy')
+        required = []
+        if support_xy is not None:
+            required.append((support_xy[:2], max(.04, float(support.get('length') or .08) / 2,
+                                                float(support.get('width') or .08) / 2),
+                             float(support.get('top_z') or .04)))
         return rank_views(cameras, self.camera.intrinsics(), point[:2],
                           preferred=preferred,
                           half_extent=max(.04, float(target.get('length') or .08) / 2),
-                          target_z=float(target.get('top_z') or .04))
+                          target_z=float(target.get('top_z') or .04), required_targets=required)
 
     def _publish_scene(self, detections, warnings, diagnostics, stamp):
             self._scene_version += 1
@@ -1188,6 +1231,7 @@ class SimulationSession:
                 version = get('scene_version', self._scene_version)
                 zone_name = get('zone_name') or get('zone')
                 destination = get('destination')
+                stack_reference = None
                 if self.cancel_event.is_set():
                     return self._refusal('aborted', 'execution cancelled', object_id, zone_name)
                 if get('action', 'pick') != 'pick':
@@ -1208,11 +1252,27 @@ class SimulationSession:
                     if zone_name is not None:
                         return self._refusal('invalid_destination', '放置区域与桌面目标不能同时指定', object_id, zone_name)
                     try:
-                        destination = validate_destination(destination, self._scene)
+                        destination = validate_destination(destination, self._scene,
+                            require_observed=not (isinstance(destination, dict)
+                                                  and destination.get('type') == 'on_object'))
+                        if destination['type'] == 'on_object':
+                            from .stacking import require_flat_support
+                            require_flat_support(destination['label'])
                     except ValueError as exc:
                         return self._refusal('invalid_destination', str(exc), object_id, None)
-                    placement_options = self._placement_options(destination)
-                    zone_name = placement_options['placement_zone'].name
+                    if destination['type'] == 'on_object':
+                        supports = [d for d in self._observed_detections
+                                    if d.label == destination['label'] and d.center_base is not None]
+                        support_hint = (supports[0].summary() if len(supports) == 1
+                                        else {'label': destination['label']})
+                        stack_reference = det.summary() | {
+                            'view': det.extra.get('view'), 'require_grasp': True,
+                            'required_support': support_hint}
+                        placement_options = {}
+                        zone_name = 'on_object_' + destination['label']
+                    else:
+                        placement_options = self._placement_options(destination)
+                        zone_name = placement_options['placement_zone'].name
                 else:
                     placement_options = {}
                     zone_name = zone_name or self.runner.class_to_zone[det.label]
@@ -1223,13 +1283,23 @@ class SimulationSession:
                 preconfirmed = (getattr(self, '_last_observation_purpose', '') in
                                 ('recover_target', 'recover_queued_target') and
                                 self._observation_revision == self._environment_revision and
+                                not getattr(self, '_interventions', ()) and
                                 any(d.valid and d.label == original.label and d.center_base is not None and
                                     np.linalg.norm(d.center_base[:2] - original.center_base[:2]) < .003
                                     for d in self._last_fresh))
+                if stack_reference is not None:
+                    preconfirmed = preconfirmed and self._support_observed(
+                        stack_reference, self._last_fresh, self._observation_revision)
                 if not preconfirmed:
-                    self.observe(target=original.summary() | {'view': original.extra.get('view')},
+                    self.observe(target=stack_reference or
+                                 (original.summary() | {'view': original.extra.get('view')}),
                                  purpose='confirm_pick', forget=[original])
                 self._last_observation_purpose = 'consumed_for_pick'
+                if self.cancel_event.is_set():
+                    return self._refusal('aborted', 'execution cancelled', object_id, zone_name)
+                if (self._observation_revision != self._environment_revision
+                        or getattr(self, '_interventions', ())):
+                    return self._refusal('stale_scene', '现场已变化，联合观测已失效', object_id, zone_name)
                 from .observation_policy import unique_target
                 det = unique_target(self._last_fresh, original.label,
                                     partial=lambda d: self._target_partial(d, original.summary()))
@@ -1245,7 +1315,14 @@ class SimulationSession:
                 target = copy.deepcopy(det)
                 if destination is not None and destination['type'] == 'on_object':
                     from .stacking import planning_options, annotate
-                    placement_options, support = planning_options(self, destination)
+                    if not self._support_observed(stack_reference, self._last_fresh,
+                                                  self._observation_revision):
+                        return self._refusal('destination_not_observed',
+                            '新相机观测未完整确认指定底座，未执行抓取', object_id, zone_name)
+                    try:
+                        placement_options, support = planning_options(self, destination, self._last_fresh)
+                    except ValueError as exc:
+                        return self._refusal('destination_not_observed', str(exc), object_id, zone_name)
                     annotate(target, support)
                 self.runner._tracks = [t for t in self.runner._tracks if not
                     (t.get('label') == det.label and

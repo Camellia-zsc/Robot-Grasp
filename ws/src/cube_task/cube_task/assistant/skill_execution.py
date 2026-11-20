@@ -199,10 +199,15 @@ class SkillExecutor:
         matches = [o for o in original if o.get('label') == label and o.get('center_base') is not None]
         return copy.deepcopy(matches[0]) if len(matches) == 1 else {'label': label}
 
-    def _fresh_target(self, label, purpose):
+    def _fresh_target(self, label, purpose, support_label=None):
         session = self.session
+        if support_label is not None:
+            from .stacking import require_flat_support
+            require_flat_support(support_label)
         reference = self._reference(label)
         reference.update(label=label, require_grasp=True)
+        if support_label is not None:
+            reference['required_support'] = self._reference(support_label)
         reusable = getattr(session, '_reusable_target', lambda target: False)(reference)
         if reusable:
             scene = session.scene
@@ -213,6 +218,9 @@ class SkillExecutor:
                             partial=lambda d: session._target_partial(d, reference))
         if det is None or session._observation_revision != session._environment_revision:
             raise ValueError('新相机图像未唯一确认目标，未执行旧坐标抓取')
+        if support_label is not None and not session._support_observed(
+                reference, session._last_fresh, session._observation_revision):
+            raise ValueError('新相机观测未同时完整确认抓取物品与指定底座，未执行抓取')
         matches = [obj for obj in scene.get('objects', ())
                    if obj.get('valid') and obj.get('label') == label
                    and obj.get('center_base') is not None]
@@ -746,7 +754,11 @@ class SkillExecutor:
         completed = self._completed_move(step, destination, yaw, cancel)
         if completed is not None:
             return completed
-        det, obj = self._fresh_target(step.get('label'), 'recover_queued_target')
+        if destination['type'] == 'on_object':
+            det, obj = self._fresh_target(step.get('label'), 'recover_queued_target',
+                                          support_label=destination['label'])
+        else:
+            det, obj = self._fresh_target(step.get('label'), 'recover_queued_target')
         self._check_plan()
         if self._stopped(cancel):
             return self._failure(step, 'aborted', '任务已停止')

@@ -13,13 +13,18 @@ from .catalog import catalog_entries
 from .observation_policy import unique_target
 
 
+def require_flat_support(label):
+    """Reject unsupported surface kinds before spending any camera motion."""
+    entry = next((e for e in catalog_entries() if e['label'] == label), {})
+    if entry.get('shape') not in ('cube', 'box'):
+        raise ValueError('当前叠放规划需要可靠平顶底座；曲面物品不能作为已确认的稳定支撑')
+
+
 def measured_support(detections, label):
     base = unique_target(detections, label)
     if base is None:
         raise ValueError('相机尚未完整确认指定底座，请先观察底座')
-    entry = next((e for e in catalog_entries() if e['label'] == label), {})
-    if entry.get('shape') not in ('cube', 'box'):
-        raise ValueError('当前叠放规划需要可靠平顶底座；曲面物品不能作为已确认的稳定支撑')
+    require_flat_support(label)
     values = [base.length, base.width, base.yaw, base.top_z, base.height]
     if (base.center_base is None or any(v is None or not math.isfinite(float(v)) for v in values)
             or min(float(base.length), float(base.width), float(base.height)) <= .005):

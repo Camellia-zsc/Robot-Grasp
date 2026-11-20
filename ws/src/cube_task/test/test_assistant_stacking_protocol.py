@@ -1,5 +1,7 @@
 """Semantic support references cannot become guessed coordinates or 2-D success."""
 from copy import deepcopy
+from threading import Event
+from types import SimpleNamespace
 
 import pytest
 
@@ -134,7 +136,11 @@ def test_old_table_footprint_check_cannot_prove_stacking(stacking):
 
 
 def test_stack_proofs_are_not_reused_when_only_an_edit_revision_is_known():
-    orchestrator = object.__new__(SkillOrchestrator)
+    session = SimpleNamespace(_environment_revision=4, _interventions=[],
+        snapshot=lambda: dict(scene_version=4, held_object=None, editor={}),
+        runner=SimpleNamespace(has_held_recovery=False), cancel_event=Event())
+    orchestrator = SkillOrchestrator(SimpleNamespace(_session=session, _cancel=Event()))
     proof = dict(goals=[dict(label='apple', zone_name=None,
-        destination={'type': 'on_object', 'label': 'red'})], result={'ok': True})
+        destination={'type': 'on_object', 'label': 'red'})],
+        result={'ok': True, 'verified_revision': 4})
     assert orchestrator._cached_verification(proof, proof['goals']) is None

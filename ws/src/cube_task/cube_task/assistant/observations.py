@@ -20,6 +20,13 @@ _SUPPORT = 0.98
 _RESIDUAL_GAP = 0.006
 
 
+def _capture_of(det):
+    # The transient camera slot can hold several poses during one local scan.
+    # Retain its public view index for future aiming, but distinguish captures
+    # when comparing independent geometry evidence within this scan.
+    return view_of(det), (det.extra or {}).get('_capture_index')
+
+
 def _prefer_pear_neck_views(merged, views, dist, partial):
     """A denser close view of the bulb can still hide this library pear's neck."""
     def geometry(det):
@@ -44,7 +51,7 @@ def _prefer_pear_neck_views(merged, views, dist, partial):
             for items in views.values():
                 for candidate in items:
                     if (not candidate.valid or candidate.label != det.label
-                            or view_of(candidate) == view_of(det)
+                            or _capture_of(candidate) == _capture_of(det)
                             or ((det.extra or {}).get('support_observed') is True
                                 and (candidate.extra or {}).get('support_observed') is not True)
                             or (partial is not None and partial(candidate))):
@@ -150,7 +157,7 @@ def merge_observations(views, dist=MERGE_DIST, partial=None):
         supported = np.zeros(len(points), dtype=bool)
         sources = []
         for anchor, surface, hull, low, high in anchors:
-            if view_of(anchor) == view_of(det):
+            if _capture_of(anchor) == _capture_of(det):
                 continue
             inside = ((points[:, 2] >= low - _MARGIN)
                       & (points[:, 2] <= high + _MARGIN)

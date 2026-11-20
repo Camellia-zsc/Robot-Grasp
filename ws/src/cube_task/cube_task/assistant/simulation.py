@@ -873,6 +873,8 @@ class SimulationSession:
                     self._observation_views = {}
                     self._observation_jpegs = {}
             views, warnings, coverage = {}, [], []
+            captured_views, attempted_views = [], []
+            stack_fallbacks = 0
             verified_merge = None
             revision = self._environment_revision
             for step, view in enumerate(order, 1):
@@ -887,12 +889,20 @@ class SimulationSession:
                 result = next_result
                 self._scan_stats['frames'] += 1
                 self._cache_observation(view, result, frame)
-                views[view] = tag_view(result.detections, view)
+                current_detections = tag_view(result.detections, view)
+                # The transient slot is reused for different camera poses. Keep
+                # each capture in this scan so later views can complement it.
+                capture_key = view if view not in views else max(views) + 1
+                views[capture_key] = current_detections
+                captured_views.append(view)
+                if hasattr(self.runner, 'views'):
+                    attempted_views.append(np.asarray(self.runner.views[view], float).copy())
                 warnings.extend(result.warnings)
                 flange = self.arm.get_flange_pose()
                 pose = camera_pose_in_base(self.runner.ext, flange.value, self.runner.T_flange_tcp)
                 coverage.append((frame, pose))
-                for measured in views[view]:
+                for measured in current_detections:
+                    measured.extra['_capture_index'] = step
                     measured.extra['_capture_stamp'] = float(frame.stamp)
                     measured.extra['_capture_flange'] = np.asarray(flange.value, float).copy()
                 if local and target.get('required_support') and (
@@ -906,15 +916,18 @@ class SimulationSession:
                             partial=lambda d: not d.valid or self.runner._partial(d))
                         if all(self._camera_goal_confirmed(goal, verified_merge[0], revision) for goal in goals):
                             break
-                        if purpose == 'verify_place' and step == 2:
-                            extra_view = self._stack_verification_view(goals, verified_merge[0], revision)
+                        if (purpose == 'verify_place' and step == len(order)
+                                and stack_fallbacks < 3):
+                            extra_view = self._stack_verification_view(
+                                goals, verified_merge[0], revision, attempted_views)
                             if extra_view is not None:
-                                # One purposeful view of the same stack; never
-                                # restart a whole-table search for verification.
+                                # Bounded alternatives around this same stack;
+                                # success stops immediately, never a table scan.
                                 order.append(extra_view)
+                                stack_fallbacks += 1
                         continue
                     label = target.get('label')
-                    measured = unique_target(views[view], label,
+                    measured = unique_target(current_detections, label,
                         partial=lambda d: self._target_partial(d, target)) if label else None
                     # Current completeness includes a separate, cloud-proven
                     # lying-pear pose. A fall must not be compared to the old
@@ -932,7 +945,7 @@ class SimulationSession:
                         if reliable:
                             peers = [d for d in self._observed_detections
                                      if d.label != label]
-                            peers += [d for d in views[view] if d.label != label]
+                            peers += [d for d in current_detections if d.label != label]
                             _candidate, planned = _grasp(self, measured, peers)
                             if planned.feasible:
                                 grasp_target = measured
@@ -989,7 +1002,7 @@ class SimulationSession:
             self._observation_revision = revision
             self._last_observation_purpose = purpose
             self._observed_detections = copy.deepcopy(detections)
-            self._emit('observation_complete', {'purpose': purpose, 'views': list(views),
+            self._emit('observation_complete', {'purpose': purpose, 'views': captured_views,
                        'message': '局部观测完成' if local else '首次全场观测完成',
                        'stats': copy.deepcopy(self._scan_stats)})
             return self._publish_scene(detections, warnings, diagnostics, result.frame_stamp)
@@ -1515,9 +1528,94 @@ class SimulationSession:
                 return False
         return True
 
-    def _stack_verification_view(self, goals, fresh, revision):
-        """Offer one safely reachable local view when the upper body hides its base."""
+    def _stack_support_hint(self, goal):
+        """Recover a measured aiming hint without publishing it as fresh evidence."""
         from .observation_policy import unique_target
+        from ..core.types import Detection
+        destination = goal.get('destination') or {}
+        base = unique_target(self._observed_detections, destination.get('label'))
+        if base is not None:
+            return base
+        active = getattr(self, '_active_placement', None)
+        if (not active or active[0].label != goal.get('label')
+                or active[1] != destination):
+            return None
+        support = active[0].extra.get('_stack_support') or {}
+        try:
+            xy = np.asarray(support['xy'], float)
+            top, length, width, yaw = [float(support[k]) for k in ('top_z', 'length', 'width', 'yaw')]
+            table = float(self.cfg.get('perception.table.expected_z', 0.) or 0.)
+            if (support['label'] != destination.get('label') or xy.shape != (2,)
+                    or not np.all(np.isfinite(np.r_[xy, top, length, width, yaw, table]))
+                    or min(length, width, top-table) <= .005):
+                return None
+        except (KeyError, TypeError, ValueError):
+            return None
+        return Detection(support['label'], 1., center_base=np.r_[xy, top], top_z=top,
+            height=top-table, length=length, width=width, yaw=yaw, valid=False,
+            reject_reason='remembered_support_aiming_hint')
+
+    def _stack_joint_view(self, upper, base, neighbors, revision, attempted=()):
+        """Use nearby taught joint poses when an exact optical pose has no IK."""
+        from ..perception.geometry import project_points
+        from .destinations import footprint_corners
+        ext = self.runner.ext
+        T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
+        intr = self.camera.intrinsics()
+        try:
+            corners = footprint_corners(upper.center_base[:2], float(upper.length),
+                                        float(upper.width), float(upper.yaw or 0.))
+            lower = footprint_corners(base.center_base[:2], float(base.length),
+                                      float(base.width), float(base.yaw or 0.))
+            points = np.vstack([np.column_stack([corners, np.full(4, z)])
+                                for z in (float(base.top_z), float(upper.top_z))] +
+                               [np.column_stack([lower, np.full(4, float(base.top_z))])])
+            if not np.all(np.isfinite(points)):
+                return None
+        except (TypeError, ValueError):
+            return None
+        reference = upper.summary() | {'required_support': base.summary()}
+        anchors = [v for v in self._view_order(reference) if v < self._base_view_count][:2]
+        # A modest side-and-up change creates parallax around the upper body.
+        # These are generic local samples, never saved object coordinates.
+        for view in anchors:
+            for shoulder in (-.32, -.16):
+                for swivel in (-.15, .15, 0.):
+                    if (self.cancel_event.is_set() or self._interventions
+                            or revision != self._environment_revision):
+                        return None
+                    q = np.asarray(self.runner.views[view], float).copy()
+                    q[0] += swivel
+                    q[1] += shoulder
+                    if any(np.max(np.abs(q - old)) < .03 for old in attempted):
+                        continue
+                    if not self.arm.kin.within_limits(q):
+                        continue
+                    uv = project_points(points, self.arm.kin.fk(q) @ T_fc, intr)
+                    if (not np.all(np.isfinite(uv)) or np.any(uv[:, 0] < 8)
+                            or np.any(uv[:, 0] > intr.width-9) or np.any(uv[:, 1] < 8)
+                            or np.any(uv[:, 1] > intr.height-9)):
+                        continue
+                    if self._safe_observation_joints(q, neighbors):
+                        return q
+        return None
+
+    def _remember_stack_view(self, q):
+        view = self._base_view_count
+        if len(self.runner.views) == view:
+            self.runner.views.append(q.tolist())
+            self._view_labels.append('叠放支撑局部视角')
+        else:
+            self.runner.views[view] = q.tolist()
+            self._view_labels[view] = '叠放支撑局部视角'
+        self.runner._at_observe = False
+        self.runner.multi_view = True
+        self._destination_views = {}
+        self._emit('stack_observation', {'message': '顶面被遮挡，正在从一个安全局部视角确认支撑关系'})
+        return view
+
+    def _stack_verification_view(self, goals, fresh, revision, attempted=()):
+        """Offer one safely reachable local view when the upper body hides its base."""
         from ..sim.scenarios import look_at
 
         if (revision != self._environment_revision or self.world.held is not None or
@@ -1530,7 +1628,7 @@ class SimulationSession:
             # A cropped upper body is still a camera aiming hint, never a grasp
             # target or proof of support. Require one unambiguous measured hint.
             upper = [d for d in fresh if d.label == goal['label'] and d.center_base is not None]
-            base = unique_target(self._observed_detections, destination['label'])
+            base = self._stack_support_hint(goal)
             if len(upper) != 1 or base is None or base.top_z is None or upper[0].top_z is None:
                 continue
             upper = upper[0]
@@ -1543,6 +1641,8 @@ class SimulationSession:
             T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
             neighbors = list(fresh) + [d for d in self._observed_detections
                                       if d.label not in {item.label for item in fresh}]
+            if not any(d.label == base.label for d in neighbors):
+                neighbors.append(base)  # Conservative obstacle only, never fresh evidence.
             for angle, distance, height in ((5., .18, .22), (-5., .18, .22),
                                             (5., .16, .22), (-5., .16, .22)):
                 if self.cancel_event.is_set() or self._interventions or revision != self._environment_revision:
@@ -1552,22 +1652,16 @@ class SimulationSession:
                 eye = np.r_[gaze[:2] - distance * direction, gaze_z + height]
                 q, _ep, _er = self.arm.kin.ik(look_at(eye, gaze) @ inv_T(T_fc),
                     q_seed=self.arm.get_joints().value, cancelled=self.cancel_event.is_set)
-                if q is None or not self._safe_observation_joints(q, neighbors):
+                if (q is None or any(np.max(np.abs(q - old)) < .03 for old in attempted)
+                        or not self._safe_observation_joints(q, neighbors)):
                     continue
                 if self.cancel_event.is_set() or self._interventions or revision != self._environment_revision:
                     return None
-                view = self._base_view_count
-                if len(self.runner.views) == view:
-                    self.runner.views.append(q.tolist())
-                    self._view_labels.append('叠放支撑局部视角')
-                else:
-                    self.runner.views[view] = q.tolist()
-                    self._view_labels[view] = '叠放支撑局部视角'
-                self.runner._at_observe = False
-                self.runner.multi_view = True
-                self._destination_views = {}
-                self._emit('stack_observation', {'message': '顶面被遮挡，正在从一个安全局部视角确认支撑关系'})
-                return view
+                return self._remember_stack_view(q)
+            q = self._stack_joint_view(upper, base, neighbors, revision, attempted)
+            if (q is not None and not self.cancel_event.is_set() and not self._interventions
+                    and revision == self._environment_revision):
+                return self._remember_stack_view(q)
         return None
 
     def _verify_zone(self, obj, zone_name):

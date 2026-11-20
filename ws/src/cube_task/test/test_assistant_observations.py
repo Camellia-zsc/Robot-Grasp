@@ -43,6 +43,23 @@ def test_pear_neck_visibility_wins_over_a_denser_low_view():
     assert len(objects) == 1 and objects[0] is whole
 
 
+def test_two_poses_in_one_transient_slot_remain_independent_neck_evidence():
+    low = pear_view([.198, -.011], .102, 19455)
+    whole = pear_view([.197, -.002], .114, 17746)
+    low.extra['_capture_index'], whole.extra['_capture_index'] = 3, 4
+    objects, _ = merge_observations({6: tag_view([low], 6), 7: tag_view([whole], 6)})
+    assert objects == [whole] and whole.extra['view'] == 6
+
+
+def test_two_poses_in_one_transient_slot_can_resolve_a_mixed_observation():
+    anchor = observation('pear', [.20, 0], box_cloud([.20, 0, .08]))
+    mixed = observation('pear', [.26, 0], anchor.extra['_points_base'].copy(), False)
+    anchor.extra['_capture_index'], mixed.extra['_capture_index'] = 3, 4
+    objects, diagnostics = merge_observations(
+        {6: tag_view([anchor], 6), 7: tag_view([mixed], 6)}, partial=lambda d: not d.valid)
+    assert objects == [anchor] and len(diagnostics) == 1
+
+
 @pytest.mark.parametrize('case', ['partial', 'invalid', 'tiny_gain', 'narrow', 'different_label', 'missing_height'])
 def test_pear_view_preference_requires_reliable_more_complete_geometry(case):
     low = pear_view([.198, -.011], .102, 19455)

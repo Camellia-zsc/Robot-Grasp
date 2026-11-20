@@ -197,17 +197,56 @@ def test_missing_stack_image_is_reported_separately_from_physical_failure(tmp_pa
         assert '没有位于' not in result['message']
 
 
-@pytest.mark.parametrize('support_visible', [True, False])
-def test_stack_fallback_adds_only_one_view_and_still_requires_support(support_visible):
+@pytest.mark.parametrize('support_after', [1, 2, 3, None])
+def test_stack_fallback_stops_on_support_and_has_a_three_view_budget(support_after):
     from cube_task.assistant.stacking import camera_confirmed
     pear, green = block('pear', top=.16, height=.11), block('green')
-    session, seen = scan_session([[pear], [pear], [pear, green] if support_visible else [pear]])
+    session, seen = scan_session([[pear], [pear], []])
+    session.runner.views = [np.full(6, n).tolist() for n in range(3)]
     proposals = []
-    session._stack_verification_view = lambda *a: proposals.append(a) or 2
+    observe = session.runner._observe
+    def capture(view):
+        if view != 2:
+            return observe(view)
+        seen.append(view)
+        visible = [pear, green] if len(proposals) == support_after else [pear]
+        return 'ok', PerceptionResult(copy.deepcopy(visible), frame_stamp=10.), SimpleNamespace(stamp=10.)
+    def propose(goals, fresh, revision, attempted):
+        proposals.append([q.copy() for q in attempted])
+        session.runner.views[2] = np.full(6, 1 + len(proposals)).tolist()
+        return 2
+    session.runner._observe = capture
+    session._stack_verification_view = propose
     session.observe(target=dict(xy=[.2, .3], verify_goals=[STACK_GOAL]), purpose='verify_place')
-    assert seen == [0, 1, 2] and len(proposals) == 1
-    assert session._scan_stats == dict(local_scans=1, full_scans=0, frames=3)
-    assert camera_confirmed(session, 'pear', STACK_GOAL['destination']) is support_visible
+    count = support_after or 3
+    assert seen == [0, 1] + [2] * count and len(proposals) == count
+    assert [len(a) for a in proposals] == list(range(2, count + 2))
+    assert len(session.runner.views) == 3
+    assert session._scan_stats == dict(local_scans=1, full_scans=0, frames=2 + count)
+    assert camera_confirmed(session, 'pear', STACK_GOAL['destination']) is (support_after is not None)
+
+
+def test_reused_stack_slot_keeps_complementary_captures_until_verification_finishes():
+    from cube_task.assistant.stacking import camera_confirmed
+    pear, green = block('pear', top=.16, height=.11), block('green')
+    partial = block('pear', top=.16, height=.16)
+    partial.valid = False
+    session, seen = scan_session([[partial], [partial], []])
+    session.runner.views = [np.full(6, n).tolist() for n in range(3)]
+    session._stack_verification_view = lambda *args: 2
+    frames = iter([[partial], [partial], [green], [pear]])
+    def capture(view):
+        seen.append(view)
+        return 'ok', PerceptionResult(copy.deepcopy(next(frames)), frame_stamp=10.), SimpleNamespace(stamp=10.)
+    captures = []
+    def placement_cloud(det, views, fresh):
+        captures.append([(d.label, d.extra['_capture_index']) for items in views.values() for d in items])
+    session.runner._observe = capture
+    session._placement_cloud = placement_cloud
+    session.observe(target=dict(xy=[.2, .3], verify_goals=[STACK_GOAL]), purpose='verify_place')
+    assert seen == [0, 1, 2, 2]
+    assert captures and all(len(items) == 4 for items in captures)
+    assert camera_confirmed(session, 'pear', STACK_GOAL['destination'])
 
 
 def route_session(height):

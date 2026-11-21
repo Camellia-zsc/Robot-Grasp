@@ -243,3 +243,19 @@ def test_fresh_refinement_without_opening_proof_cannot_reuse_previous_marker():
     result = PickResult(False, grasp_width=.0385, detail={'holding': True, 'steps': []})
     skill._inspect_release(result, grasp, place)
     assert not hasattr(place, 'release_opening_checked')
+
+
+@pytest.mark.parametrize('shortfall,accepted', [(1e-6, True), (.0005, False)])
+def test_checked_opening_allows_sensor_quantization_but_not_real_shortfall(shortfall, accepted):
+    arm, _log, skill, grasp, place, _checks = checked_wide_release()
+    original = arm.gripper
+    def quantized(width, **kwargs):
+        feedback = original(width, **kwargs)
+        arm.width = feedback.width = width - shortfall
+        return feedback
+    arm.gripper = quantized
+    result = skill.place_held(grasp, place, arm.width)
+    assert result.ok is accepted
+    assert len(arm.motions()) == (4 if accepted else 3)
+    if not accepted:
+        assert result.detail['holding'] and result.detail['fault']

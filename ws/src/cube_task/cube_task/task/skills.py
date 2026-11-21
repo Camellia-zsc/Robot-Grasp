@@ -54,6 +54,9 @@ RELEASE_OPEN_MARGIN = 0.01
 #: its full width reports a few um to a few 0.1 mm less (MuJoCo: 0.06995 for 0.07),
 #: which must not turn a release into a 'holding_object' fault.
 RELEASE_FULL_OPEN_TOL = 0.002
+#: Opening feedback is quantized to micrometres. The planner reserves this
+#: same tiny allowance above the body-clearance requirement for checked exits.
+RELEASE_OPEN_QUANTIZATION_TOL = 0.000002
 #: detail text of a gripper 'fault' whose opening stopped short (robot/pyagxarm_arm.py).
 OPENING_SHORT = 'opening stopped'
 #: AGX gripper force range (N); a configured force above it is clamped.
@@ -759,7 +762,8 @@ class PickPlaceSkill:
             return
         self._check_abort('open_release')
         self._guard('open_release')
-        need = width if wide else min(width - RELEASE_FULL_OPEN_TOL, held + RELEASE_OPEN_MARGIN)
+        need = (width - RELEASE_OPEN_QUANTIZATION_TOL if wide else
+                min(width - RELEASE_FULL_OPEN_TOL, held + RELEASE_OPEN_MARGIN))
         try:
             # A finger stopped by the bin or an earlier object is not a fault once
             # the fingers are open past the held width: the object is released.
@@ -768,7 +772,7 @@ class PickPlaceSkill:
                        short_ok=need if r.grasp_width is not None else None)
             if wide:
                 measured = self._read_width()
-                if measured is None or measured < width:
+                if measured is None or measured + RELEASE_OPEN_QUANTIZATION_TOL < width:
                     raise _StepFailed('open_release', 'checked_opening_unconfirmed',
                                       'fresh opening has not reached the checked exit width', fault=True)
         except _StepFailed as e:

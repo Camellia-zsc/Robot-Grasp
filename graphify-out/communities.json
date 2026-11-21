@@ -2,68 +2,36 @@
   {
     "id": 0,
     "label": "Color Calib Components",
-    "nodes": 156,
-    "cohesion": 0.025062034739454096,
+    "nodes": 141,
+    "cohesion": 0.025734549138804456,
     "top_files": [
       [
         "color_calib",
-        31
+        127
       ],
       [
         "onsite",
-        25
-      ],
-      [
-        "view",
-        25
-      ],
-      [
-        "common",
-        20
+        10
       ],
       [
         "",
-        17
+        4
       ]
     ]
   },
   {
     "id": 1,
-    "label": "Teach Classes Components",
-    "nodes": 111,
-    "cohesion": 0.03341523341523341,
-    "top_files": [
-      [
-        "teach_classes",
-        105
-      ],
-      [
-        "",
-        4
-      ],
-      [
-        "teach_record",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 2,
     "label": "Teach Poses Components",
-    "nodes": 111,
-    "cohesion": 0.032596232596232594,
+    "nodes": 121,
+    "cohesion": 0.029201101928374655,
     "top_files": [
       [
         "teach_poses",
-        99
-      ],
-      [
-        "config",
-        5
+        114
       ],
       [
         "",
-        4
+        3
       ],
       [
         "onsite",
@@ -72,81 +40,53 @@
       [
         "zones",
         1
+      ],
+      [
+        "safety",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 2,
+    "label": "Teach Classes Components",
+    "nodes": 110,
+    "cohesion": 0.03369474562135113,
+    "top_files": [
+      [
+        "teach_classes",
+        99
+      ],
+      [
+        "",
+        5
+      ],
+      [
+        "onsite",
+        4
+      ],
+      [
+        "teach_record",
+        2
       ]
     ]
   },
   {
     "id": 3,
-    "label": "Teach Record Components",
-    "nodes": 104,
-    "cohesion": 0.039955190440627335,
-    "top_files": [
-      [
-        "teach_record",
-        33
-      ],
-      [
-        "",
-        16
-      ],
-      [
-        "recorder",
-        13
-      ],
-      [
-        "utils",
-        9
-      ],
-      [
-        "logger",
-        8
-      ]
-    ]
-  },
-  {
-    "id": 4,
-    "label": "Onsite Components",
-    "nodes": 104,
-    "cohesion": 0.032300224047796866,
-    "top_files": [
-      [
-        "onsite",
-        54
-      ],
-      [
-        "calib_verify",
-        34
-      ],
-      [
-        "",
-        6
-      ],
-      [
-        "calib_points",
-        3
-      ],
-      [
-        "view",
-        3
-      ]
-    ]
-  },
-  {
-    "id": 5,
     "label": "Scenarios Components",
     "nodes": 102,
-    "cohesion": 0.041933605125218404,
+    "cohesion": 0.04173946806445351,
     "top_files": [
       [
         "scenarios",
         97
       ],
       [
-        "world",
+        "",
         2
       ],
       [
-        "",
+        "world",
         2
       ],
       [
@@ -156,58 +96,38 @@
     ]
   },
   {
-    "id": 6,
-    "label": "MuJoCo Arm Control",
-    "nodes": 93,
-    "cohesion": 0.04394576905095839,
+    "id": 4,
+    "label": "Calib Verify Components",
+    "nodes": 99,
+    "cohesion": 0.036899608328179755,
     "top_files": [
       [
-        "arm",
-        78
+        "calib_verify",
+        76
       ],
       [
-        "interfaces",
-        5
-      ],
-      [
-        "safety",
-        4
-      ],
-      [
-        "transforms",
-        2
+        "onsite",
+        19
       ],
       [
         "",
+        2
+      ],
+      [
+        "color_calib",
         2
       ]
     ]
   },
   {
-    "id": 7,
-    "label": "Calib Points Components",
-    "nodes": 93,
-    "cohesion": 0.042309490416082285,
-    "top_files": [
-      [
-        "calib_points",
-        90
-      ],
-      [
-        "",
-        3
-      ]
-    ]
-  },
-  {
-    "id": 8,
+    "id": 5,
     "label": "Grasp Components",
-    "nodes": 92,
-    "cohesion": 0.0482560917343526,
+    "nodes": 95,
+    "cohesion": 0.04613661814109742,
     "top_files": [
       [
         "grasp",
-        80
+        81
       ],
       [
         "transforms",
@@ -218,24 +138,80 @@
         3
       ],
       [
-        "teach_poses",
+        "selfcheck",
         2
       ],
       [
-        "",
-        1
+        "teach_poses",
+        2
       ]
     ]
   },
   {
-    "id": 9,
+    "id": 6,
+    "label": "Config Components",
+    "nodes": 92,
+    "cohesion": 0.044672718585762064,
+    "top_files": [
+      [
+        "config",
+        26
+      ],
+      [
+        "teach_poses",
+        21
+      ],
+      [
+        "common",
+        11
+      ],
+      [
+        "run",
+        10
+      ],
+      [
+        "clock",
+        7
+      ]
+    ]
+  },
+  {
+    "id": 7,
+    "label": "Interfaces Components",
+    "nodes": 91,
+    "cohesion": 0.05518925518925519,
+    "top_files": [
+      [
+        "interfaces",
+        22
+      ],
+      [
+        "safety",
+        13
+      ],
+      [
+        "kinematics",
+        6
+      ],
+      [
+        "",
+        5
+      ],
+      [
+        "utils",
+        5
+      ]
+    ]
+  },
+  {
+    "id": 8,
     "label": "Simulation World State",
-    "nodes": 89,
-    "cohesion": 0.04034729315628192,
+    "nodes": 87,
+    "cohesion": 0.03929430633520449,
     "top_files": [
       [
         "world",
-        71
+        67
       ],
       [
         "preview",
@@ -247,88 +223,64 @@
       ],
       [
         "",
+        2
+      ],
+      [
+        "sim_camera",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 9,
+    "label": "MuJoCo Arm Control",
+    "nodes": 86,
+    "cohesion": 0.046511627906976744,
+    "top_files": [
+      [
+        "arm",
+        83
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "physics",
         1
       ]
     ]
   },
   {
     "id": 10,
-    "label": "Views Components",
+    "label": "Onsite Components",
     "nodes": 86,
-    "cohesion": 0.047879616963064295,
+    "cohesion": 0.037756497948016415,
     "top_files": [
       [
-        "views",
-        28
+        "onsite",
+        66
       ],
       [
-        "live",
-        19
-      ],
-      [
-        "selection",
-        13
-      ],
-      [
-        "runner",
-        9
+        "teach_poses",
+        12
       ],
       [
         "",
-        5
+        3
+      ],
+      [
+        "safety",
+        2
+      ],
+      [
+        "selfcheck",
+        2
       ]
     ]
   },
   {
     "id": 11,
-    "label": "Legacy Task Runner",
-    "nodes": 85,
-    "cohesion": 0.05350140056022409,
-    "top_files": [
-      [
-        "runner",
-        82
-      ],
-      [
-        "types",
-        2
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 12,
-    "label": "Camera Configuration Geometry",
-    "nodes": 85,
-    "cohesion": 0.0515406162464986,
-    "top_files": [
-      [
-        "camera",
-        45
-      ],
-      [
-        "transforms",
-        24
-      ],
-      [
-        "cli",
-        5
-      ],
-      [
-        "",
-        4
-      ],
-      [
-        "live",
-        3
-      ]
-    ]
-  },
-  {
-    "id": 13,
     "label": "Browser Task Controls",
     "nodes": 84,
     "cohesion": 0.07802639127940333,
@@ -340,22 +292,38 @@
     ]
   },
   {
-    "id": 14,
-    "label": "Simulation World State",
+    "id": 12,
+    "label": "Pyagxarm Arm Components",
     "nodes": 84,
-    "cohesion": 0.045037292025243834,
+    "cohesion": 0.05450372920252438,
+    "top_files": [
+      [
+        "pyagxarm_arm",
+        79
+      ],
+      [
+        "interfaces",
+        3
+      ],
+      [
+        "",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 13,
+    "label": "Simulation World State",
+    "nodes": 80,
+    "cohesion": 0.05031645569620253,
     "top_files": [
       [
         "world",
-        71
+        69
       ],
       [
         "scenarios",
-        8
-      ],
-      [
-        "scene",
-        4
+        10
       ],
       [
         "",
@@ -364,30 +332,10 @@
     ]
   },
   {
-    "id": 15,
-    "label": "Preview Simulation Session",
-    "nodes": 77,
-    "cohesion": 0.05263157894736842,
-    "top_files": [
-      [
-        "simulation",
-        74
-      ],
-      [
-        "extrinsics",
-        2
-      ],
-      [
-        "catalog",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 16,
+    "id": 14,
     "label": "Segment Components",
-    "nodes": 76,
-    "cohesion": 0.05578947368421053,
+    "nodes": 79,
+    "cohesion": 0.06101914962674456,
     "top_files": [
       [
         "segment",
@@ -395,95 +343,47 @@
       ],
       [
         "",
-        3
+        4
+      ],
+      [
+        "stack_perception",
+        2
       ]
     ]
   },
   {
-    "id": 17,
-    "label": "Pyagxarm Arm Components",
+    "id": 15,
+    "label": "Preview Simulation Session",
     "nodes": 75,
-    "cohesion": 0.06198198198198198,
+    "cohesion": 0.04756756756756757,
     "top_files": [
       [
-        "pyagxarm_arm",
+        "simulation",
         71
       ],
       [
-        "interfaces",
+        "observation_policy",
         2
       ],
       [
+        "destinations",
+        1
+      ],
+      [
         "",
-        2
+        1
       ]
     ]
   },
   {
-    "id": 18,
-    "label": "Standalone Cube Detection",
-    "nodes": 73,
-    "cohesion": 0.05441400304414003,
-    "top_files": [
-      [
-        "l1",
-        53
-      ],
-      [
-        "camera",
-        12
-      ],
-      [
-        "cli",
-        3
-      ],
-      [
-        "",
-        2
-      ],
-      [
-        "transforms",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 19,
-    "label": "Safety Components",
-    "nodes": 70,
-    "cohesion": 0.06583850931677018,
-    "top_files": [
-      [
-        "safety",
-        14
-      ],
-      [
-        "interfaces",
-        10
-      ],
-      [
-        "kinematics",
-        6
-      ],
-      [
-        "pyagxarm_arm",
-        6
-      ],
-      [
-        "",
-        4
-      ]
-    ]
-  },
-  {
-    "id": 20,
+    "id": 16,
     "label": "Legacy Motion Skills",
-    "nodes": 70,
-    "cohesion": 0.08985507246376812,
+    "nodes": 72,
+    "cohesion": 0.08607198748043818,
     "top_files": [
       [
         "skills",
-        58
+        60
       ],
       [
         "types",
@@ -504,18 +404,118 @@
     ]
   },
   {
-    "id": 21,
-    "label": "Safety Components",
-    "nodes": 66,
-    "cohesion": 0.055944055944055944,
+    "id": 17,
+    "label": "Teach Classes Components",
+    "nodes": 65,
+    "cohesion": 0.04519230769230769,
     "top_files": [
       [
-        "safety",
-        51
+        "teach_classes",
+        59
+      ],
+      [
+        "onsite",
+        4
+      ],
+      [
+        "pipeline",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 18,
+    "label": "Motion Ctl Components",
+    "nodes": 63,
+    "cohesion": 0.0701484895033282,
+    "top_files": [
+      [
+        "motion_ctl",
+        34
+      ],
+      [
+        "run_task",
+        15
       ],
       [
         "interfaces",
-        13
+        4
+      ],
+      [
+        "",
+        4
+      ],
+      [
+        "pyagxarm_arm",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 19,
+    "label": "Safety Components",
+    "nodes": 63,
+    "cohesion": 0.06093189964157706,
+    "top_files": [
+      [
+        "safety",
+        47
+      ],
+      [
+        "interfaces",
+        9
+      ],
+      [
+        "factory",
+        2
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "reach",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 20,
+    "label": "Coordinate Transform Utilities",
+    "nodes": 62,
+    "cohesion": 0.06504494976203067,
+    "top_files": [
+      [
+        "transforms",
+        29
+      ],
+      [
+        "spherical_anchor",
+        11
+      ],
+      [
+        "held_anchor",
+        7
+      ],
+      [
+        "world",
+        6
+      ],
+      [
+        "scenarios",
+        5
+      ]
+    ]
+  },
+  {
+    "id": 21,
+    "label": "Legacy Task Runner",
+    "nodes": 61,
+    "cohesion": 0.07431693989071038,
+    "top_files": [
+      [
+        "runner",
+        59
       ],
       [
         "types",
@@ -529,34 +529,6 @@
   },
   {
     "id": 22,
-    "label": "Record Components",
-    "nodes": 62,
-    "cohesion": 0.05499735589635114,
-    "top_files": [
-      [
-        "record",
-        32
-      ],
-      [
-        "live",
-        20
-      ],
-      [
-        "",
-        4
-      ],
-      [
-        "camera",
-        2
-      ],
-      [
-        "cli",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 23,
     "label": "Export Onnx Components",
     "nodes": 60,
     "cohesion": 0.061016949152542375,
@@ -580,42 +552,110 @@
     ]
   },
   {
-    "id": 24,
-    "label": "Camera Handeye Calibration",
+    "id": 23,
+    "label": "Teach Record Components",
     "nodes": 58,
-    "cohesion": 0.06533575317604355,
+    "cohesion": 0.062310949788263764,
     "top_files": [
       [
-        "handeye",
-        37
-      ],
-      [
-        "cli",
-        12
+        "teach_record",
+        52
       ],
       [
         "",
-        5
+        4
       ],
       [
-        "operator",
+        "teach_classes",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 24,
+    "label": "Standalone Cube Detection",
+    "nodes": 57,
+    "cohesion": 0.07205513784461152,
+    "top_files": [
+      [
+        "l1",
+        41
+      ],
+      [
+        "camera",
+        12
+      ],
+      [
+        "transforms",
         2
       ],
       [
-        "__main__",
-        2
+        "l1_new",
+        1
+      ],
+      [
+        "",
+        1
       ]
     ]
   },
   {
     "id": 25,
     "label": "Sim Bench Components",
-    "nodes": 58,
-    "cohesion": 0.06110102843315184,
+    "nodes": 52,
+    "cohesion": 0.06862745098039216,
     "top_files": [
       [
         "sim_bench",
-        54
+        46
+      ],
+      [
+        "",
+        4
+      ],
+      [
+        "run",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 26,
+    "label": "Geometry Components",
+    "nodes": 52,
+    "cohesion": 0.07315233785822021,
+    "top_files": [
+      [
+        "geometry",
+        23
+      ],
+      [
+        "registration",
+        6
+      ],
+      [
+        "types",
+        4
+      ],
+      [
+        "calib_points",
+        4
+      ],
+      [
+        "",
+        3
+      ]
+    ]
+  },
+  {
+    "id": 27,
+    "label": "Extrinsics Components",
+    "nodes": 52,
+    "cohesion": 0.08521870286576169,
+    "top_files": [
+      [
+        "extrinsics",
+        48
       ],
       [
         "",
@@ -624,29 +664,13 @@
     ]
   },
   {
-    "id": 26,
-    "label": "Calib Points Components",
-    "nodes": 56,
-    "cohesion": 0.05909090909090909,
+    "id": 28,
+    "label": "Camera Configuration Geometry",
+    "nodes": 52,
+    "cohesion": 0.07918552036199095,
     "top_files": [
       [
-        "calib_points",
-        52
-      ],
-      [
-        "onsite",
-        4
-      ]
-    ]
-  },
-  {
-    "id": 27,
-    "label": "Web Service Routes",
-    "nodes": 54,
-    "cohesion": 0.07547169811320754,
-    "top_files": [
-      [
-        "server",
+        "camera",
         45
       ],
       [
@@ -654,8 +678,152 @@
         3
       ],
       [
-        "assistant_ui",
+        "handeye",
+        2
+      ],
+      [
+        "__init__",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 29,
+    "label": "Capture Components",
+    "nodes": 51,
+    "cohesion": 0.06196078431372549,
+    "top_files": [
+      [
+        "capture",
+        17
+      ],
+      [
+        "",
+        12
+      ],
+      [
+        "onsite",
+        6
+      ],
+      [
+        "motion_ctl",
         3
+      ],
+      [
+        "calib_points",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 30,
+    "label": "Pipeline Components",
+    "nodes": 50,
+    "cohesion": 0.10285714285714286,
+    "top_files": [
+      [
+        "pipeline",
+        31
+      ],
+      [
+        "classify_color",
+        6
+      ],
+      [
+        "interfaces",
+        4
+      ],
+      [
+        "types",
+        3
+      ],
+      [
+        "l1_new",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 31,
+    "label": "Simulation World State",
+    "nodes": 50,
+    "cohesion": 0.06938775510204082,
+    "top_files": [
+      [
+        "world",
+        48
+      ],
+      [
+        "",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 32,
+    "label": "Preview Simulation Session",
+    "nodes": 47,
+    "cohesion": 0.08048103607770583,
+    "top_files": [
+      [
+        "simulation",
+        31
+      ],
+      [
+        "observation_policy",
+        7
+      ],
+      [
+        "skill_execution",
+        5
+      ],
+      [
+        "extrinsics",
+        2
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 33,
+    "label": "Obstacle Recovery Components",
+    "nodes": 47,
+    "cohesion": 0.0851063829787234,
+    "top_files": [
+      [
+        "obstacle_recovery",
+        19
+      ],
+      [
+        "reach",
+        17
+      ],
+      [
+        "grasp",
+        4
+      ],
+      [
+        "runner",
+        3
+      ],
+      [
+        "",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 34,
+    "label": "Web Service Routes",
+    "nodes": 47,
+    "cohesion": 0.09435707678075855,
+    "top_files": [
+      [
+        "server",
+        43
       ],
       [
         "runner",
@@ -664,215 +832,15 @@
       [
         "batch",
         1
-      ]
-    ]
-  },
-  {
-    "id": 28,
-    "label": "Pipeline Components",
-    "nodes": 53,
-    "cohesion": 0.08563134978229318,
-    "top_files": [
-      [
-        "pipeline",
-        29
       ],
       [
-        "interfaces",
-        10
-      ],
-      [
-        "classify_color",
-        6
-      ],
-      [
-        "",
-        3
-      ],
-      [
-        "types",
-        3
-      ]
-    ]
-  },
-  {
-    "id": 29,
-    "label": "Simulation World State",
-    "nodes": 52,
-    "cohesion": 0.06561085972850679,
-    "top_files": [
-      [
-        "world",
-        50
-      ],
-      [
-        "",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 30,
-    "label": "Sim Arm Components",
-    "nodes": 51,
-    "cohesion": 0.07450980392156863,
-    "top_files": [
-      [
-        "sim_arm",
-        47
-      ],
-      [
-        "interfaces",
-        2
-      ],
-      [
-        "",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 31,
-    "label": "Teach Classes Components",
-    "nodes": 51,
-    "cohesion": 0.05568627450980392,
-    "top_files": [
-      [
-        "teach_classes",
-        51
-      ]
-    ]
-  },
-  {
-    "id": 32,
-    "label": "Preview Simulation Session",
-    "nodes": 50,
-    "cohesion": 0.07918367346938776,
-    "top_files": [
-      [
-        "simulation",
-        27
-      ],
-      [
-        "stacking",
-        10
-      ],
-      [
-        "observation_policy",
-        9
-      ],
-      [
-        "",
-        2
-      ],
-      [
-        "skill_execution",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 33,
-    "label": "Geometry Components",
-    "nodes": 50,
-    "cohesion": 0.07346938775510205,
-    "top_files": [
-      [
-        "geometry",
-        23
-      ],
-      [
-        "stack_perception",
-        12
-      ],
-      [
-        "calib_points",
-        4
-      ],
-      [
-        "types",
-        3
-      ],
-      [
-        "file_camera",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 34,
-    "label": "Calib Verify Components",
-    "nodes": 48,
-    "cohesion": 0.06914893617021277,
-    "top_files": [
-      [
-        "calib_verify",
-        37
-      ],
-      [
-        "onsite",
-        8
-      ],
-      [
-        "teach_poses",
-        2
-      ],
-      [
-        "",
+        "skill_orchestrator",
         1
       ]
     ]
   },
   {
     "id": 35,
-    "label": "Language Model Planning",
-    "nodes": 47,
-    "cohesion": 0.06567992599444958,
-    "top_files": [
-      [
-        "llm",
-        36
-      ],
-      [
-        "",
-        10
-      ],
-      [
-        "server",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 36,
-    "label": "Preview Simulation Session",
-    "nodes": 47,
-    "cohesion": 0.06290471785383904,
-    "top_files": [
-      [
-        "simulation",
-        19
-      ],
-      [
-        "destinations",
-        11
-      ],
-      [
-        "catalog",
-        8
-      ],
-      [
-        "batch",
-        2
-      ],
-      [
-        "catalog_perception",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 37,
     "label": "Ik Components",
     "nodes": 47,
     "cohesion": 0.08695652173913043,
@@ -892,26 +860,38 @@
     ]
   },
   {
-    "id": 38,
-    "label": "Placement Region Observation",
-    "nodes": 46,
-    "cohesion": 0.08115942028985507,
+    "id": 36,
+    "label": "Ros Camera Components",
+    "nodes": 47,
+    "cohesion": 0.0786308973172988,
     "top_files": [
       [
-        "placement_observation",
-        27
+        "ros_camera",
+        43
       ],
       [
-        "active_observation",
-        8
+        "",
+        2
       ],
       [
-        "simulation",
-        6
+        "types",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 37,
+    "label": "Sim Arm Components",
+    "nodes": 47,
+    "cohesion": 0.0841813135985199,
+    "top_files": [
+      [
+        "sim_arm",
+        44
       ],
       [
-        "safety",
-        4
+        "interfaces",
+        2
       ],
       [
         "",
@@ -920,18 +900,430 @@
     ]
   },
   {
-    "id": 39,
-    "label": "Classify Knn Components",
+    "id": 38,
+    "label": "Language Model Planning",
     "nodes": 46,
-    "cohesion": 0.08309178743961353,
+    "cohesion": 0.06763285024154589,
+    "top_files": [
+      [
+        "llm",
+        36
+      ],
+      [
+        "",
+        9
+      ],
+      [
+        "server",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 39,
+    "label": "Make Dataset Components",
+    "nodes": 43,
+    "cohesion": 0.08748615725359911,
+    "top_files": [
+      [
+        "make_dataset",
+        36
+      ],
+      [
+        "",
+        7
+      ]
+    ]
+  },
+  {
+    "id": 40,
+    "label": "Placement Region Observation",
+    "nodes": 43,
+    "cohesion": 0.08748615725359911,
+    "top_files": [
+      [
+        "placement_observation",
+        25
+      ],
+      [
+        "active_observation",
+        10
+      ],
+      [
+        "safety",
+        4
+      ],
+      [
+        "simulation",
+        3
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 41,
+    "label": "Destinations Components",
+    "nodes": 42,
+    "cohesion": 0.07317073170731707,
+    "top_files": [
+      [
+        "destinations",
+        10
+      ],
+      [
+        "simulation",
+        10
+      ],
+      [
+        "catalog",
+        9
+      ],
+      [
+        "zones",
+        4
+      ],
+      [
+        "batch",
+        3
+      ]
+    ]
+  },
+  {
+    "id": 42,
+    "label": "Kinematics Components",
+    "nodes": 42,
+    "cohesion": 0.09639953542392567,
+    "top_files": [
+      [
+        "kinematics",
+        35
+      ],
+      [
+        "sim_arm",
+        5
+      ],
+      [
+        "",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 43,
+    "label": "Run Task Components",
+    "nodes": 41,
+    "cohesion": 0.1,
+    "top_files": [
+      [
+        "run_task",
+        32
+      ],
+      [
+        "",
+        5
+      ],
+      [
+        "motion_ctl",
+        4
+      ]
+    ]
+  },
+  {
+    "id": 44,
+    "label": "Validated Skill Execution",
+    "nodes": 41,
+    "cohesion": 0.13048780487804879,
+    "top_files": [
+      [
+        "skill_execution",
+        38
+      ],
+      [
+        "simulation",
+        2
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 45,
+    "label": "Selfcheck Components",
+    "nodes": 41,
+    "cohesion": 0.09390243902439024,
+    "top_files": [
+      [
+        "selfcheck",
+        41
+      ]
+    ]
+  },
+  {
+    "id": 46,
+    "label": "Cli Components",
+    "nodes": 40,
+    "cohesion": 0.09358974358974359,
+    "top_files": [
+      [
+        "cli",
+        18
+      ],
+      [
+        "frames",
+        10
+      ],
+      [
+        "record",
+        4
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "handeye",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 47,
+    "label": "Legacy Task Runner",
+    "nodes": 38,
+    "cohesion": 0.09103840682788052,
+    "top_files": [
+      [
+        "runner",
+        23
+      ],
+      [
+        "polygon_collision",
+        7
+      ],
+      [
+        "geometry",
+        4
+      ],
+      [
+        "grasp",
+        2
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 48,
+    "label": "Preview Simulation Session",
+    "nodes": 38,
+    "cohesion": 0.07965860597439545,
+    "top_files": [
+      [
+        "simulation",
+        20
+      ],
+      [
+        "stacking",
+        10
+      ],
+      [
+        "runner",
+        4
+      ],
+      [
+        "observation_policy",
+        2
+      ],
+      [
+        "placement_observation",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 49,
+    "label": "Camera Handeye Calibration",
+    "nodes": 38,
+    "cohesion": 0.0953058321479374,
+    "top_files": [
+      [
+        "handeye",
+        31
+      ],
+      [
+        "cli",
+        3
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "transforms",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 50,
+    "label": "Common Components",
+    "nodes": 37,
+    "cohesion": 0.07507507507507508,
+    "top_files": [
+      [
+        "common",
+        13
+      ],
+      [
+        "",
+        4
+      ],
+      [
+        "calib_verify",
+        4
+      ],
+      [
+        "clock",
+        3
+      ],
+      [
+        "assistant_ui",
+        3
+      ]
+    ]
+  },
+  {
+    "id": 51,
+    "label": "Composable Skill Orchestration",
+    "nodes": 37,
+    "cohesion": 0.13063063063063063,
+    "top_files": [
+      [
+        "skill_orchestrator",
+        36
+      ],
+      [
+        "skill_execution",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 52,
+    "label": "Legacy Task Runner",
+    "nodes": 37,
+    "cohesion": 0.1021021021021021,
+    "top_files": [
+      [
+        "runner",
+        31
+      ],
+      [
+        "types",
+        4
+      ],
+      [
+        "grasp",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 53,
+    "label": "Render Components",
+    "nodes": 37,
+    "cohesion": 0.10960960960960961,
+    "top_files": [
+      [
+        "render",
+        33
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "world",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 54,
+    "label": "MuJoCo Scene Construction",
+    "nodes": 36,
+    "cohesion": 0.12857142857142856,
+    "top_files": [
+      [
+        "scene",
+        32
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "scenarios",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 55,
+    "label": "Pyagxarm Arm Components",
+    "nodes": 36,
+    "cohesion": 0.09206349206349207,
+    "top_files": [
+      [
+        "pyagxarm_arm",
+        33
+      ],
+      [
+        "live",
+        2
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 56,
+    "label": "Record Components",
+    "nodes": 35,
+    "cohesion": 0.10588235294117647,
+    "top_files": [
+      [
+        "record",
+        28
+      ],
+      [
+        "",
+        4
+      ],
+      [
+        "live",
+        3
+      ]
+    ]
+  },
+  {
+    "id": 57,
+    "label": "Classify Knn Components",
+    "nodes": 34,
+    "cohesion": 0.11229946524064172,
     "top_files": [
       [
         "classify_knn",
-        27
-      ],
-      [
-        "factory",
-        12
+        25
       ],
       [
         "",
@@ -940,30 +1332,238 @@
       [
         "teach",
         2
+      ],
+      [
+        "common",
+        2
       ]
     ]
   },
   {
-    "id": 40,
-    "label": "Teach Poses Components",
-    "nodes": 46,
-    "cohesion": 0.07246376811594203,
+    "id": 58,
+    "label": "Check Setup Components",
+    "nodes": 33,
+    "cohesion": 0.09090909090909091,
     "top_files": [
       [
-        "teach_poses",
-        46
+        "check_setup",
+        26
+      ],
+      [
+        "",
+        4
+      ],
+      [
+        "__main__",
+        3
       ]
     ]
   },
   {
-    "id": 41,
-    "label": "Run Components",
-    "nodes": 45,
-    "cohesion": 0.0797979797979798,
+    "id": 59,
+    "label": "Live Components",
+    "nodes": 32,
+    "cohesion": 0.08064516129032258,
     "top_files": [
       [
-        "run",
-        43
+        "live",
+        29
+      ],
+      [
+        "camera",
+        2
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 60,
+    "label": "Held Recovery Components",
+    "nodes": 31,
+    "cohesion": 0.11182795698924732,
+    "top_files": [
+      [
+        "held_recovery",
+        15
+      ],
+      [
+        "task_contract",
+        6
+      ],
+      [
+        "held_anchor",
+        4
+      ],
+      [
+        "",
+        3
+      ],
+      [
+        "skill_orchestrator",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 61,
+    "label": "MuJoCo Scene Construction",
+    "nodes": 31,
+    "cohesion": 0.09247311827956989,
+    "top_files": [
+      [
+        "scene",
+        27
+      ],
+      [
+        "",
+        4
+      ]
+    ]
+  },
+  {
+    "id": 62,
+    "label": "Catalog Perception Components",
+    "nodes": 31,
+    "cohesion": 0.09247311827956989,
+    "top_files": [
+      [
+        "catalog_perception",
+        22
+      ],
+      [
+        "stack_perception",
+        8
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 63,
+    "label": "Detector Onnx Components",
+    "nodes": 31,
+    "cohesion": 0.11827956989247312,
+    "top_files": [
+      [
+        "detector_onnx",
+        27
+      ],
+      [
+        "",
+        4
+      ]
+    ]
+  },
+  {
+    "id": 64,
+    "label": "Factory Components",
+    "nodes": 29,
+    "cohesion": 0.10837438423645321,
+    "top_files": [
+      [
+        "factory",
+        12
+      ],
+      [
+        "l1_new",
+        8
+      ],
+      [
+        "interfaces",
+        4
+      ],
+      [
+        "",
+        3
+      ],
+      [
+        "color_calib",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 65,
+    "label": "Ui Components",
+    "nodes": 28,
+    "cohesion": 0.0873015873015873,
+    "top_files": [
+      [
+        "ui",
+        24
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "run_task",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 66,
+    "label": "Calib Points Components",
+    "nodes": 28,
+    "cohesion": 0.09523809523809523,
+    "top_files": [
+      [
+        "calib_points",
+        27
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 67,
+    "label": "Calib Points Components",
+    "nodes": 28,
+    "cohesion": 0.09788359788359788,
+    "top_files": [
+      [
+        "calib_points",
+        26
+      ],
+      [
+        "onsite",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 68,
+    "label": "Calib Points Components",
+    "nodes": 28,
+    "cohesion": 0.1111111111111111,
+    "top_files": [
+      [
+        "calib_points",
+        26
+      ],
+      [
+        "onsite",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 69,
+    "label": "MuJoCo Physics Engine",
+    "nodes": 27,
+    "cohesion": 0.08831908831908832,
+    "top_files": [
+      [
+        "engine",
+        25
       ],
       [
         "",
@@ -972,18 +1572,110 @@
     ]
   },
   {
-    "id": 42,
-    "label": "Held Recovery Components",
-    "nodes": 44,
-    "cohesion": 0.08879492600422834,
+    "id": 70,
+    "label": "Features Components",
+    "nodes": 26,
+    "cohesion": 0.13230769230769232,
     "top_files": [
       [
-        "held_recovery",
-        15
+        "features",
+        16
       ],
       [
+        "classify_knn",
+        4
+      ],
+      [
+        "color_calib",
+        4
+      ],
+      [
+        "",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 71,
+    "label": "Views Components",
+    "nodes": 26,
+    "cohesion": 0.11384615384615385,
+    "top_files": [
+      [
+        "views",
+        24
+      ],
+      [
+        "",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 72,
+    "label": "Coordinate Transform Utilities",
+    "nodes": 26,
+    "cohesion": 0.11076923076923077,
+    "top_files": [
+      [
+        "transforms",
+        20
+      ],
+      [
+        "handeye",
+        4
+      ],
+      [
+        "live",
+        1
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 73,
+    "label": "Operator Components",
+    "nodes": 25,
+    "cohesion": 0.12666666666666668,
+    "top_files": [
+      [
+        "operator",
+        25
+      ]
+    ]
+  },
+  {
+    "id": 74,
+    "label": "View Components",
+    "nodes": 25,
+    "cohesion": 0.11,
+    "top_files": [
+      [
+        "view",
+        22
+      ],
+      [
+        "onsite",
+        2
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 75,
+    "label": "Sequential Batch Planning",
+    "nodes": 24,
+    "cohesion": 0.11956521739130435,
+    "top_files": [
+      [
         "batch",
-        10
+        9
       ],
       [
         "",
@@ -1000,555 +1692,7 @@
     ]
   },
   {
-    "id": 43,
-    "label": "MuJoCo Scene Construction",
-    "nodes": 44,
-    "cohesion": 0.10782241014799154,
-    "top_files": [
-      [
-        "scene",
-        39
-      ],
-      [
-        "",
-        5
-      ]
-    ]
-  },
-  {
-    "id": 44,
-    "label": "Make Dataset Components",
-    "nodes": 44,
-    "cohesion": 0.08562367864693446,
-    "top_files": [
-      [
-        "make_dataset",
-        38
-      ],
-      [
-        "",
-        6
-      ]
-    ]
-  },
-  {
-    "id": 45,
-    "label": "Obstacle Recovery Components",
-    "nodes": 44,
-    "cohesion": 0.08456659619450317,
-    "top_files": [
-      [
-        "obstacle_recovery",
-        19
-      ],
-      [
-        "runner",
-        15
-      ],
-      [
-        "grasp",
-        8
-      ],
-      [
-        "reach",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 46,
-    "label": "Validated Skill Execution",
-    "nodes": 44,
-    "cohesion": 0.11945031712473574,
-    "top_files": [
-      [
-        "skill_execution",
-        41
-      ],
-      [
-        "simulation",
-        2
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 47,
-    "label": "Sim Camera Components",
-    "nodes": 44,
-    "cohesion": 0.06025369978858351,
-    "top_files": [
-      [
-        "sim_camera",
-        16
-      ],
-      [
-        "file_camera",
-        11
-      ],
-      [
-        "factory",
-        6
-      ],
-      [
-        "interfaces",
-        6
-      ],
-      [
-        "",
-        5
-      ]
-    ]
-  },
-  {
-    "id": 48,
-    "label": "Render Components",
-    "nodes": 43,
-    "cohesion": 0.10741971207087486,
-    "top_files": [
-      [
-        "render",
-        33
-      ],
-      [
-        "world",
-        4
-      ],
-      [
-        "",
-        3
-      ],
-      [
-        "scenarios",
-        2
-      ],
-      [
-        "transforms",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 49,
-    "label": "Run Task Components",
-    "nodes": 43,
-    "cohesion": 0.10520487264673312,
-    "top_files": [
-      [
-        "run_task",
-        38
-      ],
-      [
-        "",
-        5
-      ]
-    ]
-  },
-  {
-    "id": 50,
-    "label": "Logger Components",
-    "nodes": 42,
-    "cohesion": 0.08246225319396051,
-    "top_files": [
-      [
-        "logger",
-        31
-      ],
-      [
-        "simulation",
-        7
-      ],
-      [
-        "",
-        4
-      ]
-    ]
-  },
-  {
-    "id": 51,
-    "label": "Selfcheck Components",
-    "nodes": 42,
-    "cohesion": 0.0975609756097561,
-    "top_files": [
-      [
-        "selfcheck",
-        42
-      ]
-    ]
-  },
-  {
-    "id": 52,
-    "label": "Legacy Task Runner",
-    "nodes": 39,
-    "cohesion": 0.08502024291497975,
-    "top_files": [
-      [
-        "runner",
-        25
-      ],
-      [
-        "polygon_collision",
-        7
-      ],
-      [
-        "geometry",
-        4
-      ],
-      [
-        "",
-        1
-      ],
-      [
-        "simulation",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 53,
-    "label": "Pyagxarm Arm Components",
-    "nodes": 38,
-    "cohesion": 0.08677098150782361,
-    "top_files": [
-      [
-        "pyagxarm_arm",
-        35
-      ],
-      [
-        "live",
-        2
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 54,
-    "label": "Detector Onnx Components",
-    "nodes": 37,
-    "cohesion": 0.10960960960960961,
-    "top_files": [
-      [
-        "detector_onnx",
-        32
-      ],
-      [
-        "",
-        5
-      ]
-    ]
-  },
-  {
-    "id": 55,
-    "label": "Calib Points Components",
-    "nodes": 37,
-    "cohesion": 0.06156156156156156,
-    "top_files": [
-      [
-        "calib_points",
-        12
-      ],
-      [
-        "onsite",
-        10
-      ],
-      [
-        "teach_poses",
-        5
-      ],
-      [
-        "ui",
-        4
-      ],
-      [
-        "",
-        3
-      ]
-    ]
-  },
-  {
-    "id": 56,
-    "label": "Kinematics Components",
-    "nodes": 36,
-    "cohesion": 0.12063492063492064,
-    "top_files": [
-      [
-        "kinematics",
-        35
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 57,
-    "label": "Table Components",
-    "nodes": 35,
-    "cohesion": 0.10252100840336134,
-    "top_files": [
-      [
-        "table",
-        17
-      ],
-      [
-        "types",
-        4
-      ],
-      [
-        "geometry",
-        4
-      ],
-      [
-        "pipeline",
-        4
-      ],
-      [
-        "l1_new",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 58,
-    "label": "Coordinate Transform Utilities",
-    "nodes": 34,
-    "cohesion": 0.11051693404634581,
-    "top_files": [
-      [
-        "transforms",
-        28
-      ],
-      [
-        "scenarios",
-        5
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 59,
-    "label": "Composable Skill Orchestration",
-    "nodes": 33,
-    "cohesion": 0.14393939393939395,
-    "top_files": [
-      [
-        "skill_orchestrator",
-        32
-      ],
-      [
-        "skill_execution",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 60,
-    "label": "Extrinsics Components",
-    "nodes": 31,
-    "cohesion": 0.12473118279569892,
-    "top_files": [
-      [
-        "extrinsics",
-        28
-      ],
-      [
-        "",
-        3
-      ]
-    ]
-  },
-  {
-    "id": 61,
-    "label": "Onsite Components",
-    "nodes": 31,
-    "cohesion": 0.08172043010752689,
-    "top_files": [
-      [
-        "onsite",
-        20
-      ],
-      [
-        "pyagxarm_arm",
-        4
-      ],
-      [
-        "check_setup",
-        3
-      ],
-      [
-        "safety",
-        2
-      ],
-      [
-        "run_task",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 62,
-    "label": "Motion Ctl Components",
-    "nodes": 31,
-    "cohesion": 0.16129032258064516,
-    "top_files": [
-      [
-        "motion_ctl",
-        28
-      ],
-      [
-        "run_task",
-        3
-      ]
-    ]
-  },
-  {
-    "id": 63,
-    "label": "Ros Camera Components",
-    "nodes": 30,
-    "cohesion": 0.10574712643678161,
-    "top_files": [
-      [
-        "ros_camera",
-        27
-      ],
-      [
-        "interfaces",
-        2
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 64,
-    "label": "Config Components",
-    "nodes": 28,
-    "cohesion": 0.13756613756613756,
-    "top_files": [
-      [
-        "config",
-        17
-      ],
-      [
-        "teach",
-        4
-      ],
-      [
-        "",
-        3
-      ],
-      [
-        "run",
-        2
-      ],
-      [
-        "physics",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 65,
-    "label": "MuJoCo Physics Engine",
-    "nodes": 27,
-    "cohesion": 0.08831908831908832,
-    "top_files": [
-      [
-        "engine",
-        25
-      ],
-      [
-        "",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 66,
-    "label": "Catalog Perception Components",
-    "nodes": 26,
-    "cohesion": 0.09230769230769231,
-    "top_files": [
-      [
-        "catalog_perception",
-        15
-      ],
-      [
-        "classify_color",
-        9
-      ],
-      [
-        "",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 67,
-    "label": "Camera Configuration Geometry",
-    "nodes": 26,
-    "cohesion": 0.1076923076923077,
-    "top_files": [
-      [
-        "camera",
-        23
-      ],
-      [
-        "run",
-        2
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 68,
-    "label": "Video Components",
-    "nodes": 25,
-    "cohesion": 0.12,
-    "top_files": [
-      [
-        "video",
-        21
-      ],
-      [
-        "run",
-        3
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 69,
-    "label": "Operator Components",
-    "nodes": 25,
-    "cohesion": 0.12666666666666668,
-    "top_files": [
-      [
-        "operator",
-        25
-      ]
-    ]
-  },
-  {
-    "id": 70,
+    "id": 76,
     "label": "Skill Protocol Components",
     "nodes": 24,
     "cohesion": 0.21014492753623187,
@@ -1564,50 +1708,58 @@
     ]
   },
   {
-    "id": 71,
-    "label": "Interactive Physics Session",
+    "id": 77,
+    "label": "Logger Components",
     "nodes": 24,
-    "cohesion": 0.12318840579710146,
+    "cohesion": 0.11594202898550725,
     "top_files": [
       [
-        "physics",
-        19
+        "logger",
+        17
       ],
       [
         "simulation",
-        5
+        6
+      ],
+      [
+        "",
+        1
       ]
     ]
   },
   {
-    "id": 72,
-    "label": "Ros Camera Components",
+    "id": 78,
+    "label": "Camera Configuration Geometry",
     "nodes": 24,
-    "cohesion": 0.15217391304347827,
+    "cohesion": 0.10869565217391304,
     "top_files": [
       [
-        "ros_camera",
-        20
+        "camera",
+        23
       ],
       [
         "",
-        2
+        1
+      ]
+    ]
+  },
+  {
+    "id": 79,
+    "label": "Table Components",
+    "nodes": 23,
+    "cohesion": 0.14624505928853754,
+    "top_files": [
+      [
+        "table",
+        17
       ],
       [
         "types",
         2
-      ]
-    ]
-  },
-  {
-    "id": 73,
-    "label": "MuJoCo Scene Construction",
-    "nodes": 24,
-    "cohesion": 0.10144927536231885,
-    "top_files": [
+      ],
       [
-        "scene",
-        22
+        "geometry",
+        2
       ],
       [
         "",
@@ -1616,37 +1768,49 @@
     ]
   },
   {
-    "id": 74,
-    "label": "Reach Components",
+    "id": 80,
+    "label": "Run Components",
     "nodes": 23,
-    "cohesion": 0.16205533596837945,
+    "cohesion": 0.12648221343873517,
     "top_files": [
       [
-        "reach",
-        17
-      ],
-      [
-        "zones",
-        4
+        "run",
+        22
       ],
       [
         "",
         1
+      ]
+    ]
+  },
+  {
+    "id": 81,
+    "label": "Selection Components",
+    "nodes": 23,
+    "cohesion": 0.1422924901185771,
+    "top_files": [
+      [
+        "selection",
+        13
       ],
       [
         "runner",
+        9
+      ],
+      [
+        "",
         1
       ]
     ]
   },
   {
-    "id": 75,
-    "label": "Ui Components",
+    "id": 82,
+    "label": "Calib Points Components",
     "nodes": 23,
-    "cohesion": 0.1067193675889328,
+    "cohesion": 0.11067193675889328,
     "top_files": [
       [
-        "ui",
+        "calib_points",
         22
       ],
       [
@@ -1656,27 +1820,23 @@
     ]
   },
   {
-    "id": 76,
-    "label": "Spherical Anchor Components",
-    "nodes": 22,
-    "cohesion": 0.1341991341991342,
+    "id": 83,
+    "label": "Calib Points Components",
+    "nodes": 23,
+    "cohesion": 0.11067193675889328,
     "top_files": [
       [
-        "spherical_anchor",
-        11
+        "calib_points",
+        22
       ],
       [
-        "held_anchor",
-        9
-      ],
-      [
-        "simulation",
-        2
+        "",
+        1
       ]
     ]
   },
   {
-    "id": 77,
+    "id": 84,
     "label": "Browser Scene Editor",
     "nodes": 22,
     "cohesion": 0.2510822510822511,
@@ -1688,51 +1848,103 @@
     ]
   },
   {
-    "id": 78,
-    "label": "Detector Onnx Components",
+    "id": 85,
+    "label": "Recorder Components",
+    "nodes": 22,
+    "cohesion": 0.16017316017316016,
+    "top_files": [
+      [
+        "recorder",
+        15
+      ],
+      [
+        "",
+        4
+      ],
+      [
+        "file_camera",
+        2
+      ],
+      [
+        "view",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 86,
+    "label": "Onsite Components",
+    "nodes": 22,
+    "cohesion": 0.10822510822510822,
+    "top_files": [
+      [
+        "onsite",
+        10
+      ],
+      [
+        "ui",
+        4
+      ],
+      [
+        "",
+        3
+      ],
+      [
+        "teach_poses",
+        2
+      ],
+      [
+        "view",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 87,
+    "label": "Calib Points Components",
+    "nodes": 21,
+    "cohesion": 0.11428571428571428,
+    "top_files": [
+      [
+        "calib_points",
+        14
+      ],
+      [
+        "types",
+        6
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 88,
+    "label": "Check Onnx Components",
     "nodes": 21,
     "cohesion": 0.13333333333333333,
     "top_files": [
       [
+        "check_onnx",
+        11
+      ],
+      [
         "detector_onnx",
-        18
+        4
       ],
       [
         "",
+        3
+      ],
+      [
+        "make_dataset",
         3
       ]
     ]
   },
   {
-    "id": 79,
-    "label": "Catalog Perception Components",
-    "nodes": 21,
-    "cohesion": 0.12380952380952381,
-    "top_files": [
-      [
-        "catalog_perception",
-        8
-      ],
-      [
-        "scenarios",
-        6
-      ],
-      [
-        "calib_points",
-        5
-      ],
-      [
-        "",
-        1
-      ],
-      [
-        "types",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 80,
+    "id": 89,
     "label": "Moveit Bridge Components",
     "nodes": 21,
     "cohesion": 0.11904761904761904,
@@ -1748,83 +1960,43 @@
     ]
   },
   {
-    "id": 81,
-    "label": "Check Setup Components",
-    "nodes": 21,
-    "cohesion": 0.14761904761904762,
+    "id": 90,
+    "label": "Interactive Physics Session",
+    "nodes": 20,
+    "cohesion": 0.1631578947368421,
     "top_files": [
       [
-        "check_setup",
-        13
+        "physics",
+        19
       ],
       [
-        "selfcheck",
-        6
-      ],
-      [
-        "",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 82,
-    "label": "Color Calib Components",
-    "nodes": 21,
-    "cohesion": 0.1380952380952381,
-    "top_files": [
-      [
-        "color_calib",
-        20
-      ],
-      [
-        "",
+        "simulation",
         1
       ]
     ]
   },
   {
-    "id": 83,
-    "label": "Color Calib Components",
-    "nodes": 21,
-    "cohesion": 0.13333333333333333,
+    "id": 91,
+    "label": "Sim Camera Components",
+    "nodes": 20,
+    "cohesion": 0.11578947368421053,
     "top_files": [
       [
-        "color_calib",
-        21
-      ]
-    ]
-  },
-  {
-    "id": 84,
-    "label": "Color Calib Components",
-    "nodes": 21,
-    "cohesion": 0.11904761904761904,
-    "top_files": [
-      [
-        "color_calib",
-        21
-      ]
-    ]
-  },
-  {
-    "id": 85,
-    "label": "Teach Record Components",
-    "nodes": 21,
-    "cohesion": 0.1523809523809524,
-    "top_files": [
-      [
-        "teach_record",
-        19
+        "sim_camera",
+        15
       ],
       [
-        "teach_classes",
+        "",
+        3
+      ],
+      [
+        "factory",
         2
       ]
     ]
   },
   {
-    "id": 86,
+    "id": 92,
     "label": "Video Components",
     "nodes": 20,
     "cohesion": 0.14736842105263157,
@@ -1840,7 +2012,39 @@
     ]
   },
   {
-    "id": 87,
+    "id": 93,
+    "label": "Live Components",
+    "nodes": 20,
+    "cohesion": 0.14210526315789473,
+    "top_files": [
+      [
+        "live",
+        19
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 94,
+    "label": "Detector Onnx Components",
+    "nodes": 19,
+    "cohesion": 0.14035087719298245,
+    "top_files": [
+      [
+        "detector_onnx",
+        16
+      ],
+      [
+        "",
+        3
+      ]
+    ]
+  },
+  {
+    "id": 95,
     "label": "Catalog Components",
     "nodes": 18,
     "cohesion": 0.17647058823529413,
@@ -1860,33 +2064,69 @@
     ]
   },
   {
-    "id": 88,
+    "id": 96,
+    "label": "Logger Components",
+    "nodes": 18,
+    "cohesion": 0.16993464052287582,
+    "top_files": [
+      [
+        "logger",
+        15
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "simulation",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 97,
+    "label": "Video Components",
+    "nodes": 18,
+    "cohesion": 0.1830065359477124,
+    "top_files": [
+      [
+        "video",
+        17
+      ],
+      [
+        "",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 98,
     "label": "Observations Components",
     "nodes": 17,
-    "cohesion": 0.18382352941176472,
+    "cohesion": 0.19852941176470587,
     "top_files": [
       [
         "observations",
         13
       ],
       [
-        "active_observation",
+        "geometry",
         2
       ],
       [
-        "geometry",
+        "views",
         2
       ]
     ]
   },
   {
-    "id": 89,
-    "label": "Extrinsics Components",
+    "id": 99,
+    "label": "Run Components",
     "nodes": 17,
-    "cohesion": 0.22794117647058823,
+    "cohesion": 0.16176470588235295,
     "top_files": [
       [
-        "extrinsics",
+        "run",
         16
       ],
       [
@@ -1896,119 +2136,111 @@
     ]
   },
   {
-    "id": 90,
-    "label": "Check Onnx Components",
+    "id": 100,
+    "label": "Color Calib Components",
     "nodes": 17,
-    "cohesion": 0.15441176470588236,
+    "cohesion": 0.14705882352941177,
     "top_files": [
       [
-        "check_onnx",
-        11
-      ],
-      [
-        "",
-        3
-      ],
-      [
-        "detector_onnx",
-        2
-      ],
-      [
-        "make_dataset",
-        1
+        "color_calib",
+        17
       ]
     ]
   },
   {
-    "id": 91,
-    "label": "Clock Components",
-    "nodes": 16,
-    "cohesion": 0.15,
-    "top_files": [
-      [
-        "clock",
-        8
-      ],
-      [
-        "simulation",
-        4
-      ],
-      [
-        "run",
-        4
-      ]
-    ]
-  },
-  {
-    "id": 92,
-    "label": "Onsite Components",
-    "nodes": 16,
-    "cohesion": 0.14166666666666666,
-    "top_files": [
-      [
-        "onsite",
-        10
-      ],
-      [
-        "capture",
-        3
-      ],
-      [
-        "teach_classes",
-        2
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 93,
-    "label": "Motion Ctl Components",
-    "nodes": 15,
-    "cohesion": 0.14285714285714285,
-    "top_files": [
-      [
-        "motion_ctl",
-        9
-      ],
-      [
-        "config",
-        4
-      ],
-      [
-        "",
-        1
-      ],
-      [
-        "run_task",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 94,
+    "id": 101,
     "label": "Visualize Components",
-    "nodes": 14,
-    "cohesion": 0.27472527472527475,
+    "nodes": 16,
+    "cohesion": 0.23333333333333334,
     "top_files": [
       [
         "visualize",
         9
       ],
       [
-        "",
-        3
+        "geometry",
+        4
       ],
       [
-        "geometry",
+        "",
+        3
+      ]
+    ]
+  },
+  {
+    "id": 102,
+    "label": "Standalone Cube Detection",
+    "nodes": 16,
+    "cohesion": 0.15,
+    "top_files": [
+      [
+        "l1",
+        12
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "l1_new",
+        1
+      ],
+      [
+        "cli",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 103,
+    "label": "Detector Onnx Components",
+    "nodes": 14,
+    "cohesion": 0.24175824175824176,
+    "top_files": [
+      [
+        "detector_onnx",
+        12
+      ],
+      [
+        "",
         2
       ]
     ]
   },
   {
-    "id": 95,
+    "id": 104,
+    "label": "Classify Color Components",
+    "nodes": 14,
+    "cohesion": 0.1978021978021978,
+    "top_files": [
+      [
+        "classify_color",
+        11
+      ],
+      [
+        "",
+        2
+      ],
+      [
+        "catalog_perception",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 105,
+    "label": "Calib Points Components",
+    "nodes": 14,
+    "cohesion": 0.18681318681318682,
+    "top_files": [
+      [
+        "calib_points",
+        14
+      ]
+    ]
+  },
+  {
+    "id": 106,
     "label": "Check Setup Components",
     "nodes": 14,
     "cohesion": 0.2087912087912088,
@@ -2020,23 +2252,7 @@
     ]
   },
   {
-    "id": 96,
-    "label": "Features Components",
-    "nodes": 13,
-    "cohesion": 0.23076923076923078,
-    "top_files": [
-      [
-        "features",
-        12
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 97,
+    "id": 107,
     "label": "MuJoCo Scene Construction",
     "nodes": 13,
     "cohesion": 0.16666666666666666,
@@ -2060,51 +2276,67 @@
     ]
   },
   {
-    "id": 98,
-    "label": "Color Calib Components",
-    "nodes": 13,
-    "cohesion": 0.15384615384615385,
+    "id": 108,
+    "label": "File Camera Components",
+    "nodes": 12,
+    "cohesion": 0.19696969696969696,
     "top_files": [
       [
-        "color_calib",
-        13
+        "file_camera",
+        11
+      ],
+      [
+        "",
+        1
       ]
     ]
   },
   {
-    "id": 99,
-    "label": "Color Calib Components",
+    "id": 109,
+    "label": "MuJoCo Scene Construction",
     "nodes": 12,
-    "cohesion": 0.22727272727272727,
+    "cohesion": 0.18181818181818182,
     "top_files": [
       [
-        "color_calib",
+        "scene",
+        10
+      ],
+      [
+        "world",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 110,
+    "label": "Calib Points Components",
+    "nodes": 12,
+    "cohesion": 0.21212121212121213,
+    "top_files": [
+      [
+        "calib_points",
         12
       ]
     ]
   },
   {
-    "id": 100,
+    "id": 111,
     "label": "Check Setup Components",
-    "nodes": 11,
-    "cohesion": 0.2,
+    "nodes": 12,
+    "cohesion": 0.19696969696969696,
     "top_files": [
       [
         "check_setup",
-        5
+        10
       ],
       [
         "",
-        3
-      ],
-      [
-        "__main__",
-        3
+        2
       ]
     ]
   },
   {
-    "id": 101,
+    "id": 112,
     "label": "Language Model Planning",
     "nodes": 11,
     "cohesion": 0.23636363636363636,
@@ -2116,30 +2348,22 @@
     ]
   },
   {
-    "id": 102,
-    "label": "L1 New Components",
+    "id": 113,
+    "label": "Selfcheck Components",
     "nodes": 11,
-    "cohesion": 0.2727272727272727,
+    "cohesion": 0.2545454545454545,
     "top_files": [
       [
-        "l1_new",
-        9
+        "selfcheck",
+        6
       ],
       [
-        "",
+        "factory",
         2
-      ]
-    ]
-  },
-  {
-    "id": 103,
-    "label": "Color Calib Components",
-    "nodes": 11,
-    "cohesion": 0.2,
-    "top_files": [
+      ],
       [
-        "color_calib",
-        10
+        "check_setup",
+        2
       ],
       [
         "",
@@ -2148,7 +2372,27 @@
     ]
   },
   {
-    "id": 104,
+    "id": 114,
+    "label": "Grasp Components",
+    "nodes": 10,
+    "cohesion": 0.24444444444444444,
+    "top_files": [
+      [
+        "grasp",
+        7
+      ],
+      [
+        "views",
+        2
+      ],
+      [
+        "runner",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 115,
     "label": "Pyagxarm Arm Components",
     "nodes": 10,
     "cohesion": 0.28888888888888886,
@@ -2160,51 +2404,7 @@
     ]
   },
   {
-    "id": 105,
-    "label": "Color Calib Components",
-    "nodes": 10,
-    "cohesion": 0.2,
-    "top_files": [
-      [
-        "color_calib",
-        10
-      ]
-    ]
-  },
-  {
-    "id": 106,
-    "label": "Motion Ctl Components",
-    "nodes": 10,
-    "cohesion": 0.2,
-    "top_files": [
-      [
-        "motion_ctl",
-        4
-      ],
-      [
-        "run_task",
-        4
-      ],
-      [
-        "",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 107,
-    "label": "Live Components",
-    "nodes": 10,
-    "cohesion": 0.2222222222222222,
-    "top_files": [
-      [
-        "live",
-        10
-      ]
-    ]
-  },
-  {
-    "id": 108,
+    "id": 116,
     "label": "Web Service Routes",
     "nodes": 9,
     "cohesion": 0.3611111111111111,
@@ -2220,7 +2420,23 @@
     ]
   },
   {
-    "id": 109,
+    "id": 117,
+    "label": "Logger Components",
+    "nodes": 9,
+    "cohesion": 0.3333333333333333,
+    "top_files": [
+      [
+        "logger",
+        7
+      ],
+      [
+        "",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 118,
     "label": "Recovery Components",
     "nodes": 9,
     "cohesion": 0.3888888888888889,
@@ -2232,39 +2448,19 @@
     ]
   },
   {
-    "id": 110,
-    "label": "Check Setup Components",
+    "id": 119,
+    "label": "Run Components",
     "nodes": 9,
-    "cohesion": 0.2222222222222222,
+    "cohesion": 0.25,
     "top_files": [
       [
-        "check_setup",
-        8
-      ],
-      [
-        "",
-        1
+        "run",
+        9
       ]
     ]
   },
   {
-    "id": 111,
-    "label": "Detector Onnx Components",
-    "nodes": 8,
-    "cohesion": 0.42857142857142855,
-    "top_files": [
-      [
-        "detector_onnx",
-        7
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 112,
+    "id": 120,
     "label": "Dialogue Context Management",
     "nodes": 8,
     "cohesion": 0.32142857142857145,
@@ -2276,87 +2472,47 @@
     ]
   },
   {
-    "id": 113,
-    "label": "Grasp Components",
+    "id": 121,
+    "label": "Sim Bench Components",
     "nodes": 8,
-    "cohesion": 0.32142857142857145,
+    "cohesion": 0.35714285714285715,
     "top_files": [
       [
-        "grasp",
+        "sim_bench",
         8
       ]
     ]
   },
   {
-    "id": 114,
-    "label": "Run Components",
-    "nodes": 8,
+    "id": 122,
+    "label": "Video Components",
+    "nodes": 7,
     "cohesion": 0.2857142857142857,
     "top_files": [
       [
+        "video",
+        4
+      ],
+      [
         "run",
-        8
+        3
       ]
     ]
   },
   {
-    "id": 115,
-    "label": "Check Setup Components",
-    "nodes": 8,
-    "cohesion": 0.32142857142857145,
-    "top_files": [
-      [
-        "check_setup",
-        7
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 116,
-    "label": "Color Calib Components",
-    "nodes": 8,
-    "cohesion": 0.25,
-    "top_files": [
-      [
-        "color_calib",
-        8
-      ]
-    ]
-  },
-  {
-    "id": 117,
-    "label": "Registration Components",
+    "id": 123,
+    "label": "Teach Poses Components",
     "nodes": 7,
-    "cohesion": 0.38095238095238093,
+    "cohesion": 0.2857142857142857,
     "top_files": [
       [
-        "registration",
-        6
-      ],
-      [
-        "",
-        1
-      ]
-    ]
-  },
-  {
-    "id": 118,
-    "label": "Common Components",
-    "nodes": 7,
-    "cohesion": 0.3333333333333333,
-    "top_files": [
-      [
-        "common",
+        "teach_poses",
         7
       ]
     ]
   },
   {
-    "id": 119,
+    "id": 124,
     "label": "Interfaces Components",
     "nodes": 6,
     "cohesion": 0.3333333333333333,
@@ -2376,25 +2532,13 @@
     ]
   },
   {
-    "id": 120,
-    "label": "Calib Verify Components",
-    "nodes": 6,
-    "cohesion": 0.3333333333333333,
-    "top_files": [
-      [
-        "calib_verify",
-        6
-      ]
-    ]
-  },
-  {
-    "id": 121,
-    "label": "Color Calib Components",
+    "id": 125,
+    "label": "Utils Components",
     "nodes": 5,
-    "cohesion": 0.4,
+    "cohesion": 0.5,
     "top_files": [
       [
-        "color_calib",
+        "utils",
         4
       ],
       [
@@ -2404,35 +2548,39 @@
     ]
   },
   {
-    "id": 122,
-    "label": "Types Components",
+    "id": 126,
+    "label": "Grasp Components",
     "nodes": 5,
     "cohesion": 0.4,
     "top_files": [
+      [
+        "grasp",
+        2
+      ],
+      [
+        "runner",
+        2
+      ],
       [
         "types",
-        4
-      ],
-      [
-        "",
         1
       ]
     ]
   },
   {
-    "id": 123,
-    "label": "MuJoCo Arm Control",
+    "id": 127,
+    "label": "Safety Components",
     "nodes": 5,
-    "cohesion": 0.4,
+    "cohesion": 0.5,
     "top_files": [
       [
-        "arm",
+        "safety",
         5
       ]
     ]
   },
   {
-    "id": 124,
+    "id": 128,
     "label": "Simulation World State",
     "nodes": 5,
     "cohesion": 0.4,
@@ -2444,62 +2592,6 @@
       [
         "scene",
         1
-      ]
-    ]
-  },
-  {
-    "id": 125,
-    "label": "Selfcheck Components",
-    "nodes": 5,
-    "cohesion": 0.4,
-    "top_files": [
-      [
-        "selfcheck",
-        5
-      ]
-    ]
-  },
-  {
-    "id": 126,
-    "label": "Extrinsics Components",
-    "nodes": 4,
-    "cohesion": 0.5,
-    "top_files": [
-      [
-        "extrinsics",
-        4
-      ]
-    ]
-  },
-  {
-    "id": 127,
-    "label": "Interfaces Components",
-    "nodes": 4,
-    "cohesion": 0.5,
-    "top_files": [
-      [
-        "interfaces",
-        2
-      ],
-      [
-        "safety",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 128,
-    "label": "Interfaces Components",
-    "nodes": 4,
-    "cohesion": 0.5,
-    "top_files": [
-      [
-        "interfaces",
-        2
-      ],
-      [
-        "safety",
-        2
       ]
     ]
   },
@@ -2537,6 +2629,70 @@
   },
   {
     "id": 131,
+    "label": "Interfaces Components",
+    "nodes": 4,
+    "cohesion": 0.5,
+    "top_files": [
+      [
+        "interfaces",
+        2
+      ],
+      [
+        "safety",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 132,
+    "label": "Interfaces Components",
+    "nodes": 4,
+    "cohesion": 0.5,
+    "top_files": [
+      [
+        "interfaces",
+        2
+      ],
+      [
+        "safety",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 133,
+    "label": "Interfaces Components",
+    "nodes": 4,
+    "cohesion": 0.5,
+    "top_files": [
+      [
+        "interfaces",
+        2
+      ],
+      [
+        "safety",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 134,
+    "label": "Interfaces Components",
+    "nodes": 4,
+    "cohesion": 0.5,
+    "top_files": [
+      [
+        "interfaces",
+        2
+      ],
+      [
+        "safety",
+        2
+      ]
+    ]
+  },
+  {
+    "id": 135,
     "label": "MuJoCo Arm Control",
     "nodes": 4,
     "cohesion": 0.5,
@@ -2548,61 +2704,17 @@
     ]
   },
   {
-    "id": 132,
-    "label": "MuJoCo Scene Construction",
-    "nodes": 4,
-    "cohesion": 0.5,
-    "top_files": [
-      [
-        "scene",
-        4
-      ]
-    ]
-  },
-  {
-    "id": 133,
-    "label": "Color Calib Components",
-    "nodes": 4,
-    "cohesion": 0.5,
-    "top_files": [
-      [
-        "color_calib",
-        4
-      ]
-    ]
-  },
-  {
-    "id": 134,
-    "label": "  Init   Components",
-    "nodes": 2,
-    "cohesion": 1.0,
-    "top_files": [
-      [
-        "__init__",
-        2
-      ]
-    ]
-  },
-  {
-    "id": 135,
-    "label": "  Init   Components",
-    "nodes": 2,
-    "cohesion": 1.0,
-    "top_files": [
-      [
-        "__init__",
-        2
-      ]
-    ]
-  },
-  {
     "id": 136,
-    "label": "  Init   Components",
-    "nodes": 1,
-    "cohesion": 1.0,
+    "label": "View Components",
+    "nodes": 3,
+    "cohesion": 0.6666666666666666,
     "top_files": [
       [
-        "__init__",
+        "view",
+        2
+      ],
+      [
+        "",
         1
       ]
     ]
@@ -2610,24 +2722,24 @@
   {
     "id": 137,
     "label": "  Init   Components",
-    "nodes": 1,
+    "nodes": 2,
     "cohesion": 1.0,
     "top_files": [
       [
         "__init__",
-        1
+        2
       ]
     ]
   },
   {
     "id": 138,
     "label": "  Init   Components",
-    "nodes": 1,
+    "nodes": 2,
     "cohesion": 1.0,
     "top_files": [
       [
         "__init__",
-        1
+        2
       ]
     ]
   },
@@ -2693,6 +2805,42 @@
   },
   {
     "id": 144,
+    "label": "  Init   Components",
+    "nodes": 1,
+    "cohesion": 1.0,
+    "top_files": [
+      [
+        "__init__",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 145,
+    "label": "  Init   Components",
+    "nodes": 1,
+    "cohesion": 1.0,
+    "top_files": [
+      [
+        "__init__",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 146,
+    "label": "  Init   Components",
+    "nodes": 1,
+    "cohesion": 1.0,
+    "top_files": [
+      [
+        "__init__",
+        1
+      ]
+    ]
+  },
+  {
+    "id": 147,
     "label": "  Init   Components",
     "nodes": 1,
     "cohesion": 1.0,

@@ -114,10 +114,10 @@
     "semantic_hash": "17cee1cc5d3a42ea394d6b676c89a81e"
   },
   "ws/src/cube_task/cube_task/assistant/simulation.py": {
-    "mtime": 1795259159.3630335,
-    "seen": 1795259757.3823981,
-    "ast_hash": "20169661e58e38b1c51ea5ba08b5c378",
-    "semantic_hash": "20169661e58e38b1c51ea5ba08b5c378"
+    "mtime": 1795262559.1658864,
+    "seen": 1795263823.2127647,
+    "ast_hash": "c033d9a6b91c5cba9d79229f61bcf432",
+    "semantic_hash": "c033d9a6b91c5cba9d79229f61bcf432"
   },
   "ws/src/cube_task/cube_task/assistant/skill_execution.py": {
     "mtime": 1795193861.7177122,
@@ -126,16 +126,16 @@
     "semantic_hash": "b0b0c0d08bcef9b0046e717c3234fad7"
   },
   "ws/src/cube_task/cube_task/assistant/skill_orchestrator.py": {
-    "mtime": 1795232820.985448,
-    "seen": 1795236841.0745907,
-    "ast_hash": "8bcba1d2fbd5c658f0de0f2e22e50143",
-    "semantic_hash": "8bcba1d2fbd5c658f0de0f2e22e50143"
+    "mtime": 1795263358.265795,
+    "seen": 1795263823.2127647,
+    "ast_hash": "604435c138de149c158ff870da596555",
+    "semantic_hash": "604435c138de149c158ff870da596555"
   },
   "ws/src/cube_task/cube_task/assistant/skill_protocol.py": {
-    "mtime": 1795193566.7591717,
-    "seen": 1795230886.465848,
-    "ast_hash": "589606398cc42640526fc50195b0cabb",
-    "semantic_hash": "589606398cc42640526fc50195b0cabb"
+    "mtime": 1795262670.6694782,
+    "seen": 1795263823.2127647,
+    "ast_hash": "d06b98cff38cedcdc79e3a570d6ea07c",
+    "semantic_hash": "d06b98cff38cedcdc79e3a570d6ea07c"
   },
   "ws/src/cube_task/cube_task/assistant/stack_perception.py": {
     "mtime": 1795010670.2903416,
@@ -730,5 +730,11 @@
     "seen": 1795259757.3823981,
     "ast_hash": "ea4248fd7a514bc7c5d546b914c57ced",
     "semantic_hash": "ea4248fd7a514bc7c5d546b914c57ced"
+  },
+  "ws/src/cube_task/cube_task/assistant/task_contract.py": {
+    "mtime": 1795262711.5978067,
+    "seen": 1795263823.2127647,
+    "ast_hash": "a3127380fa202700131dc5df5e703d6b",
+    "semantic_hash": "a3127380fa202700131dc5df5e703d6b"
   }
 }

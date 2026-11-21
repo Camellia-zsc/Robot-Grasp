@@ -43,6 +43,7 @@
     "ws/src/cube_task/cube_task/assistant/stacking.py",
     "ws/src/cube_task/cube_task/assistant/static/app.js",
     "ws/src/cube_task/cube_task/assistant/static/editor.js",
+    "ws/src/cube_task/cube_task/assistant/task_contract.py",
     "ws/src/cube_task/cube_task/camera/__init__.py",
     "ws/src/cube_task/cube_task/camera/factory.py",
     "ws/src/cube_task/cube_task/camera/file_camera.py",

@@ -1912,7 +1912,10 @@ class SimulationSession:
         camera_success = camera_success and (getattr(self, '_observation_revision', -1) ==
                                               getattr(self, '_environment_revision', -2))
         summary['camera_verified'] = camera_success
-        summary['ok'] = summary['controller_ok'] and truth_success and camera_success
+        # Release success can survive a later retreat failure. Public success
+        # must still stop legacy callers before they dispatch another action.
+        summary['ok'] = bool(summary['controller_ok'] and truth_success and camera_success
+                             and not summary.get('fault') and not summary['aborted'])
         if summary['controller_ok'] and not truth_success:
             summary['error'] = ('pear_not_upright' if resting is not None and
                 not resting['posture_ok'] else 'stack_unstable_or_fallen' if destination is not None and
@@ -1923,6 +1926,8 @@ class SimulationSession:
         if summary['aborted']:
             summary['message'] = ('任务已停止，夹爪保持夹持，机械臂保持当前位置'
                                   if summary['holding'] else '任务已停止，机械臂保持当前位置')
+        elif summary.get('fault'):
+            summary['message'] = '机械臂执行异常，已停止后续动作并保留现场'
         elif summary['ok']:
             zone_label = self.runner.zones[zone_name].label if destination is None else ''
             names = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块',

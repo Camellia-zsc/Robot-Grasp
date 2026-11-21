@@ -1841,6 +1841,59 @@ class SimulationSession:
                                       if d.label not in {item.label for item in fresh}]
             if not any(d.label == base.label for d in neighbors):
                 neighbors.append(base)  # Conservative obstacle only, never fresh evidence.
+            # A broad belly can hide the lower object's whole top from nearby
+            # high views. Aim a lower, genuinely different side view at the
+            # measured support, rather than repeatedly circling a cropped
+            # upper-body centroid. Catalogue dimensions bound framing only;
+            # fresh RGB-D must still establish the actual support relation.
+            wide = (max(float(upper.length or 0.), float(upper.width or 0.)) >
+                    1.4 * max(float(base.length or 0.), float(base.width or 0.)))
+            nearby = np.linalg.norm(upper.center_base[:2]-base.center_base[:2]) < .10
+            if wide and nearby:
+                from .catalog import catalog_entries
+                from .destinations import footprint_corners
+                from ..perception.geometry import project_points
+                entry = next((item for item in catalog_entries()
+                              if item['label'] == upper.label), None)
+                if entry is not None:
+                    length, width, height = map(float, entry['dimensions'])
+                    low_gaze = np.r_[base.center_base[:2],
+                                     float(base.top_z)+min(.06, height/2)]
+                    low_radial = low_gaze[:2]/max(float(np.linalg.norm(low_gaze[:2])), 1e-6)
+                    top = max(float(upper.top_z), float(base.top_z)+height)
+                    points = []
+                    for center in (upper.center_base[:2], base.center_base[:2]):
+                        corners = footprint_corners(center, max(length, float(upper.length)),
+                                                    max(width, float(upper.width)),
+                                                    float(upper.yaw or 0.))
+                        points.extend(np.column_stack([corners, np.full(4, z)])
+                                      for z in (float(base.top_z), top))
+                    corners = footprint_corners(base.center_base[:2], float(base.length),
+                                                float(base.width), float(base.yaw or 0.))
+                    points.append(np.column_stack([corners, np.full(4, float(base.top_z))]))
+                    intr = self.camera.intrinsics()
+                    for angle in (-45., 45., -65., 65.):
+                        if (self.cancel_event.is_set() or self._interventions
+                                or revision != self._environment_revision):
+                            return None
+                        c, s = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+                        direction = np.array([[c, -s], [s, c]]) @ low_radial
+                        eye = np.r_[low_gaze[:2]-.16*direction, low_gaze[2]+.12]
+                        q, _ep, _er = self.arm.kin.ik(look_at(eye, low_gaze) @ inv_T(T_fc),
+                            q_seed=self.arm.get_joints().value, cancelled=self.cancel_event.is_set)
+                        if (q is None or any(np.max(np.abs(q-old)) < .03 for old in attempted)
+                                or not self.arm.kin.within_limits(q)):
+                            continue
+                        uv = project_points(np.vstack(points), self.arm.kin.fk(q) @ T_fc, intr)
+                        if (not np.all(np.isfinite(uv)) or np.any(uv[:, 0] < 8)
+                                or np.any(uv[:, 0] > intr.width-9) or np.any(uv[:, 1] < 8)
+                                or np.any(uv[:, 1] > intr.height-9)
+                                or not self._safe_observation_joints(q, neighbors)):
+                            continue
+                        if (self.cancel_event.is_set() or self._interventions
+                                or revision != self._environment_revision):
+                            return None
+                        return self._remember_stack_view(q)
             # After one extra optical view, try another viewing direction
             # before spending the remaining budget on nearly identical IK poses.
             if len(attempted) > 2:

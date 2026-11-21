@@ -1507,6 +1507,21 @@ class PlacePlanner:
                     required_angles += [required + math.pi / 2, required - math.pi / 2, required + math.pi]
                 angles = [(closing + axis_offset if held.get('elongated') else None, closing)
                           for closing in required_angles]
+            else:
+                # Parallel jaws share an axis after a half turn, but a leaned
+                # wrist has two distinct full poses. Their source-to-release
+                # body rotations can have very different support clearance.
+                complete = []
+                for axis, closing in angles:
+                    for turn in (0.0, math.pi):
+                        full = wrap_pi(closing + turn)
+                        if any(abs(wrap_pi(full - old[1])) < 1e-8 for old in complete):
+                            continue
+                        complete.append((None if axis is None else axis + turn, full))
+                source_closing = held.get('grasp_closing')
+                if source_closing is not None and _finite(source_closing):
+                    complete.sort(key=lambda value: abs(wrap_pi(value[1] - float(source_closing))))
+                angles = complete
             for axis, closing in angles:
                 if cancelled is not None and cancelled():
                     return None

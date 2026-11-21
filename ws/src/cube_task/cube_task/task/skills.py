@@ -57,6 +57,8 @@ RELEASE_FULL_OPEN_TOL = 0.002
 #: Opening feedback is quantized to micrometres. The planner reserves this
 #: same tiny allowance above the body-clearance requirement for checked exits.
 RELEASE_OPEN_QUANTIZATION_TOL = 0.000002
+# Let gravity/contact settle a released stack before any finger or palm exit.
+STACK_RELEASE_SETTLE_S = 1.2
 #: detail text of a gripper 'fault' whose opening stopped short (robot/pyagxarm_arm.py).
 OPENING_SHORT = 'opening stopped'
 #: AGX gripper force range (N); a configured force above it is clamped.
@@ -171,6 +173,12 @@ class PickPlaceSkill:
         # Optional final visual holding check. It may refuse opening, but a
         # successful callback never replaces actual TCP/settling feedback.
         self.before_open = None
+        # Optional carried-reference confirmation after lifting, before the
+        # first transfer. Held continuations own their separate route hook.
+        self.before_carry = None
+        # A complete-opening exit needs measured geometry rechecked from the
+        # actual release pose, including its admitted controller pose error.
+        self.current_release_exit_check = None
         # Interactive recovery may start at another camera pose. The optional
         # planner returns fully checked linear waypoints ending at T_pre.
         self.before_held_transit = None
@@ -466,6 +474,9 @@ class PickPlaceSkill:
             return
         if w is not None and abs(w - g.expected_width) > self.width_tolerance:
             _LOG.warning('held width %.4f m differs from expected %.4f m', w, g.expected_width)
+        if w is not None:
+            # Keep the original closure through pick-only / held continuations.
+            g.target.extra['_closed_grip_width'] = float(w)
         r.detail['holding'] = True
         self._move(r, 'lift', g.T_lift, self.linear_moves)
         held_width = self._verify_held(r, 'dropped')
@@ -489,8 +500,32 @@ class PickPlaceSkill:
             # A body may have moved during the lift. Stop at this safe held
             # boundary before using an obsolete transit or inspection plan.
             self._guard('held_transit')
-            self._move(r, 'transit', p.T_pre, False)
-            self._verify_held(r, 'dropped_in_transit')
+            callback = getattr(self, 'before_carry', None)
+            route = None
+            if callback is not None:
+                self._check_abort('held_transit')
+                try:
+                    confirmed, reason, route = callback(g, p, r)
+                except RuntimeError as exc:
+                    confirmed, reason, route = False, str(exc), None
+                self._check_abort('held_transit')
+                self._guard('held_transit')
+                if not confirmed:
+                    raise _StepFailed('held_transit', 'placement_changed',
+                                      str(reason or 'held reference is unconfirmed'))
+            if route is not None:
+                try:
+                    self._checked_held_transit(r, g, p, preplanned_route=route)
+                except _StepFailed as exc:
+                    if exc.fault:
+                        raise
+                    # A calibrated grip is no longer the executed source TCP.
+                    # An invalidated checked route must hold for replanning,
+                    # never use the legacy automatic source put-back path.
+                    raise _StepFailed('held_transit', exc.error, exc.detail)
+            else:
+                self._move(r, 'transit', p.T_pre, False)
+                self._verify_held(r, 'dropped_in_transit')
             self._guard('held_transit')
             self._inspect_release(r, g, p)
             self._guard('release')
@@ -526,11 +561,13 @@ class PickPlaceSkill:
             if error:
                 raise _StepFailed(stage, error, 'scene changed; camera confirmation required')
 
-    def _checked_held_transit(self, r, grasp, place):
+    def _checked_held_transit(self, r, grasp, place, preplanned_route=None):
         """Execute only the entry path checked for this measured held opening."""
         self._guard('held_transit')
         checked_width = r.grasp_width
-        route = self.before_held_transit(grasp, place, checked_width, r)
+        route = preplanned_route
+        if route is None:
+            route = self.before_held_transit(grasp, place, checked_width, r)
         self._check_abort('held_transit')
 
         def held_width():
@@ -771,6 +808,22 @@ class PickPlaceSkill:
             # wider between the fingers would stay held by it.
             width = min(self.max_width, max(width, held + RELEASE_OPEN_EXTRA))
         wide = self._checked_stack_opening(g, p, after, width)
+        if wide:
+            self._check_abort('release_clearance')
+            self._guard('open_release')
+            if not self._healthy():
+                raise _StepFailed('release_clearance', 'arm_error', 'arm unhealthy', fault=True)
+            checker = getattr(self, 'current_release_exit_check', None)
+            confirmed = bool(checker is not None and checker(g, p, after, width))
+            self._check_abort('release_clearance')
+            self._guard('open_release')
+            if not self._healthy():
+                raise _StepFailed('release_clearance', 'arm_error', 'arm unhealthy', fault=True)
+            if not confirmed:
+                r.ok = False
+                r.stage, r.error = 'release_clearance', 'release_clearance_unconfirmed'
+                r.detail.update(holding=True, reason='actual open-gripper exit geometry is unconfirmed')
+                return
         clear, why = (None, '') if wide else self._stack_release_clearance(g, p, after, width)
         if why:
             r.ok = False
@@ -807,12 +860,27 @@ class PickPlaceSkill:
         r.ok = True
         r.stage = 'done'
         try:
+            if (g.target.extra or {}).get('_stack_support') is not None:
+                self._check_abort('retreat')
+                self._guard('retreat')
+                settled_at = self.clock.now()
+                self.clock.sleep(STACK_RELEASE_SETTLE_S)
+                r.detail['release_settle_s'] = self.clock.now() - settled_at
+                self._check_abort('retreat')
+                self._guard('retreat')
             if clear is not None:
+                self._check_abort('release_clearance')
                 self._guard('release_clearance')
                 self._move(r, 'release_clearance', clear, True)
+            self._check_abort('retreat')
+            self._guard('retreat')
             self._move(r, 'retreat', p.T_retreat, True if wide else self.linear_moves)
         except _StepFailed as e:
-            # The object is in the zone; report the failed retreat but keep ok=True.
+            # A completed opening cannot become a held-object continuation.
+            # Scene invalidation and controller stops still fail the task.
+            if e.error == 'scene_changed' or e.fault:
+                r.ok = False
+                r.stage = e.stage
             r.error = 'retreat_' + e.error
             r.detail['fault'] = bool(e.fault)
             r.detail['retreat_failed'] = True
@@ -892,6 +960,17 @@ class PickPlaceSkill:
             r.detail['fault'] = True
             r.detail['recovery'] = 'skipped: arm unhealthy'
             return
+        if (g.target.extra or {}).get('_held_translation_anchor') is not None:
+            try:
+                executed = np.asarray(g.target.extra['_executed_grasp_T'], float)
+                unchanged = (executed.shape == (4, 4) and
+                             np.allclose(g.T_grasp, executed, atol=1e-7, rtol=0))
+            except (KeyError, TypeError, ValueError):
+                unchanged = False
+            if not unchanged:
+                r.detail.update(holding=True,
+                    recovery='skipped: calibrated held reference requires checked replanning')
+                return
         try:
             if from_transit:
                 self._move(r, 'putback_lift', g.T_lift, False)

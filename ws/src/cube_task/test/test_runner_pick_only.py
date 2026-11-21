@@ -18,6 +18,7 @@ def test_pick_only_does_not_need_capacity_and_keeps_camera_measured_anchor():
     assert result is not None and result.ok and result.detail['holding'], why
     context = runner._held_recovery_context
     assert context['zone'] == 'held' and context['width'] == pytest.approx(.03)
+    assert context['grasp'].target.extra['_closed_grip_width'] == pytest.approx(.03)
     np.testing.assert_array_equal(context['det'].center_base, before.center_base)
     assert len(rig.arm.motions()) == 3 and not runner._placed and not runner._placed_labels
     # Attempting another pick cannot open the held grasp.

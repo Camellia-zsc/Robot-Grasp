@@ -23,7 +23,7 @@ from ..camera.factory import make_camera
 from ..core.clock import SimClock
 from ..core.extrinsics import extrinsics_from_cfg
 from ..core.logger import RunLogger, to_jsonable
-from ..core.transforms import inv_T
+from ..core.transforms import inv_T, rotation_angle
 from ..core.types import Zone
 from ..core.zones import parse_zones
 from ..robot.factory import make_arm
@@ -269,7 +269,9 @@ class SimulationSession:
         self.runner.skill.on_stage = self._on_stage
         self.runner.skill.execution_guard = self._execution_guard
         self.runner.skill.before_release = self._before_release
+        self.runner.skill.before_open = self._before_open
         if self._physics is not None:
+            self.runner.skill.before_carry = self._before_carry
             self.runner.skill.before_held_transit = self._before_held_transit
         try:
             self.arm.connect()
@@ -443,17 +445,13 @@ class SimulationSession:
         if (stage in ('descend', 'close') and
                 self._environment_revision != self._active_revision):
             return 'scene_changed'
-        if (stage in ('release', 'open_release', 'held_transit') and
+        if (stage in ('release', 'open_release', 'held_transit', 'release_clearance', 'retreat') and
                 self._environment_revision != self._active_revision):
             return 'scene_changed'
         return None
 
     def _before_held_transit(self, grasp, place, width, result):
         """Precheck the actual held entry path after an arbitrary inspected pose."""
-        from .observation_policy import merge_local_detections, measurement_visible
-        from .placement_observation import safe_inspection_route
-        from ..core.extrinsics import camera_pose_in_base
-
         budget = _PlacementBudget(self.arm, self.cancel_event, seconds=15.)
         uncertainty = .001
         def reject(reason):
@@ -478,35 +476,169 @@ class SimulationSession:
                 return reject(why)
             if abs(measured_width - width) > uncertainty:
                 return reject('held_opening_changed')
-            current = self.arm.get_tcp_pose()
-            if (current is None or current.value is None or
-                    self.clock.now() - float(current.stamp) > self.runner.skill.feedback_max_age):
-                return reject('no_fresh_pose_feedback')
-            frame = self.camera._last
-            pose = camera_pose_in_base(self.runner.ext, self.arm.get_flange_pose().value,
-                                       self.runner.T_flange_tcp)
-            neighbors = merge_local_detections(self._observed_detections,
-                [d for d in fresh if d.center_base is not None and d.label != grasp.target.label],
-                lambda d: measurement_visible(d, frame, pose), forget=[grasp.target])
-            self._emit('placement_progress', {
-                'message': '正在按当前夹持姿态检查搬运路径，保持夹持'})
-            route, why = budget.run(safe_inspection_route, self.arm, grasp,
-                np.asarray(current.value).copy(), place.T_pre, neighbors, width,
-                table_z=float(self.cfg.get('perception.table.expected_z', 0.) or 0.),
-                nominal=self.runner.nominal.get(grasp.target.label),
-                neighbor_nominal=self.runner.nominal, free_tilt_deg=self.runner.free_tilt,
-                opening_uncertainty=uncertainty, cancelled=budget.cancelled)
-            self._apply_interventions()
-            if revision != self._environment_revision:
-                return reject('scene_changed')
-            if not route:
+            confirmed, why, last_capture = self._calibrate_carried_anchor(
+                grasp, result, measured_width, fresh)
+            if not confirmed:
                 return reject(why)
-            self._observed_detections = copy.deepcopy(neighbors)
-            result.detail['held_transit_opening_uncertainty'] = uncertainty
+            if last_capture is not None:
+                fresh = last_capture
+            route, why = self._plan_carried_entry(grasp, place, width, result,
+                                                 fresh, revision, budget)
+            if route is None:
+                return reject(why)
             return route
         except _PlacementInterrupted:
             return reject('aborted' if self.cancel_event.is_set()
                           else 'held_transit_planning_budget_exceeded')
+
+    def _plan_carried_entry(self, grasp, place, width, result, fresh, revision, budget):
+        """Check a carried path from the current, visually refined reference."""
+        from .observation_policy import merge_local_detections, measurement_visible
+        from .placement_observation import safe_inspection_route
+        from ..core.extrinsics import camera_pose_in_base
+        current = self.arm.get_tcp_pose()
+        if (current is None or current.value is None or
+                self.clock.now()-float(current.stamp) > self.runner.skill.feedback_max_age):
+            return None, 'no_fresh_pose_feedback'
+        frame = self.camera._last
+        pose = camera_pose_in_base(self.runner.ext, self.arm.get_flange_pose().value,
+                                   self.runner.T_flange_tcp)
+        neighbors = merge_local_detections(self._observed_detections,
+            [d for d in fresh if d.center_base is not None and d.label != grasp.target.label],
+            lambda d: measurement_visible(d, frame, pose), forget=[grasp.target])
+        self._emit('placement_progress', {'message': '正在按当前夹持姿态检查搬运路径，保持夹持'})
+        route, why = budget.run(safe_inspection_route, self.arm, grasp,
+            np.asarray(current.value).copy(), place.T_pre, neighbors, width,
+            table_z=float(self.cfg.get('perception.table.expected_z', 0.) or 0.),
+            nominal=self.runner.nominal.get(grasp.target.label),
+            neighbor_nominal=self.runner.nominal, free_tilt_deg=self.runner.free_tilt,
+            opening_uncertainty=.001, cancelled=budget.cancelled)
+        self._apply_interventions()
+        if revision != self._environment_revision:
+            return None, 'scene_changed'
+        if not route:
+            return None, why
+        self._observed_detections = copy.deepcopy(neighbors)
+        result.detail['held_transit_opening_uncertainty'] = .001
+        return route, ''
+
+    def _calibrate_carried_anchor(self, grasp, result, width, first_detections=None):
+        """Confirm seating before using the carried reference for another path."""
+        from .held_anchor import (apply_translation_anchor, seating_requires_feedback,
+                                  source_anchor)
+        if not seating_requires_feedback(grasp, result, width):
+            return True, '', None
+        try:
+            width = float(width)
+            if not math.isfinite(width) or width <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            return False, 'held_anchor_unconfirmed: held_width_unavailable', None
+        reference = grasp.target.extra.get('_held_translation_anchor') or {}
+        try:
+            if abs(float(width)-float(reference['grip_width'])) <= .003:
+                return True, '', None
+        except (KeyError, TypeError, ValueError):
+            pass
+        source = source_anchor(grasp)
+        pair, fresh = self._measure_held_anchor(grasp, source, first_detections)
+        if not pair.get('ok'):
+            return False, 'held_anchor_unconfirmed: '+str(pair.get('error')), fresh
+        calibrated = apply_translation_anchor(grasp, source, pair, self._environment_revision)
+        if not calibrated.get('ok'):
+            return False, 'held_anchor_unconfirmed: '+str(calibrated.get('error')), fresh
+        grasp.target.extra['_held_translation_anchor']['grip_width'] = float(width)
+        result.detail['held_anchor_feedback'] = calibrated
+        self._emit('grasp_anchor_refined', dict(message='已用两帧深度图修正夹持位置', **calibrated))
+        return True, '', fresh
+
+    def _before_carry(self, grasp, place, result):
+        original = grasp.T_grasp.copy()
+        revision = self._environment_revision
+        measured = self.runner.skill._verify_held(result, 'dropped_before_carry')
+        if measured is not None:
+            result.grasp_width = measured
+        confirmed, reason, fresh = self._calibrate_carried_anchor(grasp, result, result.grasp_width)
+        if not confirmed:
+            return False, reason, None
+        if np.array_equal(original, grasp.T_grasp):
+            return True, '', None
+        budget = _PlacementBudget(self.arm, self.cancel_event, seconds=15.)
+        try:
+            route, reason = self._plan_carried_entry(grasp, place, result.grasp_width,
+                                                    result, fresh, revision, budget)
+        except _PlacementInterrupted:
+            return False, 'held_transit_planning_budget_exceeded', None
+        return bool(route), reason, route
+
+    def _measure_held_anchor(self, grasp, source, first_detections=None):
+        """Two actual stationary captures, bound to one unchanged grip/scene."""
+        from .held_anchor import held_anchor
+        from .spherical_anchor import validate_anchor_pair
+        revision = self._environment_revision
+        captures, fits, stamps, poses = [], [], [], []
+        try:
+            for index in range(2):
+                self._apply_interventions()
+                if self.cancel_event.is_set() or revision != self._environment_revision:
+                    return dict(ok=False, error='scene_changed'), []
+                fresh = (first_detections if index == 0 and first_detections is not None
+                         else self._stationary_recovery_observation())
+                self._apply_interventions()
+                if self.cancel_event.is_set() or revision != self._environment_revision:
+                    return dict(ok=False, error='scene_changed'), fresh
+                frame = self.camera._last
+                sample = self.arm.get_tcp_pose()
+                age = self.clock.now()-float(sample.stamp) if sample is not None else math.inf
+                frame_age = self.clock.now()-float(frame.stamp) if frame is not None else math.inf
+                max_age = getattr(self.runner.skill, 'feedback_max_age', .5)
+                if not math.isfinite(frame_age) or not -.05 <= frame_age <= max_age:
+                    return dict(ok=False, error='held_camera_not_fresh'), fresh
+                if (sample is None or not math.isfinite(age) or age < -.05
+                        or age > max_age or abs(float(sample.stamp)-float(frame.stamp)) > max_age):
+                    return dict(ok=False, error='held_tcp_not_fresh'), fresh
+                pose = np.asarray(sample.value, float)
+                fitted = held_anchor(fresh, grasp, source, pose)
+                if not fitted.get('ok'):
+                    return fitted, fresh
+                fits.append(fitted)
+                stamps.append(float(frame.stamp))
+                poses.append(pose.copy())
+                captures.append(fresh)
+            if (np.linalg.norm(poses[1][:3, 3]-poses[0][:3, 3]) > .001
+                    or rotation_angle(poses[0][:3, :3].T@poses[1][:3, :3]) > math.radians(1.)):
+                return dict(ok=False, error='held_camera_moved_between_captures'), captures[-1]
+            pair = validate_anchor_pair(fits[0], fits[1], stamps[0], stamps[1])
+            if pair.get('ok'):
+                pair['capture_stamps'] = stamps
+                pair['environment_revision'] = revision
+            return pair, captures[-1]
+        except (RuntimeError, ValueError, TypeError, AttributeError):
+            return dict(ok=False, error='held_anchor_capture_unavailable'), []
+
+    def _before_open(self, grasp, place, result):
+        """Recheck a calibrated translation at the actual release, before opening."""
+        from .held_anchor import apply_translation_anchor, seating_requires_feedback, source_anchor
+        measured = self.runner.skill._verify_held(result, 'dropped_before_open')
+        if measured is not None:
+            result.grasp_width = measured
+        reference = grasp.target.extra.get('_held_translation_anchor')
+        if reference is None:
+            if seating_requires_feedback(grasp, result, result.grasp_width):
+                return False, 'held_anchor_unconfirmed: 夹内位置已变化，需在上方重新观测后规划'
+            return True, ''
+        source = source_anchor(grasp)
+        pair, _fresh = self._measure_held_anchor(grasp, source)
+        if not pair.get('ok'):
+            return False, 'held_anchor_unconfirmed: '+str(pair.get('error'))
+        delta = np.asarray(pair['center'], float)-np.asarray(reference['center_tcp'], float)
+        result.detail['held_anchor_before_open'] = dict(
+            translation_only=True, drift_mm=(delta*1000).tolist(),
+            capture_stamps=pair['capture_stamps'])
+        if np.linalg.norm(delta) > .003:
+            apply_translation_anchor(grasp, source, pair, self._environment_revision)
+            return False, '夹内位置再次变化超过 3 毫米，已保留夹持，需要按新测量重规划'
+        return True, ''
 
     def _before_release(self, grasp, place, width, result):
         if self.cancel_event.is_set():
@@ -590,12 +722,20 @@ class SimulationSession:
                 return function(*args, cancelled=interrupted, **kwargs)
 
         def measure():
-            nonlocal neighbors, support_revision, options, support_current
+            nonlocal neighbors, support_revision, options, support_current, width
             revision = self._environment_revision
             fresh = self._stationary_recovery_observation()
             if revision != self._environment_revision:
                 support_views.clear()
                 return None, 'scene_changed', revision
+            measured = self.runner.skill._verify_held(result, 'dropped_before_release')
+            if measured is not None:
+                width = result.grasp_width = measured
+            confirmed, why, last_capture = self._calibrate_carried_anchor(grasp, result, width, fresh)
+            if not confirmed:
+                return None, why, revision
+            if last_capture is not None:
+                fresh = last_capture
             remember_inspection(self, grasp, self.arm.get_tcp_pose().value)
             frame = self.camera._last
             flange = self.arm.get_flange_pose()
@@ -660,6 +800,10 @@ class SimulationSession:
                     progress=progress, **options)
             return updated, why, revision
         updated, why, revision = budget.run(measure)
+        if str(why).startswith('held_anchor_unconfirmed'):
+            result.detail['placement_planning_reason'] = why
+            self._emit('placement_changed', dict(message='夹内位置尚未得到可靠视觉确认，保持夹持', reason=why))
+            return None
         if why == 'scene_changed':
             result.detail['placement_planning_reason'] = why
             return None

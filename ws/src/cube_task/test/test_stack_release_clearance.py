@@ -178,6 +178,7 @@ def checked_wide_release():
     place.open_width = .095
     place.release_opening_checked = dict(width=.095,
         release_T=place.T_release.copy(), retreat_T=place.T_retreat.copy())
+    skill.current_release_exit_check = lambda *args: True
     return arm, log, skill, grasp, place, checks
 
 

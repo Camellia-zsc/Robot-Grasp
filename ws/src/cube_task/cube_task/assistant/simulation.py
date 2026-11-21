@@ -1948,6 +1948,9 @@ class SimulationSession:
                 raise RuntimeError('任务已停止，不能自动恢复')
             if goal != self._recovery_goal or self._recovery_target is None:
                 raise ValueError('恢复目标与原任务不一致')
+            self._recovery_context = None
+            self._apply_interventions()
+            revision = self._environment_revision
             health = self.arm.health()
             healthy = health is not None and health.ok
             holding = self.world.held is not None
@@ -2012,9 +2015,15 @@ class SimulationSession:
                         options = clearance
             else:
                 self._scene_version += 1
+            self._apply_interventions()
+            if revision != self._environment_revision:
+                self._held_proposals = {}
+                self._recovery_retry = None
+                raise ValueError('恢复观测期间现场已变化，请重新观察')
             if holding:
                 self._scene_version += 1
-            context = {'scene_version': self._scene_version, 'attempt': int(attempt),
+            context = {'scene_version': self._scene_version,
+                       'environment_revision': revision, 'attempt': int(attempt),
                        'max_attempts': 3, 'goal': copy.deepcopy(goal),
                        'failure': dict(failure, holding=holding),
                        'observations': observations, 'options': options,
@@ -2055,10 +2064,12 @@ class SimulationSession:
 
         with self._operation_lock:
             self._check_open()
+            self._apply_interventions()
             context = self._recovery_context
             if context is None:
                 raise ValueError('恢复方案已过期，请重新观察')
-            if context['scene_version'] != self._scene_version:
+            if (context['scene_version'] != self._scene_version
+                    or context.get('environment_revision') != self._environment_revision):
                 raise ValueError('恢复场景已变化，请重新观察')
             chosen = validate_recovery_decision(decision, context)
             if chosen['action'] != 'recover':
@@ -2069,6 +2080,8 @@ class SimulationSession:
                 if self.cancel_event.is_set():
                     raise RuntimeError('任务已停止')
                 self._apply_interventions()
+                if context['environment_revision'] != self._environment_revision:
+                    raise ValueError('恢复场景已变化，请重新观察')
                 if chosen['option_id'].startswith('stage_'):
                     from .held_recovery import execute_held_recovery
                     return execute_held_recovery(self, chosen['option_id'], cancel_event, confirmed)
@@ -2095,6 +2108,7 @@ class SimulationSession:
                 options = self._placement_options(destination) if destination is not None else {}
                 zone_name = options['placement_zone'].name if destination is not None else goal['zone_name']
                 self._refresh_placement_occupancy(target, self._recovery_neighbors, destination)
+                self._active_revision = context['environment_revision']
                 self._status = 'executing'
                 result, why = self.runner.retry_held_placement(
                     target, zone_name, neighbors=self._recovery_neighbors, **options)

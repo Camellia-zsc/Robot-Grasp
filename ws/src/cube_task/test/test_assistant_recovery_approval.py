@@ -90,6 +90,12 @@ def test_explicit_resume_preserves_goal_and_does_not_restart_cancelled_items():
             self.runner = SimpleNamespace(has_held_recovery=True)
             self.cancel_event = threading.Event()
             self._recovery_goal = {'label': 'apple', 'zone_name': 'zone_red'}
+
+        def execute(self, decision, cancel_event=None):
+            result = super().execute(decision, cancel_event)
+            if not result['ok'] and not result.get('aborted'):
+                result.update(error='scene_changed', fault=False)
+            return result
     ctl = create(Resumable, RecoveryClient())
     try:
         ctl.submit('依次抓苹果和梨')

@@ -523,6 +523,8 @@ def test_actual_recovery_does_not_substitute_a_far_away_object_of_the_same_class
     session._check_open = Mock()
     session.cancel_event = threading.Event()
     session._recovery_goal = {'label': 'apple', 'zone_name': 'zone_red'}
+    session._environment_revision = 0
+    session._apply_interventions = Mock()
     session._recovery_target = SimpleNamespace(summary=lambda: {'label': 'apple'}, extra={})
     session.editor = SimpleNamespace(metadata=lambda: {'one_per_class': False})
     session.arm = SimpleNamespace(health=lambda: SimpleNamespace(ok=True))
@@ -545,6 +547,8 @@ def test_actual_recovery_does_not_regrasp_a_completed_same_class_object():
     session._check_open = Mock()
     session.cancel_event = threading.Event()
     session._recovery_goal = {'label': 'apple', 'zone_name': 'zone_red'}
+    session._environment_revision = 0
+    session._apply_interventions = Mock()
     session._recovery_target = SimpleNamespace(summary=lambda: {'label': 'apple'}, extra={})
     session.editor = SimpleNamespace(metadata=lambda: {'one_per_class': False})
     session.arm = SimpleNamespace(health=lambda: SimpleNamespace(ok=True))

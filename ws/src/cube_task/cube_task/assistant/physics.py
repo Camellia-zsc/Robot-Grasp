@@ -101,6 +101,22 @@ class DashboardPhysics:
                 self.cfg.set('sim.mujoco.assets_dir', str(bundled))
         # A thin display card must not alter a taught tabletop destination z.
         self.cfg.set('sim.mujoco.card_collision', False)
+        # Keep the held body's belly in the wrist camera's depth field instead
+        # of imaging only a narrow ring behind its neck. This is a physical
+        # mounting change: build_scene derives both the rendered pose and its
+        # calibrated extrinsics from this same copied transform.
+        offset_key = 'assistant.physics.wrist_camera_flange_z_offset'
+        try:
+            camera_offset = float(self.cfg.get(offset_key, -.025))
+        except (TypeError, ValueError):
+            raise ValueError(offset_key + ' must be a finite distance in metres') from None
+        if not np.isfinite(camera_offset):
+            raise ValueError(offset_key + ' must be a finite distance in metres')
+        self.cfg.set(offset_key, camera_offset)
+        camera_pose = np.asarray(self.info['T_flange_camera'], float).copy()
+        camera_pose[2, 3] += camera_offset
+        self.info['T_flange_camera'] = camera_pose
+        # Apply once to our scenario copy, never again during scene rebuilds.
         self._build()
         self.clock.add_listener(self._after_advance)
         self.sync(emit=False)

@@ -880,6 +880,7 @@ class SimulationSession:
             local = target is not None
             require_grasp = bool(local and target.get('require_grasp'))
             grasp_target = None
+            grasp_geometry_ready = False
             self._last_fresh = []
             order = self._view_order(target) if local else list(range(self._base_view_count))
             if local and purpose == 'verify_place':
@@ -966,13 +967,27 @@ class SimulationSession:
                             _candidate, planned = _grasp(self, measured, peers)
                             if planned.feasible:
                                 grasp_target = measured
+                                grasp_geometry_ready = geometry_ready
                         support_ready = True
                         if target.get('required_support'):
                             joint, _diagnostics = merge_observations(views, dist=self.runner.view_merge,
                                 partial=lambda d: not d.valid or self.runner._partial(d))
                             support_ready = self._support_observed(target, joint, revision)
-                        if grasp_target is not None and geometry_ready and support_ready:
+                        if grasp_target is not None and grasp_geometry_ready and support_ready:
                             break
+                        if (grasp_target is not None and grasp_geometry_ready
+                                and not support_ready):
+                            # A complete upper-body grasp stays measured while
+                            # another fresh view supplies its missing support.
+                            # Look for that remaining entity before unrelated
+                            # cards; this only ranks unvisited checked views.
+                            support = target['required_support']
+                            if (support.get('center_base') is not None
+                                    or support.get('xy') is not None):
+                                ranked = self._view_order(support)
+                                priority = {candidate: rank for rank, candidate in enumerate(ranked)}
+                                order[step:] = sorted(order[step:],
+                                    key=lambda candidate: priority.get(candidate, len(priority)))
                         continue
                     if (reliable and (geometry_ready or purpose == 'verify_place')) or (not label and len(coverage) >= 1):
                         break

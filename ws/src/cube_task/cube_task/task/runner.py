@@ -1522,6 +1522,12 @@ class TaskRunner:
                     ok, why = False, 'final release footprint is not visible in the fresh image'
             if ok and not np.allclose(planning_grasp.T_grasp, gp.T_grasp, atol=1e-7, rtol=0):
                 ok, why = False, 'release planning would change the held grasp transform'
+            if (ok and stacked and shape.get('requested_release_opening') is not None
+                    and observation_filter is not None):
+                ok, why = self._release_retreat_clear(
+                    det, planning_grasp, candidate, neighbors, polygon, interrupted)
+                if interrupted():
+                    return None, interruption_reason()
             if ok:
                 if interrupted():
                     return None, interruption_reason()
@@ -1755,7 +1761,7 @@ class TaskRunner:
         return sum(1 for z in self.class_to_zone.values() if z == zone_name) <= 1
 
     def _strict_place_filter(self, det, gp, neighbors, support_polygon, completion_zone=None,
-                             release_opening=None):
+                             release_opening=None, gripper_only=False):
         """Complete body envelopes bound the destination and the open fingers."""
         from ..perception.geometry import points_in_polygon, object_footprint, object_prism
         from ..perception.grasp import FINGER_OUTER, FINGER_HALF_BAND, RELEASE_OPEN_EXTRA
@@ -1764,7 +1770,7 @@ class TaskRunner:
         polygon = np.asarray(support_polygon, dtype=float)
         dims = footprint_dims(det, self.nominal.get(det.label))
         if polygon.ndim != 2 or polygon.shape[1:] != (2,) or dims is None:
-            return lambda x, y, closing: False
+            return lambda *args, **kwargs: False
         if completion_zone is not None:
             from ..assistant.destinations import ZONE_COMPLETION_MARGIN
             goal_center = np.asarray(completion_zone.center, float)[:2]
@@ -1787,7 +1793,7 @@ class TaskRunner:
             odims = footprint_dims(other, self.nominal.get(other.label))
             if odims is None or other.yaw is None:
                 # Missing footprint geometry cannot establish a free destination.
-                return lambda x, y, closing: False
+                return lambda *args, **kwargs: False
             height = float(other.height or 0.0)
             bottom = detection_table_z(other)
             bottom = 0.0 if bottom is None else float(bottom)
@@ -1803,11 +1809,33 @@ class TaskRunner:
         finger_floor = self.placer.release_height_flat + max(0.0, float(gp.T_grasp[2, 3]) -
                                                             (detection_table_z(det) or 0.0)) - .015
 
+        def gripper_clear(pose, width, padding=0.0):
+            import cv2
+            if pose is None:
+                return False
+            # Match the actual finger and palm boxes used by the final release
+            # check. Padding covers the tool's movement between sweep samples.
+            boxes = [(np.array([0., sign * (width / 2 + .006), -.025]),
+                      np.array([.010, .006, .025])) for sign in (-1, 1)]
+            boxes.append((np.array([0., 0., -.095]), np.array([.0225, .045, .045])))
+            signs = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
+            T = np.asarray(pose, float)
+            for center, half in boxes:
+                points = (center + signs * (half + padding)) @ T[:3, :3].T + T[:3, 3]
+                footprint = prepare_polygon(cv2.convexHull(points[:, :2].astype(np.float32)).reshape(-1, 2))
+                low_z, high_z = float(points[:, 2].min()), float(points[:, 2].max())
+                for other, _height, bottom, top, _designated in obstacles:
+                    if top + .002 > low_z and bottom - .002 < high_z and overlaps(footprint, other):
+                        return False
+            return True
+
         def allowed(x, y, closing, final_yaw=None, tcp_xy=None, held_projection=None,
-                    gripper_pose=None, gripper_open_width=None):
+                    gripper_pose=None, gripper_open_width=None, gripper_padding=0.0):
             width = opening if gripper_open_width is None else float(gripper_open_width)
             if not math.isfinite(width) or width <= 0.0 or width > self.placer.open_width:
                 return False
+            if gripper_only:
+                return gripper_clear(gripper_pose, width, gripper_padding)
             if stack_support is not None:
                 from ..assistant.stacking import center_supported
                 if not center_supported([x, y], stack_support):
@@ -1845,14 +1873,6 @@ class TaskRunner:
                    for other, height, _bottom, _top, designated in obstacles):
                 return False
             if gripper_pose is not None:
-                import cv2
-                # Fixed tool geometry, matching the physical fingers/palm.
-                # Project all eight box corners after the final reach tilt;
-                # only vertically overlapping obstacles can collide with it.
-                boxes = [(np.array([0., sign * (width / 2 + .006), -.025]),
-                          np.array([.010, .006, .025])) for sign in (-1, 1)]
-                boxes.append((np.array([0., 0., -.095]), np.array([.0225, .045, .045])))
-                signs = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
                 T = np.asarray(gripper_pose, float)
                 if stack_support is not None:
                     source_floor = detection_table_z(det)
@@ -1865,15 +1885,35 @@ class TaskRunner:
                     released = (source_box - gp.T_grasp[:3, 3]) @ rotation.T + T[:3, 3]
                     if float(released[:, 2].min()) < float(stack_support['top_z']) - .002:
                         return False
-                for center, half in boxes:
-                    points = (center + signs * half) @ T[:3, :3].T + T[:3, 3]
-                    footprint = prepare_polygon(cv2.convexHull(points[:, :2].astype(np.float32)).reshape(-1, 2))
-                    low_z, high_z = float(points[:, 2].min()), float(points[:, 2].max())
-                    for other, _height, bottom, top, _designated in obstacles:
-                        if top + .002 > low_z and bottom - .002 < high_z and overlaps(footprint, other):
-                            return False
+                if not gripper_clear(T, width):
+                    return False
             return True
         return allowed
+
+    def _release_retreat_clear(self, det, gp, pp, neighbors, polygon, cancelled):
+        """Check only the open tool after release, including between samples."""
+        from ..core.transforms import rotation_angle
+        from ..robot.safety import interpolate_pose
+
+        allowed = self._strict_place_filter(det, gp, neighbors, polygon,
+            release_opening=pp.open_width, gripper_only=True)
+        travel = float(np.linalg.norm(pp.T_retreat[:3, 3] - pp.T_release[:3, 3]))
+        angle = rotation_angle(pp.T_release[:3, :3].T @ pp.T_retreat[:3, :3])
+        # Every finger/palm corner lies within this tool-frame radius. For
+        # linear translation+slerp, each corner moves at most travel+r*angle.
+        radius = max(math.sqrt(.010**2 + (pp.open_width / 2 + .012)**2 + .050**2),
+                     math.sqrt(.0225**2 + .045**2 + .140**2))
+        extent = travel + radius * angle
+        segments = max(1, int(math.ceil(extent / .004)))
+        padding = extent / (2 * segments)
+        for fraction in np.linspace(0., 1., segments + 1):
+            if cancelled():
+                return False, 'release exit check interrupted'
+            pose = interpolate_pose(pp.T_release, pp.T_retreat, float(fraction))
+            if not allowed(0., 0., 0., gripper_pose=pose,
+                           gripper_open_width=pp.open_width, gripper_padding=padding):
+                return False, 'open gripper retreat intersects measured occupancy'
+        return True, ''
 
     def _adjust_strict_release(self, det, gp, pp, neighbors, polygon, desired_xy, held,
                                held_only=False, completion_zone=None):

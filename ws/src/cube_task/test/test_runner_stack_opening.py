@@ -144,7 +144,7 @@ def test_final_leaned_body_check_receives_the_actual_wider_aperture():
     runner._strict_place_filter = factory
     candidate, why = replan(parts, observation_filter=lambda *a, **k: True)
     assert candidate is not None, why
-    assert checked == [pytest.approx(candidate.open_width)]
+    assert checked and all(value == pytest.approx(candidate.open_width) for value in checked)
 
 
 @pytest.mark.parametrize('failure', ['reach', 'geometry', 'visibility', 'cancelled'])

@@ -139,7 +139,9 @@ def test_target_moved_during_pre_aborts_old_grasp_then_reobserves_and_recovers(t
                 np.testing.assert_array_equal(obj.T_base_obj, before[obj.name])
 
 
-def test_neighbor_moved_into_planned_slot_during_transit_causes_local_new_slot(tmp_path):
+def test_neighbor_moved_during_transit_stops_then_fresh_held_plan_uses_new_slot(tmp_path):
+    from cube_task.assistant.skill_execution import SkillExecutor
+
     events, initial_slot = [], []
     with SimulationSession(realtime=False, log_dir=tmp_path) as sim:
         sim.prepare()
@@ -157,16 +159,27 @@ def test_neighbor_moved_into_planned_slot_during_transit_causes_local_new_slot(t
                 queue_from_another_thread(sim, green.name, initial_slot)
 
         sim.on_event = event
-        result = sim.execute(pick(sim, 'red'))
+        failed = sim.execute(pick(sim, 'red'))
+        assert not failed['ok'] and failed['error'] == 'scene_changed', failed
+        assert failed['holding'] and sim.runner.has_held_recovery
+        assert not any(kind == 'placement_refined' for kind, _fields in events)
+        stages = []
+        sim.on_event = lambda kind, fields: stages.append(fields.get('stage')) if kind == 'stage' else None
+        executor = SkillExecutor(sim)
+        result = executor.execute(
+            dict(id='new-held-place', skill='place', label='red',
+                 destination=dict(type='goal', index=0)),
+            [dict(label='red', zone_name='zone_red')],
+            expected_revision=sim._environment_revision)
         save_camera_evidence(sim, tmp_path)
-        save_report(tmp_path, 'occupied_slot_replan', result=result, initial_slot=initial_slot,
+        save_report(tmp_path, 'occupied_slot_replan', failed=failed, result=result, initial_slot=initial_slot,
                     final_slot=sim._placement_center, scans=sim._scan_stats,
                     independent_world=sim.snapshot(), events=events)
         assert initial_slot and any(kind == 'scene_intervention_applied' for kind, _ in events), events
         assert result['ok'] and result['truth']['success'], result
         np.testing.assert_allclose(green.center_xy(), initial_slot, atol=1e-8)
         assert np.linalg.norm(np.asarray(sim._placement_center)[:2] - initial_slot) > .04
-        assert any(kind == 'placement_refined' for kind, _ in events)
+        assert 'close' not in stages and 'descend' not in stages
         red = next(obj for obj in sim.world.objects if obj.label == 'red')
         assert sim.world.zone_of(red).name == 'zone_red'
         assert np.linalg.norm(red.center_xy() - green.center_xy()) > .05

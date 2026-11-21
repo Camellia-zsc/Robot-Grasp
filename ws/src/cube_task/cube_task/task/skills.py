@@ -235,13 +235,16 @@ class PickPlaceSkill:
             if self.before_held_transit is not None:
                 self._checked_held_transit(r, grasp, place)
             else:
+                self._guard('held_transit')
                 height = float(place.T_pre[2, 3])
                 if float(lift[2, 3]) < height - 1e-4:
                     lift[2, 3] = height
                     self._move(r, 'retry_lift', lift, True)
                     self._verify_held(r, 'dropped')
+                    self._guard('held_transit')
                 self._move(r, 'transit', place.T_pre, False)
                 self._verify_held(r, 'dropped_in_transit')
+            self._guard('held_transit')
             self._inspect_release(r, grasp, place)
             self._guard('release')
             self._move(r, 'release', place.T_release, self.linear_moves)
@@ -475,8 +478,12 @@ class PickPlaceSkill:
             self._pick_to_lift(g, r)
             if not r.detail['holding']:
                 return
+            # A body may have moved during the lift. Stop at this safe held
+            # boundary before using an obsolete transit or inspection plan.
+            self._guard('held_transit')
             self._move(r, 'transit', p.T_pre, False)
             self._verify_held(r, 'dropped_in_transit')
+            self._guard('held_transit')
             self._inspect_release(r, g, p)
             self._guard('release')
             self._move(r, 'release', p.T_release, self.linear_moves)
@@ -513,6 +520,7 @@ class PickPlaceSkill:
 
     def _checked_held_transit(self, r, grasp, place):
         """Execute only the entry path checked for this measured held opening."""
+        self._guard('held_transit')
         checked_width = r.grasp_width
         route = self.before_held_transit(grasp, place, checked_width, r)
         self._check_abort('held_transit')
@@ -533,6 +541,7 @@ class PickPlaceSkill:
         # A failed path search must not hide a drop or lost feedback that
         # occurred during its camera capture or calculation.
         held_width()
+        self._guard('held_transit')
         why = r.detail.get('held_transit_planning_reason', 'no safe held transit route')
         valid = isinstance(route, (list, tuple)) and bool(route)
         if valid:

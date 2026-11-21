@@ -159,10 +159,10 @@ def whole_footprint_in_zone(target, scene, zone_name):
             return False
         length = max(length, max(nominal[:2]))
         width = max(width, min(nominal[:2]))
-        from .destinations import completion_outline
+        from .destinations import completion_outline, ZONE_COMPLETION_MARGIN
         corners = completion_outline(target, length, width, yaw)
         zrotation = np.array([[math.cos(zyaw), -math.sin(zyaw)], [math.sin(zyaw), math.cos(zyaw)]])
         in_zone = (corners - zcenter[:2]) @ zrotation
-        return bool(np.all(np.abs(in_zone) <= zsize / 2 - .005))
+        return bool(np.all(np.abs(in_zone) <= zsize / 2 - ZONE_COMPLETION_MARGIN))
     except (KeyError, ValueError, TypeError, StopIteration):
         return False

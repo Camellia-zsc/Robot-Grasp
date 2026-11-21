@@ -9,6 +9,7 @@ from ..perception.geometry import points_in_polygon
 
 POINT_TOLERANCE = 0.015
 PLACEMENT_MARGIN = 0.002
+ZONE_COMPLETION_MARGIN = 0.005
 
 
 def placement_metadata(cfg, pick_polygon):

@@ -1333,9 +1333,18 @@ class TaskRunner:
                 return None, 'neighbor footprint is unavailable before release'
             occupied.append((*_xy(other), dims[0], float(other.height or 0.),
                              *dims, float(other.yaw)))
+        # Held skill transfers pass exact copies of configured named zones.
+        # Preserve that goal contract without assigning it to arbitrary table
+        # regions, points or object supports that also use explicit polygons.
+        configured = self.zones.get(zone.name)
+        completion_zone = (configured if configured is not None
+            and np.array_equal(zone.center, configured.center)
+            and np.array_equal(zone.size, configured.size)
+            and float(zone.yaw) == float(configured.yaw)
+            and np.array_equal(polygon, configured.corners_xy()) else None)
         return dict(width=width, zone=zone, polygon=polygon, grasp=planning_grasp,
                     shape=shape, held=held, transit=transit, neighbors=neighbors,
-                    occupied=occupied), ''
+                    occupied=occupied, completion_zone=completion_zone), ''
 
     def has_release_capacity(self, det, gp, pp, width, neighbors, placement_zone=None,
                              placement_polygon=None, exact_xy=False, cancelled=None,
@@ -1369,7 +1378,8 @@ class TaskRunner:
                 occupied=search['occupied'], held=search['shape'], strict=True,
                 fixed_xy=bool(exact_xy),
                 pose_filter=self._strict_place_filter(det, search['grasp'], search['neighbors'],
-                                                      search['polygon']),
+                                                      search['polygon'],
+                                                      completion_zone=search['completion_zone']),
                 candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
                 center_first=self._center_first(search['zone'].name),
                 lower=self.release_lower.get(det.label, 0.0), cancelled=interrupted)
@@ -1448,7 +1458,8 @@ class TaskRunner:
                 source = np.r_[det.center_base[:2], table + float(det.height or 0.0) / 2]
                 center = pp.T_release[:3, 3] + rotation @ (source - gp.T_grasp[:3, 3])
             preferred_xy = (tuple(center[:2]),)
-        allowed = self._strict_place_filter(det, planning_grasp, neighbors, polygon)
+        allowed = self._strict_place_filter(det, planning_grasp, neighbors, polygon,
+                                            completion_zone=search['completion_zone'])
         def measured_allowed(x, y, closing):
             return (not interrupted() and
                     allowed(x, y, closing) and
@@ -1486,7 +1497,7 @@ class TaskRunner:
             if ok:
                 ok, why = self._adjust_strict_release(
                     det, planning_grasp, candidate, neighbors, polygon, xy, held,
-                    held_only=True)
+                    held_only=True, completion_zone=search['completion_zone'])
             if interrupted():
                 return None, interruption_reason()
             if ok and observation_filter is not None:
@@ -1723,7 +1734,7 @@ class TaskRunner:
         """Release the first object at the zone center unless several labels share the zone."""
         return sum(1 for z in self.class_to_zone.values() if z == zone_name) <= 1
 
-    def _strict_place_filter(self, det, gp, neighbors, support_polygon):
+    def _strict_place_filter(self, det, gp, neighbors, support_polygon, completion_zone=None):
         """Complete body envelopes bound the destination and the open fingers."""
         from ..perception.geometry import points_in_polygon, object_footprint, object_prism
         from ..perception.grasp import FINGER_OUTER, FINGER_HALF_BAND, RELEASE_OPEN_EXTRA
@@ -1733,6 +1744,12 @@ class TaskRunner:
         dims = footprint_dims(det, self.nominal.get(det.label))
         if polygon.ndim != 2 or polygon.shape[1:] != (2,) or dims is None:
             return lambda x, y, closing: False
+        if completion_zone is not None:
+            from ..assistant.destinations import ZONE_COMPLETION_MARGIN
+            goal_center = np.asarray(completion_zone.center, float)[:2]
+            goal_half = np.asarray(completion_zone.size, float) / 2 - ZONE_COMPLETION_MARGIN
+            c, s = math.cos(completion_zone.yaw), math.sin(completion_zone.yaw)
+            goal_rotation = np.array([[c, -s], [s, c]])
 
         def corners(xy, size, yaw):
             local = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1]]) * (np.asarray(size) / 2)
@@ -1779,6 +1796,12 @@ class TaskRunner:
             if held_projection is not None:
                 import cv2
                 obj = cv2.convexHull(np.vstack((obj, held_projection)).astype(np.float32)).reshape(-1, 2)
+            # Named zones use the same full-outline margin as final camera
+            # completion, in the zone's own axes. Explicit tabletop/stack
+            # supports retain their independent placement contracts below.
+            if (completion_zone is not None and
+                    not np.all(np.abs((obj - goal_center) @ goal_rotation) <= goal_half)):
+                return False
             expanded = (obj[:, None, :] + margin_offsets).reshape(-1, 2)
             if not np.all(points_in_polygon(expanded, polygon)):
                 return False
@@ -1829,7 +1852,7 @@ class TaskRunner:
         return allowed
 
     def _adjust_strict_release(self, det, gp, pp, neighbors, polygon, desired_xy, held,
-                               held_only=False):
+                               held_only=False, completion_zone=None):
         """Recheck final leaned poses and compensate their measured center shift."""
         from .reach import adjust_plan_poses, _planning_cancelled
         from ..perception.geometry import object_prism
@@ -1841,7 +1864,8 @@ class TaskRunner:
         if cloud.ndim != 2 or cloud.shape[1:] != (3,) or len(cloud) < 40 or not np.all(np.isfinite(cloud)):
             cloud = None
         source_axis = np.array([math.cos(float(det.yaw or 0)), math.sin(float(det.yaw or 0)), 0])
-        allowed = self._strict_place_filter(det, gp, neighbors, polygon)
+        allowed = self._strict_place_filter(det, gp, neighbors, polygon,
+                                            completion_zone=completion_zone)
         for _ in range(4):
             if _planning_cancelled(self.arm):
                 return False, 'aborted'

@@ -46,6 +46,8 @@ RELEASE_ROT_TOL = math.radians(3.0)
 RELEASE_SETTLE_S = 0.12
 RELEASE_MAX_SPEED = 0.01
 RELEASE_MAX_ANGULAR_SPEED = math.radians(6.0)
+#: Keep the lowest gripper point above a released stack before rotating (m).
+RELEASE_CLEARANCE_MARGIN = 0.005
 #: at the release the fingers must open this far past the held width (m).
 RELEASE_OPEN_MARGIN = 0.01
 #: ... but never more than the commanded opening minus this (m): a gripper opened to
@@ -61,7 +63,7 @@ MAX_GRIPPER_FORCE = 3.0
 #: robot default, which lets a tapered neck slip during a real contact lift.
 TASK_GRIPPER_FORCE = {'L1': 1.5, 'L2': 2.5, 'Sandbox': 2.5}
 #: stages whose target is a free-space pose (may lean up to max_tilt_free_deg).
-FREE_STAGES = ('pre', 'lift', 'transit', 'retreat', 'recover_retreat', 'recover_up',
+FREE_STAGES = ('pre', 'lift', 'transit', 'retreat', 'release_clearance', 'recover_retreat', 'recover_up',
                'putback_lift', 'putback_retreat', 'up', 'retry_lift', 'inspect_lift', 'inspect_place')
 
 
@@ -612,7 +614,106 @@ class PickPlaceSkill:
             if not at_hover():
                 raise _StepFailed('inspect_place', 'hover_pose_unconfirmed',
                                   'return to the release hover was not confirmed', fault=True)
+        # Refinement owns its checks. A new plan without an opening proof
+        # must not retain an earlier plan's dynamic attribute via dict.update.
+        if not hasattr(updated, 'release_opening_checked'):
+            place.__dict__.pop('release_opening_checked', None)
         place.__dict__.update(updated.__dict__)
+
+    def _stack_release_clearance(self, g, p, actual, width):
+        """Precheck a straight exit before a stack retreat changes orientation."""
+        support = (g.target.extra or {}).get('_stack_support')
+        if support is None or rotation_angle(p.T_release[:3, :3].T @ p.T_retreat[:3, :3]) < 1e-6:
+            return None, ''
+        try:
+            top, measured = float(support['top_z']), float(g.target.height)
+            if not math.isfinite(top) or not math.isfinite(measured) or measured <= 0:
+                raise ValueError
+        except (KeyError, TypeError, ValueError):
+            return None, 'stack support or object height is unavailable'
+        from ..assistant.catalog import catalog_entries
+        nominal = next((float(entry['dimensions'][2]) for entry in catalog_entries()
+                        if entry['label'] == g.target.label), measured)
+        height = max(measured, nominal)
+        # Match the complete finger/palm boxes used by release planning. A
+        # leaning fingertip can extend below the TCP, even during a pure lift.
+        signs = np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)])
+        boxes = [(np.array([0., side * (width / 2 + .006), -.025]),
+                  np.array([.010, .006, .025])) for side in (-1, 1)]
+        boxes.append((np.array([0., 0., -.095]), np.array([.0225, .045, .045])))
+        tool = np.vstack([center + signs * half for center, half in boxes])
+        lowest = min(0., float((tool @ actual[:3, :3].T)[:, 2].min()))
+        clear = actual.copy()
+        clear[2, 3] = max(float(actual[2, 3]), top + height + RELEASE_CLEARANCE_MARGIN - lowest)
+        if clear[2, 3] <= actual[2, 3] + 1e-6:
+            return None, ''
+        why = self._precheck_release_exit(p, actual, clear)
+        return (None, why) if why else (clear, '')
+
+    def _checked_stack_opening(self, g, p, actual, width):
+        """Accept only a planner-checked full opening for this exact plan.
+
+        This strategy retains the planner's measured obstacle/finger checks;
+        it does not claim to observe the carried body's full physical pose.
+        """
+        proof = getattr(p, 'release_opening_checked', None)
+        support = (g.target.extra or {}).get('_stack_support')
+        if not isinstance(proof, dict) or not isinstance(support, dict):
+            return False
+        try:
+            measured = np.asarray([g.target.length, g.target.width, g.target.height], float)
+            checked = float(proof['width'])
+            if (not math.isfinite(float(support['top_z']))
+                    or not np.all(np.isfinite(measured)) or np.any(measured <= 0)
+                    or not math.isfinite(checked) or checked > self.max_width
+                    or abs(checked - float(width)) > 1e-9
+                    or abs(checked - float(p.open_width)) > 1e-9
+                    or not np.array_equal(proof['release_T'], p.T_release)
+                    or not np.array_equal(proof['retreat_T'], p.T_retreat)):
+                return False
+        except (KeyError, TypeError, ValueError):
+            return False
+        from ..assistant.catalog import catalog_entries
+        nominal = next((entry['dimensions'][:2] for entry in catalog_entries()
+                        if entry['label'] == g.target.label), measured[:2])
+        required = max(*measured[:2], *nominal) + RELEASE_OPEN_MARGIN
+        if checked + 1e-12 < required:
+            return False
+        return not self._precheck_release_exit(p, actual, p.T_retreat)
+
+    def _precheck_release_exit(self, p, actual, target):
+        """Check an exit from fresh actual joints before the gripper opens."""
+        check = getattr(self.arm, 'check_reachable', None)
+        native = getattr(self.arm, '_check_linear_path', None)
+        if not callable(check) or not callable(native):
+            return 'native linear clearance preflight is unavailable'
+        joints = self.arm.get_joints()
+        if (joints is None or joints.value is None or
+                not -.05 <= self.clock.now() - float(joints.stamp) <= self.feedback_max_age):
+            return 'current joints are unavailable for clearance preflight'
+        seed = np.asarray(joints.value, float)
+        if seed.shape != (6,) or not np.all(np.isfinite(seed)):
+            return 'current joints are invalid for clearance preflight'
+        from .reach import accepts_kwarg
+        kwargs = {'q_seed': seed} if accepts_kwarg(check, 'q_seed') else {}
+        if self.free_tilt is not None and accepts_kwarg(check, 'max_tilt_deg'):
+            kwargs['max_tilt_deg'] = self.free_tilt
+        self._check_abort('release_clearance')
+        self._guard('release_clearance')
+        ok, why = check(target, **kwargs)
+        self._check_abort('release_clearance')
+        if not ok:
+            return 'release exit endpoint: ' + str(why)
+        ok, why = native(actual, target, seed, self.free_tilt)
+        self._check_abort('release_clearance')
+        if not ok:
+            return 'release exit path: ' + str(why)
+        self._guard('release_clearance')
+        current, why = self._release_feedback(p)
+        if (why or current is None or np.linalg.norm(current[:3, 3] - actual[:3, 3]) > .001
+                or rotation_angle(actual[:3, :3].T @ current[:3, :3]) > math.radians(.5)):
+            return 'release pose changed during clearance preflight'
+        return ''
 
     def _release_and_retreat(self, r: PickResult, g: GraspPlan, p: PlacePlan) -> None:
         # A successful motion flag is insufficient: recovery and continuation
@@ -643,20 +744,33 @@ class PickPlaceSkill:
             height_error_m=float(after[2, 3] - p.T_release[2, 3]),
             linear_speed_m_s=speed, angular_speed_rad_s=angular,
             settled_s=elapsed)
-        self._guard('open_release')
         held = r.grasp_width or 0.0
         width = p.open_width
         if r.grasp_width is not None:
             # The plan sized the opening from the detected width; an object that is
             # wider between the fingers would stay held by it.
             width = min(self.max_width, max(width, held + RELEASE_OPEN_EXTRA))
-        need = min(width - RELEASE_FULL_OPEN_TOL, held + RELEASE_OPEN_MARGIN)
+        wide = self._checked_stack_opening(g, p, after, width)
+        clear, why = (None, '') if wide else self._stack_release_clearance(g, p, after, width)
+        if why:
+            r.ok = False
+            r.stage, r.error = 'release_clearance', 'release_clearance_unconfirmed'
+            r.detail.update(holding=True, reason=why)
+            return
+        self._check_abort('open_release')
+        self._guard('open_release')
+        need = width if wide else min(width - RELEASE_FULL_OPEN_TOL, held + RELEASE_OPEN_MARGIN)
         try:
             # A finger stopped by the bin or an earlier object is not a fault once
             # the fingers are open past the held width: the object is released.
             self._open(r, 'open_release', width,
-                       need=need if self.verify else None,
+                       need=need if self.verify or wide else None,
                        short_ok=need if r.grasp_width is not None else None)
+            if wide:
+                measured = self._read_width()
+                if measured is None or measured < width:
+                    raise _StepFailed('open_release', 'checked_opening_unconfirmed',
+                                      'fresh opening has not reached the checked exit width', fault=True)
         except _StepFailed as e:
             r.stage, r.error = e.stage, e.error
             if not e.fault:
@@ -665,10 +779,17 @@ class PickPlaceSkill:
             r.detail['fault'] = True
             return
         r.detail['holding'] = False
+        if wide:
+            r.detail['release_exit_mode'] = 'checked_wide_opening'
+        elif clear is not None:
+            r.detail['release_exit_mode'] = 'vertical_clearance'
         r.ok = True
         r.stage = 'done'
         try:
-            self._move(r, 'retreat', p.T_retreat, self.linear_moves)
+            if clear is not None:
+                self._guard('release_clearance')
+                self._move(r, 'release_clearance', clear, True)
+            self._move(r, 'retreat', p.T_retreat, True if wide else self.linear_moves)
         except _StepFailed as e:
             # The object is in the zone; report the failed retreat but keep ok=True.
             r.error = 'retreat_' + e.error

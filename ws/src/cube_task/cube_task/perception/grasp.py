@@ -510,7 +510,7 @@ class GraspPlanner:
         """Constrain a known shape's approach depth, e.g. a tall pear's neck."""
         return self.max_depth_by_label.get(str(label), self.max_depth)
 
-    def plan(self, det: Detection) -> GraspPlan:
+    def plan(self, det: Detection, *, closing_angle: Optional[float] = None) -> GraspPlan:
         """Return a GraspPlan; feasible=False with a reason when it cannot be done."""
         missing = [n for n in ('yaw', 'length', 'width', 'height') if not _finite(getattr(det, n))]
         c = det.center_base
@@ -575,6 +575,12 @@ class GraspPlanner:
             if is_block:
                 # A block next to a taller one looks elongated (strip hidden behind it).
                 closing, expected = self._avoid_neighbors(det, closing, x, y, expected, length)
+        if closing_angle is not None:
+            if not _finite(closing_angle):
+                return _identity_plan(det, 'bad_geometry: closing angle is not finite', self.close_width)
+            # Alternative contact axes still pass the same measured section,
+            # aperture, taper and neighborhood checks below.
+            closing = wrap_pi(float(closing_angle))
         z_floor = (table_floor_z(table_z, self.expected_table_z) + self.table_clearance
                    + TABLE_MARGIN)
         pts = det.extra.get('_points_base') if (det.extra and self.use_profile) else None
@@ -633,6 +639,11 @@ class GraspPlanner:
                 info.update(adaptive)
                 if adaptive.get('blocked'):
                     reason = 'blocked_by_neighbor: no measured collision-free finger sweep'
+        if (not reason and closing_angle is not None
+                and det.extra.get('_neighbor_xy') is not None
+                and np.any(self._sweep_mask(det.extra['_neighbor_xy'], closing,
+                                           x, y, expected, open_w))):
+            reason = 'blocked_by_neighbor: requested contact axis intersects measured material'
         info['z_rel'] = round(z_grasp - table_z, 4)
         det.extra['grasp'] = info
         plan = GraspPlan(

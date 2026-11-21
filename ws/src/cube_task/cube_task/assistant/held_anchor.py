@@ -51,7 +51,15 @@ def spherical_model(target):
 
 def seating_requires_feedback(grasp, result, width):
     """A large measured seating change cannot establish an unchanged grip."""
-    if not grasp.target.extra.get('_stack_support') or spherical_model(grasp.target) is None:
+    extra = grasp.target.extra
+    try:
+        supported_source = (extra.get('support_observed') is True
+                            and bool(extra.get('support_label'))
+                            and math.isfinite(float(extra.get('support_z'))))
+    except (TypeError, ValueError):
+        supported_source = False
+    if (not (extra.get('_stack_support') or supported_source)
+            or spherical_model(grasp.target) is None):
         return False
     closes = [step.get('width') for step in result.detail.get('steps', [])
               if step.get('stage') == 'close' and step.get('ok')]

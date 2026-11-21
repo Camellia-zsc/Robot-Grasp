@@ -893,6 +893,8 @@ class TaskRunner:
         from ..perception.grasp import annotate_grasp_neighbors
         annotate_grasp_neighbors(det, neighbors)
         gp = self.planner.plan(det)
+        from .grasp_contact import supported_grasp
+        gp = supported_grasp(self.planner, self.arm, det, gp)
         if not gp.feasible:
             if gp.reason.startswith(REMEASURE_REASONS):
                 # One bad frame can give these: measure again on the next observation.
@@ -1700,6 +1702,8 @@ class TaskRunner:
         from ..perception.grasp import annotate_grasp_neighbors
         annotate_grasp_neighbors(target, others)
         gp = self.planner.plan(target)
+        from .grasp_contact import supported_grasp
+        gp = supported_grasp(self.planner, self.arm, target, gp)
         if not gp.feasible:
             return None, 'grasp infeasible: %s' % gp.reason
         held = held_offset_of(gp)

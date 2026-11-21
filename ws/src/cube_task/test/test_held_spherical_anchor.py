@@ -136,7 +136,7 @@ def anchored_release_session(monkeypatch, *, clouds=True, second_change=False, d
     session.camera._last.stamp = 1.
     captures, replans = [], []
     local = np.array([.005, -.004, .052])
-    def capture():
+    def capture(**kwargs):
         captures.append(1)
         now[0] = 2.+.05*len(captures)
         session.camera._last.stamp = (2. if duplicate_stamp else now[0]-(1. if stale_frames else 0.))
@@ -171,6 +171,19 @@ def test_two_fresh_anchor_captures_precede_release_replanning(monkeypatch):
     assert not np.array_equal(replans[0], original)
     source = source_anchor(grasp)
     np.testing.assert_allclose((inv_T(grasp.T_grasp) @ np.r_[source['center'], 1.])[:3], local, atol=.0001)
+
+
+def test_self_filtered_environment_does_not_remove_raw_surfaces_from_grip_calibration(monkeypatch):
+    from cube_task.assistant.carried_observation import CarriedDetections
+    session, grasp, place, result, captures, replans, moves, local = anchored_release_session(monkeypatch)
+    capture = session._stationary_recovery_observation
+    def filtered_capture(**kwargs):
+        raw = capture(**kwargs)
+        return CarriedDetections([], raw)
+    session._stationary_recovery_observation = filtered_capture
+    assert session._before_release(grasp, place, .0385, result) is place
+    assert len(captures) == 2 and len(replans) == 1 and not moves
+    assert result.detail['held_anchor_feedback']['ok']
 
 
 def test_edit_during_anchor_capture_invalidates_reference_before_replan(monkeypatch):

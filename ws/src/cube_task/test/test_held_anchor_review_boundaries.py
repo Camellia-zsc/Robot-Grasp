@@ -17,7 +17,7 @@ def test_seated_held_continuation_never_checks_sweep_with_unconfirmed_source_anc
     session.runner._held_transfer_feedback = lambda det: ({'grasp': grasp}, .0385, '')
     # The current capture contains no held target. A 7.9 mm seating change
     # therefore cannot establish the rigid body envelope used by the sweep.
-    session._stationary_recovery_observation = lambda: []
+    session._stationary_recovery_observation = lambda **kwargs: []
     result = PickResult(False, grasp_width=.0385,
                         detail={'holding': True, 'steps': []})
     route = session._before_held_transit(grasp, place, .0385, result)

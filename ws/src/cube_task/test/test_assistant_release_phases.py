@@ -30,7 +30,7 @@ def release_session(monkeypatch, capacity=True):
     session._emit = lambda *a: None
     session._on_stage = lambda *a: None
     session._refresh_placement_occupancy = lambda *a: None
-    session._stationary_recovery_observation = lambda: []
+    session._stationary_recovery_observation = lambda **kwargs: []
     session.cfg = SimpleNamespace(get=lambda key, default=None: default)
     session.camera = SimpleNamespace(_last=SimpleNamespace(), intrinsics=lambda: None)
 
@@ -244,7 +244,7 @@ def test_new_inspection_targets_the_measured_planned_landing_not_region_center(m
 
 def test_intervention_during_capture_never_uses_mixed_scene_depth_for_release(monkeypatch):
     session, target, grasp, place, _now, moves, calls = release_session(monkeypatch)
-    def capture():
+    def capture(**kwargs):
         session._environment_revision += 1
         return []
     session._stationary_recovery_observation = capture
@@ -269,3 +269,27 @@ def test_release_support_views_are_accumulated_only_within_one_scene_revision(mo
     result = PickResult(False, detail={'holding': True})
     assert session._before_release(grasp, place, .05, result) is place
     assert seen == [0, 0]
+
+
+@pytest.mark.parametrize('capacity', [True, None])
+def test_observation_route_failure_preserves_release_and_capacity_diagnostics(monkeypatch, capacity):
+    session, _target, grasp, place, _now, moves, _calls = release_session(monkeypatch, capacity)
+    session.runner.replan_release = lambda *a, **k: (None, 'landing_not_visible')
+    monkeypatch.setattr('cube_task.assistant.placement_observation.safe_inspection_route',
+        lambda *a, **k: ([], 'inspection_path_blocked'))
+    result = PickResult(False, detail={'holding': True})
+    assert session._before_release(grasp, place, .05, result) is None
+    assert not moves
+    assert result.detail['placement_checks'] == dict(release_rejection='landing_not_visible',
+        capacity=capacity, capacity_reason='' if capacity else 'no_clear_supported_release',
+        inspection_rejection='inspection_path_blocked')
+
+
+def test_proven_full_destination_is_distinct_from_an_unchecked_observation_path(monkeypatch):
+    session, _target, grasp, place, _now, moves, _calls = release_session(monkeypatch, False)
+    session.runner.replan_release = lambda *a, **k: (None, 'no_clear_supported_release')
+    result = PickResult(False, detail={'holding': True})
+    assert session._before_release(grasp, place, .05, result) is None
+    assert not moves
+    assert result.detail['placement_checks'] == dict(release_rejection='no_clear_supported_release',
+        capacity=False, capacity_reason='no_clear_supported_release', inspection_rejection='')

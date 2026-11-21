@@ -9,7 +9,7 @@ import copy
 import math
 from contextlib import nullcontext
 
-from .skill_protocol import MAX_SKILL_STEPS, validate_skill_plan
+from .skill_protocol import MAX_SKILL_STEPS, placement_checks_summary, validate_skill_plan
 
 MIN_PLANS = 8
 MAX_PLANS = 16
@@ -336,6 +336,9 @@ class SkillOrchestrator:
         for name in ('changed', 'progress', 'skipped', 'verification_reused'):
             if type(result.get(name)) is bool:
                 entry[name] = result[name]
+        checks = placement_checks_summary(result.get('placement_checks'))
+        if checks is not None:
+            entry['placement_checks'] = checks
         with self.ctl._lock:
             self.ctl._skill_task['history'].append(entry)
             self.ctl._last_result = copy.deepcopy(result)

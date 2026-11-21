@@ -583,7 +583,7 @@ class SimulationSession:
                 if self.cancel_event.is_set() or revision != self._environment_revision:
                     return dict(ok=False, error='scene_changed'), []
                 fresh = (first_detections if index == 0 and first_detections is not None
-                         else self._stationary_recovery_observation())
+                         else self._stationary_recovery_observation(grasp=grasp))
                 self._apply_interventions()
                 if self.cancel_event.is_set() or revision != self._environment_revision:
                     return dict(ok=False, error='scene_changed'), fresh
@@ -598,7 +598,10 @@ class SimulationSession:
                         or age > max_age or abs(float(sample.stamp)-float(frame.stamp)) > max_age):
                     return dict(ok=False, error='held_tcp_not_fresh'), fresh
                 pose = np.asarray(sample.value, float)
-                fitted = held_anchor(fresh, grasp, source, pose)
+                # Environment segmentation removes the carried body before
+                # merging obstacles. Seating feedback still needs that same
+                # capture's original surfaces, never a previous frame's cache.
+                fitted = held_anchor(getattr(fresh, 'anchor_detections', fresh), grasp, source, pose)
                 if not fitted.get('ok'):
                     return fitted, fresh
                 fits.append(fitted)
@@ -698,6 +701,8 @@ class SimulationSession:
                                              remember_inspection)
         from ..core.extrinsics import camera_pose_in_base
         neighbors = list(self._observed_detections)
+        checks = result.detail['placement_checks'] = dict(
+            release_rejection='', capacity=None, capacity_reason='', inspection_rejection='')
         support_views, support_revision = [], None
         support_current = True
         last_progress = [0.]
@@ -723,8 +728,9 @@ class SimulationSession:
 
         def measure():
             nonlocal neighbors, support_revision, options, support_current, width
+            checks.update(capacity=None, capacity_reason='')
             revision = self._environment_revision
-            fresh = self._stationary_recovery_observation()
+            fresh = self._stationary_recovery_observation(grasp=grasp, width=width)
             if revision != self._environment_revision:
                 support_views.clear()
                 return None, 'scene_changed', revision
@@ -798,6 +804,7 @@ class SimulationSession:
                     target, grasp, place, width, neighbors, seconds=8.,
                     observation_filter=visible, search_state=search_state,
                     progress=progress, **options)
+            checks['release_rejection'] = str(why) if updated is None else ''
             return updated, why, revision
         updated, why, revision = budget.run(measure)
         if str(why).startswith('held_anchor_unconfirmed'):
@@ -817,6 +824,7 @@ class SimulationSession:
                 capacity, capacity_why = budget.run(phase, self.runner.has_release_capacity,
                     target, grasp, place, width, neighbors, seconds=5.,
                     progress=progress, **options)
+            checks.update(capacity=capacity, capacity_reason=str(capacity_why))
             if capacity is False:
                 why = '当前测量下无可确认的放置方案：' + str(capacity_why)
             else:
@@ -856,6 +864,7 @@ class SimulationSession:
                         free_tilt_deg=self.runner.free_tilt,
                         cancelled=budget.cancelled, progress=progress)
                     if not route:
+                        checks['inspection_rejection'] = str(route_why)
                         why = route_why
                         continue
                     observed_views += 1
@@ -2033,6 +2042,8 @@ class SimulationSession:
             summary['diagnostics'] = str(result.detail.get('last_motion_detail') or
                                          result.detail.get('placement_planning_reason') or
                                          result.detail.get('reason') or why or '')[:500]
+            if 'placement_checks' in result.detail:
+                summary['placement_checks'] = copy.deepcopy(result.detail['placement_checks'])
         if (result is not None and self._physics is not None and
                 not self.cancel_event.is_set() and self.world.held is None):
             self._status = 'settling'
@@ -2269,7 +2280,7 @@ class SimulationSession:
             self._publish_snapshot()
             return context
 
-    def _stationary_recovery_observation(self):
+    def _stationary_recovery_observation(self, *, grasp=None, width=None):
         """Capture and process a new RGB-D frame without commanding any joint."""
         from ..camera.utils import capture_averaged
         from ..core.extrinsics import camera_pose_in_base
@@ -2283,14 +2294,43 @@ class SimulationSession:
         if flange is None or self.runner.ext is None:
             raise RuntimeError('恢复时无法读取相机坐标变换')
         pose = camera_pose_in_base(self.runner.ext, flange.value, self.runner.T_flange_tcp)
-        result = self.runner.perception.process(frame, pose, self.runner.zones)
+        raw_result = self.runner.perception.process(frame, pose, self.runner.zones)
+        result = raw_result
+        context = getattr(self.runner, '_held_recovery_context', None)
+        if context is not None or grasp is not None:
+            # Separate self surfaces in 3-D before segmentation: a carried
+            # block can merge with a fruit below and acquire a different label.
+            # Keep original depth for visibility and the raw surfaces for
+            # independent held-anchor feedback from this exact capture.
+            from .carried_observation import CarriedDetections, mask_carried_depth
+            if grasp is None:
+                confirmed, opening, _why = self.runner._held_transfer_feedback(context['det'])
+                grasp = context['grasp'] if confirmed is not None else None
+            else:
+                # During the first move the recovery context is saved only
+                # after the skill returns. Its live callback already owns the
+                # executed measured grasp and verified opening.
+                opening = width if width is not None else self.runner.skill._read_width()
+                if not self.runner.skill._healthy():
+                    grasp = None
+            if grasp is not None:
+                tcp = self.arm.get_tcp_pose()
+                if (tcp is not None and tcp.value is not None
+                        and abs(float(tcp.stamp) - float(frame.stamp)) <= self.runner.skill.feedback_max_age):
+                    environment_frame = mask_carried_depth(frame, pose, grasp,
+                        tcp.value, opening, nominal=self.runner.nominal.get(grasp.target.label))
+                    if environment_frame is not frame:
+                        result = self.runner.perception.process(environment_frame, pose, self.runner.zones)
+            detections = CarriedDetections(result.detections, raw_result.detections)
+        else:
+            detections = result.detections
         self._scan_stats['frames'] += 1
         self.runner._last_stamp = float(frame.stamp)
         self._cache_observation(6, result, frame, label='恢复时静止观测')
         self._emit('recovery_observation', {'message': ('已保持夹持并完成静止相机观测'
                     if self.runner.has_held_recovery else '已完成当前视角的静止相机观测'),
                                            'detections': [d.summary() for d in result.detections]})
-        return result.detections
+        return detections
 
     def execute_recovery(self, decision, cancel_event=None, confirmed=False):
         """Execute only a current locally offered action, preserving the original goal."""

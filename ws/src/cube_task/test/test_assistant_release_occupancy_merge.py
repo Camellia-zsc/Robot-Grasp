@@ -43,7 +43,7 @@ def test_release_merge_rebinds_only_a_fresh_complete_unique_catalog_object(
                                    valid=False)
     fresh.append(uncertain_neighbor)
     session._observed_detections = [target, old]
-    session._stationary_recovery_observation = lambda: fresh
+    session._stationary_recovery_observation = lambda **kwargs: fresh
     monkeypatch.setattr('cube_task.assistant.observation_policy.measurement_visible',
                         lambda *a: False)
     planned_neighbors = []

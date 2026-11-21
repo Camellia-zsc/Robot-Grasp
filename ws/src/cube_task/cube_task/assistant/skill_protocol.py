@@ -37,6 +37,10 @@ task_contract 是用户全体任务的固定范围；task_inventory 仅含摆场
 pending_obligations 列出尚未履行的非目标物品原位复位义务：必须用 original 引用恢复，
 不能把这些义务改写成用户goals或偷偷放弃；finish前必须完成，否则控制器不会判为成功。
 history、failure 和 last_action_failure 是真实逐步执行反馈；观察成功不代表上次动作失败已解决。
+placement_checks 将放置拒绝 release_rejection、几何容量 capacity/capacity_reason 和观察路径拒绝
+inspection_rejection 分开记录。观察路径受阻不能推论目标区域已满；只有 capacity=false 才表示
+当前测量与安全余量下没有几何可放方案。capacity=null 或缺失表示未能判定容量；capacity=true
+仅表示几何上存在候选，仍须通过新相机可见性、可达性和完整路径等检查，不能授权强行放置。
 失败后结合新观测重新规划，不能假定旧步骤成功。capabilities 是当前执行器能力，按能力组合技能，
 可依次腾挪多件物品、暂放当前持物、再搬开障碍并恢复原位，不必拘泥于单物品固定套路。
 不要无限重复失败技能；没有实测依据时先观察，需人工决策时询问，无法推进时 stop。
@@ -184,15 +188,31 @@ def _destination_summary(value):
     return result
 
 
+def placement_checks_summary(value):
+    """Keep independent local checks without leaking geometry or coercing unknown."""
+    if not isinstance(value, dict):
+        return None
+    result = {key: value[key][:500]
+              for key in ('release_rejection', 'capacity_reason', 'inspection_rejection')
+              if isinstance(value.get(key), str)}
+    if 'capacity' in value and (value['capacity'] is None or type(value['capacity']) is bool):
+        result['capacity'] = value['capacity']
+    return result
+
+
 def _failure_summary(value):
     if not isinstance(value, dict):
         raise ValueError('技能执行失败反馈无效。')
-    # Refusals keep the actionable measurement reason in detail, separate from
-    # their short UI message. Forward text only, never structured motion/truth data.
-    return _fields(value,
+    # Reasons stay separate from the short UI message. Structured diagnostics
+    # use their own narrow allowlist, never arbitrary motion or truth data.
+    result = _fields(value,
                    strings=('stage', 'error', 'message', 'detail', 'diagnostics', 'observation_error'),
                    flags=('holding', 'fault', 'aborted', 'controller_ok', 'ok', 'progress'),
                    numbers=('duration',))
+    checks = placement_checks_summary(value.get('placement_checks'))
+    if checks is not None:
+        result['placement_checks'] = checks
+    return result
 
 
 def _capabilities(value):
@@ -392,6 +412,9 @@ def model_skill_context(context: dict) -> dict:
         destination = _destination_summary(item.get('destination'))
         if destination is not None:
             record['destination'] = destination
+        checks = placement_checks_summary(item.get('placement_checks'))
+        if checks is not None:
+            record['placement_checks'] = checks
         visible['history'].append(record)
     return visible
 

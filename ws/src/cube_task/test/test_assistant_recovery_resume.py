@@ -17,6 +17,14 @@ class Resumable(ConfirmedSession):
         self.cancel_event = threading.Event()
         self._recovery_goal = {'label': 'apple', 'zone_name': 'zone_red'}
 
+    def execute(self, decision, cancel_event=None):
+        result = super().execute(decision, cancel_event)
+        if not result['ok'] and not result.get('aborted'):
+            # This fixture represents a held scene refusal. A driver fault
+            # requires intervention and must not make resume available.
+            result.update(error='scene_changed', fault=False)
+        return result
+
 
 def answer(controller, approval, approved):
     controller.approve_recovery(dict(request_id=approval['request_id'],
@@ -28,6 +36,20 @@ def decline_initial_recovery(controller):
     answer(controller, pending(controller), False)
     assert controller.wait_idle(3)
     assert controller.snapshot()['can_resume_recovery']
+
+
+def test_legacy_held_driver_fault_cannot_resume_through_the_request_boundary():
+    ctl = create(Resumable, RecoveryClient())
+    try:
+        decline_initial_recovery(ctl)
+        ctl._last_result.update(fault=True, error='comm', aborted=False)
+        assert not ctl.snapshot()['can_resume_recovery']
+        with pytest.raises(ValueError, match='故障'):
+            ctl.resume_recovery()
+        assert not ctl._session.repairs
+        assert not ctl.snapshot()['busy']
+    finally:
+        ctl.close()
 
 
 def test_partial_batch_resume_does_not_count_the_whole_request_as_success():

@@ -222,6 +222,8 @@ class DashboardController:
         if hasattr(self._client, 'plan_skills'):
             return self._resume_skills()
         with self._lock:
+            if self._has_controller_fault():
+                raise ValueError('机械臂故障尚未清除，请先重置场景再继续')
             session = self._session
             if (self._busy or self._closed or self._cancel.is_set() or session is None
                     or not getattr(getattr(session, 'runner', None), 'has_held_recovery', False)

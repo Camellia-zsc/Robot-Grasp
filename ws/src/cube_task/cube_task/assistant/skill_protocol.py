@@ -50,8 +50,9 @@ pending_obligations 列出尚未履行的非目标物品原位复位义务：必
 不能把这些义务改写成用户goals或偷偷放弃；finish前必须完成，否则控制器不会判为成功。
 history、failure 和 last_action_failure 是真实逐步执行反馈；观察成功不代表上次动作失败已解决。
 placement_checks 将放置拒绝 release_rejection、几何容量 capacity/capacity_reason 和观察路径拒绝
-inspection_rejection 分开记录。观察路径受阻不能推论目标区域已满；只有 capacity=false 才表示
-当前测量与安全余量下没有几何可放方案。capacity=null 或缺失表示未能判定容量；capacity=true
+inspection_rejection 分开记录。观察路径受阻不能推论目标区域已满；capacity=false 表示
+当前测量与安全余量下受检候选未找到几何可放方案，有限采样不能断言连续空间绝对已满。
+capacity=null 或缺失表示未能判定容量；capacity=true
 仅表示几何上存在候选，仍须通过新相机可见性、可达性和完整路径等检查，不能授权强行放置。
 失败后结合新观测重新规划，不能假定旧步骤成功。capabilities 是当前执行器能力，按能力组合技能，
 可依次腾挪多件物品、暂放当前持物、再搬开障碍并恢复原位，不必拘泥于单物品固定套路。

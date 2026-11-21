@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
+from itertools import chain
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -1493,8 +1494,62 @@ class PlacePlanner:
                      center[1] + s * i * SLOT_GRID_STEP + c * j * SLOT_GRID_STEP)
                     for i in range(-nx, nx + 1) for j in range(-ny, ny + 1)]
             candidates += sorted(grid, key=lambda p: math.hypot(p[0]-center[0], p[1]-center[1]))
+
+        def boundary_candidates():
+            # A 5 mm grid can miss a valid pocket between an occupied footprint
+            # and the support's inset edge. Refine only that narrow boundary
+            # band after the ordinary search; every seed keeps the same checks.
+            if fixed_xy:
+                return
+            axis_offset = float(held.get('axis_offset', -math.pi / 2))
+            axes = self._axes(zone, *center, L, W, bool(held.get('elongated')))
+            if '_required_closing' in held:
+                closing = float(held['_required_closing'])
+                if not math.isfinite(closing):
+                    return
+                turns = (0., math.pi/2, -math.pi/2, math.pi) if held.get('_restore_quarter_turns') else (0.,)
+                axes = [closing + turn + axis_offset if held.get('elongated') else None for turn in turns]
+            else:
+                neutral = neutral_closing_angle(*center)
+                axes += [neutral + turn*math.pi/4 + axis_offset if held.get('elongated') else None
+                         for turn in (0, 1, -1, 2, 3)]
+            c, s = math.cos(zone.yaw), math.sin(zone.yaw)
+            rotation = np.array([[c, -s], [s, c]])
+            insets = np.arange(9) * (SLOT_GRID_STEP / 4)
+            seen_bounds = set()
+            for axis in axes:
+                cap = footprint_capsule(0., 0., L, W, axis)
+                extent = np.max(np.abs(np.asarray(cap[:2]) @ rotation), axis=0) + cap[2]
+                bounds = np.asarray(zone.size, float)/2 - extent
+                key = tuple(np.round(bounds, 12))
+                if np.any(bounds < 0.) or key in seen_bounds:
+                    continue
+                seen_bounds.add(key)
+                levels = [[max(0., float(bound-depth)) for depth in insets if depth <= bound+1e-12]
+                          for bound in bounds]
+
+                def points(x, y):
+                    for sx, sy in ((1, 1), (-1, -1), (1, -1), (-1, 1)):
+                        point = np.asarray(center) + rotation @ [sx*x, sy*y]
+                        yield float(point[0]), float(point[1]), True
+
+                # Corners expose narrow pockets quickly before the edge rows.
+                for depth in insets:
+                    if depth <= min(bounds)+1e-12:
+                        yield from points(max(0., bounds[0]-depth), max(0., bounds[1]-depth))
+                for x in levels[0]:
+                    for y in levels[1]:
+                        yield from points(x, y)
+                along = [[i*SLOT_GRID_STEP for i in range(int(bound/SLOT_GRID_STEP)+1)]
+                         for bound in bounds]
+                for x in levels[0]:
+                    for y in along[1]:
+                        yield from points(x, y)
+                for y in levels[1]:
+                    for x in along[0]:
+                        yield from points(x, y)
         visited = set()
-        for x, y in candidates:
+        for x, y, boundary in chain(((x, y, False) for x, y in candidates), boundary_candidates()):
             if cancelled is not None and cancelled():
                 return None
             key = (round(x, 12), round(y, 12))
@@ -1561,7 +1616,8 @@ class PlacePlanner:
                 info = {'xy': [x, y], 'axis': axis, 'closing_angle': closing, 'edge_margin': edge,
                         'footprint_clearance': None if not math.isfinite(fp) else fp,
                         'finger_clearance': None if not math.isfinite(fg) else fg,
-                        'open_width': opening, 'tier': 'exact_point' if fixed_xy else 'strict_grid'}
+                        'open_width': opening, 'tier': 'exact_point' if fixed_xy else
+                        'strict_boundary' if boundary else 'strict_grid'}
                 return tx, ty, closing, info
         return None
 

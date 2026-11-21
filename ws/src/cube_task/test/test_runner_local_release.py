@@ -67,18 +67,21 @@ def test_fixed_point_occupied_returns_no_plan_instead_of_another_center():
     assert not runner.events
 
 
-def test_region_final_tilt_failure_retries_another_center():
+def test_region_final_tilt_failure_keeps_other_wrist_directions_at_same_center():
     runner, target, grasp, previous = scene()
     visited = []
+    runner._strict_place_filter = lambda *a, **k: (
+        lambda x, y, closing: abs(x - .4) < 1e-9 and abs(y) < 1e-9)
 
     def final_check(det, gp, pp, neighbors, polygon, desired, held, **kwargs):
-        visited.append(tuple(desired))
+        visited.append((tuple(desired), pp.T_release[:3, :3].copy()))
         return (False, 'leaned finger blocked') if len(visited) == 1 else (True, '')
 
     runner._adjust_strict_release = final_check
     updated, why = runner.replan_release(target, grasp, previous, .05, [target])
     assert updated is not None, why
-    assert len(visited) == 2 and visited[0] != visited[1]
+    assert len(visited) == 2 and visited[0][0] == visited[1][0]
+    assert not np.allclose(visited[0][1], visited[1][1])
 
 
 def test_interrupted_release_search_resumes_completed_rejections_in_same_measurement(monkeypatch):
@@ -100,14 +103,18 @@ def test_interrupted_release_search_resumes_completed_rejections_in_same_measure
         cancelled=lambda: stopped[0], progress=progress, search_state=state)
     assert updated is None and why == 'placement_planning_budget_exceeded'
     assert visited == [(.4, 0.)]
-    assert state['avoided'] == [(.4, 0.)]
+    assert state['avoided'] == []
+    assert len(state['avoided_poses']) == 1
+    assert tuple(state['avoided_poses'][0][:2]) == (.4, 0.)
+    assert tuple(state['preferred_xy'][0]) == (.4, 0.)
 
     stopped[0] = False
     runner._adjust_strict_release = lambda *a, **k: (True, '')
     updated, why = runner.replan_release(target, grasp, previous, .05, [target],
         search_state=state)
     assert updated is not None, why
-    assert tuple(runner.placer.last_info['xy']) != visited[0]
+    assert tuple(runner.placer.last_info['xy']) == visited[0]
+    assert runner.placer.last_info['closing_angle'] != state['avoided_poses'][0][2]
 
 
 def test_interrupted_candidate_is_not_saved_as_a_completed_rejection(monkeypatch):

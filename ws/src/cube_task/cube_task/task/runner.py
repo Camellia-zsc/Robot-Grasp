@@ -1505,6 +1505,7 @@ class TaskRunner:
         state = {} if search_state is None else search_state
         avoided = state.setdefault('avoided', [])
         avoided_poses = state.setdefault('avoided_poses', [])
+        preferred_xy = tuple(state.get('preferred_xy', preferred_xy))
         why = 'no clear reachable position in the requested destination'
         for attempt in range(attempt_limit):
             if interrupted():
@@ -1576,10 +1577,19 @@ class TaskRunner:
                             changed=not np.allclose(candidate.T_release, pp.T_release, atol=.001),
                             avoided=[[round(float(a), 4), round(float(b), 4)] for a, b in avoided])
                 return candidate, ''
-            if exact_xy or stacked:
-                avoided_poses.append((*xy, info['closing_angle']))
-            else:
-                avoided.append(xy)
+            # The placer already established XY support/occupancy geometry.
+            # Rejections here come from the leaned full pose, IK, retreat or
+            # final camera footprint. Another wrist direction at this same
+            # measured point can still work, including in an ordinary region.
+            # Keep broad XY exclusions for caller-proven XY-only conflicts.
+            avoided_poses.append((*xy, info['closing_angle']))
+            # This point has already passed measured XY support/occupancy.
+            # Try its remaining directions before rescanning the region grid;
+            # the same-measurement continuation retains this bounded ordering.
+            preferred_xy = (xy,) + tuple(p for p in preferred_xy
+                if np.linalg.norm(np.asarray(p) - xy) > 1e-8)
+            preferred_xy = preferred_xy[:8]
+            state['preferred_xy'] = preferred_xy
             # Reach adjustment mutates both plans. Every new candidate must use
             # the same physically held grasp, not a failed candidate's anchor.
             planning_grasp = copy.deepcopy(gp)

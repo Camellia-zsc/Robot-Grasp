@@ -2436,6 +2436,14 @@ class SimulationSession:
         with self._cache_lock:
             return copy.deepcopy(self._snapshot)
 
+    def task_inventory(self) -> list:
+        """Operator-created identities for task scope; never motion geometry."""
+        from collections import Counter
+        with self._operation_lock:
+            self._check_open()
+            counts = Counter(obj.label for obj in self.world.objects)
+            return [dict(label=label, count=count) for label, count in counts.items()]
+
     def frame_jpeg(self) -> Optional[bytes]:
         """Return the most recent perception image; polling has no side effects."""
         with self._cache_lock:

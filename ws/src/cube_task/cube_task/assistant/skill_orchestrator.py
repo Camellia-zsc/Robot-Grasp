@@ -172,6 +172,40 @@ class SkillOrchestrator:
             return context['det'].label
         return None
 
+    def _bind_task_contract(self, memory):
+        """Freeze the requested scope independently of camera actionability."""
+        from .task_contract import bind_task_contract
+        inventory = memory.get('task_inventory')
+        if inventory is None:
+            reader = getattr(self.session, 'task_inventory', None)
+            if callable(reader):
+                inventory = reader()
+            else:
+                # Compatibility sessions have observations but no scene editor.
+                # Deduplicate semantic fragments; never use all configured classes.
+                labels = dict.fromkeys(o.get('label') for o in self.session.scene.get('objects', [])
+                                       if isinstance(o.get('label'), str))
+                inventory = [dict(label=label, count=1) for label in labels]
+            # Old task memory predates manifest snapshots. A task-start camera
+            # identity remains requested even if the user later removes it.
+            inventory = copy.deepcopy(inventory)
+            known = {item if isinstance(item, str) else item.get('label') for item in inventory}
+            for original in memory.get('originals', []):
+                label = original.get('label')
+                if original.get('valid') and isinstance(label, str) and label not in known:
+                    inventory.append(dict(label=label, count=1))
+                    known.add(label)
+        contract = bind_task_contract(memory.get('instruction', ''), self.session.scene,
+                                      inventory, memory['goals'])
+        if contract is None and memory.get('task_contract') is not None:
+            raise ValueError('已保存的全体任务范围无法与原指令对应，不能缩减目标。')
+        if contract is not None:
+            memory['task_inventory'] = [dict(label=label, count=1)
+                                        for label in contract['required_labels']]
+            memory['task_contract'] = contract
+            memory['goals'] = copy.deepcopy(contract['goals'])
+        return contract
+
     def _context(self, memory, failure, executor=None):
         snap = self.session.snapshot()
         scene = self.session.scene
@@ -189,7 +223,7 @@ class SkillOrchestrator:
         budget = dict(plan_number=task['plan_number'], max_plans=task['max_plans'],
                       remaining_plans=max(0, task['max_plans']-task['plan_number']),
                       remaining_steps=max(0, remaining), stagnation=memory['stagnation'])
-        return dict(scene=scene, goals=copy.deepcopy(memory['goals']),
+        context = dict(scene=scene, goals=copy.deepcopy(memory['goals']),
                     conversation=copy.deepcopy(memory.get('conversation', [])),
                     originals=copy.deepcopy(memory['originals']),
                     protected_goals=copy.deepcopy(memory['protected_goals']),
@@ -200,6 +234,10 @@ class SkillOrchestrator:
                     last_action_failure=copy.deepcopy(memory.get('last_action_failure', {})),
                     failure=copy.deepcopy(failure), max_steps=MAX_SKILL_STEPS,
                     remaining_steps=min(MAX_SKILL_STEPS, remaining))
+        if memory.get('task_contract') is not None:
+            context.update(task_contract=copy.deepcopy(memory['task_contract']),
+                           task_inventory=copy.deepcopy(memory['task_inventory']))
+        return context
 
     def _request(self, instruction, context, number):
         ctl = self.ctl
@@ -323,20 +361,35 @@ class SkillOrchestrator:
                 and (step.get('destination') or {}).get('type') == 'original'):
             memory['obligations'].pop(label, None)
 
-    def _verify_all(self, executor, memory, cached=None):
+    def _final_goals(self, memory):
+        """One contract list for both measurement and success publication."""
         goals = copy.deepcopy(memory['goals']+memory['protected_goals'])
         for label in memory['restorations']:
             originals = [o for o in memory['originals'] if o['label'] == label]
             if len(originals) != 1:
-                return dict(ok=False, error='original_not_measured', message='缺少承诺复位物品的原始测量')
+                raise ValueError('缺少承诺复位物品的原始测量')
             goals.append(dict(label=label, zone_name=None,
                 destination=dict(type='point', xy=list(originals[0]['center_base'][:2]))))
+        return goals
+
+    def _verify_all(self, executor, memory, cached=None):
+        try:
+            contract = self._bind_task_contract(memory)
+        except ValueError as exc:
+            return dict(ok=False, error='task_scope_unconfirmed', message=str(exc))
+        try:
+            goals = self._final_goals(memory)
+        except ValueError as exc:
+            return dict(ok=False, error='original_not_measured', message=str(exc))
         result = (self._cached_verification(cached, goals)
                   if not memory['protected_goals'] and not memory['restorations'] else None)
         if result is None:
             result = executor.execute(dict(id='final-check', skill='verify'), goals, cancel_event=self.ctl._cancel)
         if not self._verification_current(result):
             return dict(result, ok=False, error='scene_changed', message='最终核验期间现场变化，结果已过期')
+        if contract is not None and result.get('ok') and self._proof(result, goals) is None:
+            return dict(result, ok=False, error='task_scope_incomplete',
+                        message='最终核验没有覆盖全部请求物品，不能以部分目标宣告完成')
         for label in memory['restorations']:
             original = next(o for o in memory['originals'] if o['label'] == label)
             measured = [o for o in self.session.scene.get('objects', [])
@@ -361,6 +414,19 @@ class SkillOrchestrator:
         # Publish success atomically with respect to application/queuing of edits.
         with getattr(self.session, '_operation_lock', nullcontext()):
             with getattr(self.session, '_intervention_lock', nullcontext()):
+                if ok:
+                    try:
+                        contract = self._bind_task_contract(memory)
+                        expected = self._final_goals(memory)
+                    except ValueError as exc:
+                        ok, message = False, str(exc)
+                        result = dict(result or {}, error='task_scope_unconfirmed')
+                    else:
+                        if contract is not None and self._proof(result, expected) is None:
+                            ok, message = False, '仍有请求物品未通过最终核验，不能宣告全部完成'
+                            result = dict(result or {}, error='task_scope_incomplete')
+                    with self.ctl._lock:
+                        self.ctl._skill_task['goals'] = copy.deepcopy(memory['goals'])
                 if ok and not self._verification_current(result):
                     ok, message = False, '最终核验后现场发生变化，旧结果不能计作完成'
                 if ok:
@@ -464,6 +530,9 @@ class SkillOrchestrator:
         executor = self.executor_factory(self.session, originals=memory['originals'])
         try:
             self._check_stop()
+            self._bind_task_contract(memory)
+            self._publish(goals=memory['goals'],
+                          max_plans=plan_limit(memory['goals'], memory.get('initial_steps', ())))
             if not self.session.scene.get('objects') and not self.session.snapshot().get('held_object'):
                 self.session.observe()
                 if not resuming:

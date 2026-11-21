@@ -30,6 +30,10 @@ invalid 触边残片保留作诊断，不阻断同类别唯一完整测量；多
 允许同一物品多次搬移，允许依次搬开多件障碍；临时步骤不等于最终任务完成。
 goals 表示用户最终要求，不是当前临时落点。context.goals 非空时必须原样保持，
 不能因失败换目标或目的地。protected_goals 也是不可损害的既有最终约束。
+task_contract 是用户全体任务的固定范围；task_inventory 仅含摆场清单中的类别与数量，
+不是新相机测量，不能提供抓取坐标或执行许可。全体归默认区时，goals 必须覆盖完整清单，
+即使某些物品被遮挡、无效或尚未测到，也不能删掉。先观察取得有效测量再执行对应动作。
+每轮 steps 可以只处理一部分物品，但最终 goals 不能随局部计划缩小；finish 须核验全部。
 pending_obligations 列出尚未履行的非目标物品原位复位义务：必须用 original 引用恢复，
 不能把这些义务改写成用户goals或偷偷放弃；finish前必须完成，否则控制器不会判为成功。
 history、failure 和 last_action_failure 是真实逐步执行反馈；观察成功不代表上次动作失败已解决。
@@ -326,6 +330,31 @@ def model_skill_context(context: dict) -> dict:
         'max_steps': maximum, 'remaining_steps': remaining,
         'failure': _failure_summary(failure),
     }
+    if context.get('task_contract') is not None:
+        contract = context['task_contract']
+        inventory = context.get('task_inventory')
+        if (not isinstance(contract, dict)
+                or set(contract) != {'kind', 'required_labels', 'goals'}
+                or contract['kind'] != 'all_default'
+                or not isinstance(inventory, list) or not inventory):
+            raise ValueError('固定任务范围缺少有效的实际物品清单。')
+        records = []
+        for item in inventory:
+            if (not isinstance(item, dict) or type(item.get('count')) is not int
+                    or item['count'] != 1):
+                raise ValueError('固定任务范围的物品清单无法唯一引用。')
+            records.append(dict(label=_text(item.get('label'), '物品清单类别', 100), count=1))
+        labels = [item['label'] for item in records]
+        if (len(labels) > MAX_SKILL_STEPS or len(set(labels)) != len(labels)
+                or contract['required_labels'] != labels):
+            raise ValueError('固定任务范围与实际物品清单不一致。')
+        fixed_goals = _goals(contract['goals'], visible_scene, existing=True)
+        if (set(g['label'] for g in fixed_goals) != set(labels)
+                or fixed_goals != visible['goals']):
+            raise ValueError('最终目标没有覆盖固定任务范围。')
+        visible['task_inventory'] = records
+        visible['task_contract'] = dict(kind='all_default', required_labels=labels,
+                                        goals=fixed_goals)
     if 'conversation' in context:
         from .conversation import model_conversation
         visible['conversation'] = model_conversation(context['conversation'])

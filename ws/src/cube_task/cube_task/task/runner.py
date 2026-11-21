@@ -1727,6 +1727,7 @@ class TaskRunner:
         """Complete body envelopes bound the destination and the open fingers."""
         from ..perception.geometry import points_in_polygon, object_footprint, object_prism
         from ..perception.grasp import FINGER_OUTER, FINGER_HALF_BAND, RELEASE_OPEN_EXTRA
+        from ..perception.polygon_collision import prepare_polygon, polygons_overlap as overlaps
 
         polygon = np.asarray(support_polygon, dtype=float)
         dims = footprint_dims(det, self.nominal.get(det.label))
@@ -1737,16 +1738,6 @@ class TaskRunner:
             local = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1]]) * (np.asarray(size) / 2)
             c, s = math.cos(yaw), math.sin(yaw)
             return local @ np.array([[c, -s], [s, c]]).T + xy
-
-        def overlaps(a, b):
-            for poly in (a, b):
-                for edge in np.roll(poly, -1, axis=0) - poly:
-                    normal = np.array([-edge[1], edge[0]])
-                    normal /= max(float(np.linalg.norm(normal)), 1e-12)
-                    pa, pb = a @ normal, b @ normal
-                    if max(pa.min(), pb.min()) >= min(pa.max(), pb.max()) + 0.002:
-                        return False
-            return True
 
         stack_support = (det.extra or {}).get('_stack_support')
         if stack_support is not None and not any(_is_stack_base(det, other) for other in neighbors):
@@ -1763,8 +1754,8 @@ class TaskRunner:
             bottom = detection_table_z(other)
             bottom = 0.0 if bottom is None else float(bottom)
             top = float(other.top_z) if other.top_z is not None else bottom + height
-            obstacles.append((object_footprint(other.center_base[:2], *odims, float(other.yaw),
-                              label=other.label, resting_pose=(other.extra or {}).get('resting_pose')),
+            obstacles.append((prepare_polygon(object_footprint(other.center_base[:2], *odims, float(other.yaw),
+                              label=other.label, resting_pose=(other.extra or {}).get('resting_pose'))),
                               height, bottom, top, _is_stack_base(det, other)))
         offset = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
         margin_offsets = np.array([[.002, .002], [.002, -.002], [-.002, .002], [-.002, -.002]])
@@ -1798,8 +1789,9 @@ class TaskRunner:
                     or np.any(expanded[:, 1] > guard.y[1])
                     or np.any(np.linalg.norm(expanded, axis=1) > guard.r_max)):
                 return False
-            fingers = corners(np.array([x, y]) - rotated if tcp_xy is None else tcp_xy,
-                              (fingers_length, 2 * FINGER_HALF_BAND), closing)
+            obj = prepare_polygon(obj)
+            fingers = prepare_polygon(corners(np.array([x, y]) - rotated if tcp_xy is None else tcp_xy,
+                              (fingers_length, 2 * FINGER_HALF_BAND), closing))
             if any(not designated and (overlaps(obj, other)
                    or (height > finger_floor and overlaps(fingers, other)))
                    for other, height, _bottom, _top, designated in obstacles):
@@ -1828,7 +1820,7 @@ class TaskRunner:
                         return False
                 for center, half in boxes:
                     points = (center + signs * half) @ T[:3, :3].T + T[:3, 3]
-                    footprint = cv2.convexHull(points[:, :2].astype(np.float32)).reshape(-1, 2)
+                    footprint = prepare_polygon(cv2.convexHull(points[:, :2].astype(np.float32)).reshape(-1, 2))
                     low_z, high_z = float(points[:, 2].min()), float(points[:, 2].max())
                     for other, _height, bottom, top, _designated in obstacles:
                         if top + .002 > low_z and bottom - .002 < high_z and overlaps(footprint, other):

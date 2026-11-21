@@ -609,8 +609,17 @@ class SimulationSession:
                 support_views.append((copy.deepcopy(frame), pose.copy()))
                 del support_views[:-6]
             fresh = [d for d in fresh if d.center_base is not None and d.label != target.label]
+            # A complete current singleton measurement can supersede an old
+            # cropped centroid beyond normal association distance. Ambiguous
+            # fresh instances and incomplete/invalid geometry remain obstacles.
+            editor = getattr(self, 'editor', None)
+            singleton_labels = ({d.label for d in fresh
+                                 if d.valid and d.extra.get('catalog_complete')}
+                                if editor is not None and editor.metadata().get('one_per_class')
+                                else ())
             neighbors = merge_local_detections(neighbors, fresh,
-                         lambda d: measurement_visible(d, frame, pose), forget=[target])
+                         lambda d: measurement_visible(d, frame, pose), forget=[target],
+                         singleton_labels=singleton_labels)
             self._recovery_neighbors = copy.deepcopy(neighbors)
             if destination is not None and destination['type'] == 'on_object':
                 from .stacking import planning_options, annotate

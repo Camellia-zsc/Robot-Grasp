@@ -1378,6 +1378,25 @@ class TaskRunner:
             self.placer.last_info = previous_info
         if interrupted():
             return None, 'aborted' if self._aborted() else 'placement_planning_budget_exceeded'
+        if not candidate.feasible:
+            from ..perception.grasp import FINGER_OUTER
+            low, high = search['polygon'].min(axis=0), search['polygon'].max(axis=0)
+            reach = .5 * max(self.placer.open_width,
+                            math.hypot(search['shape']['length'], search['shape']['width']))
+            for other in search['neighbors']:
+                if other is det or other.valid or not _has_xy(other):
+                    continue
+                dims = footprint_dims(other, self.nominal.get(other.label))
+                if dims is None:
+                    continue
+                radius = .5 * math.hypot(*dims) + reach + FINGER_OUTER
+                xy = np.asarray(other.center_base[:2], float)
+                if np.all(xy >= low - radius) and np.all(xy <= high + radius):
+                    # A cropped silhouette's centroid is not its full body's
+                    # measured centre. Keep its conservative obstacle, but let
+                    # the caller seek a checked new view instead of treating
+                    # this geometry failure as proof the support is full.
+                    return None, 'release_occupancy_unconfirmed'
         return bool(candidate.feasible), '' if candidate.feasible else candidate.reason
 
     def replan_release(self, det, gp, pp, width, neighbors, placement_zone=None,

@@ -1,0 +1,218 @@
+{
+  "node_count": 4746,
+  "unverified_node_count": 0,
+  "raw_edge_count": 14124,
+  "non_object_edges": 0,
+  "missing_endpoint_edges": 0,
+  "dangling_endpoint_edges": 1347,
+  "external_reference_edges": 0,
+  "self_loop_edges": 6,
+  "valid_candidate_edges": 12777,
+  "exact_duplicate_edges": 0,
+  "directed_unique_endpoint_pairs": 12021,
+  "directed_same_endpoint_collapsed_edges": 756,
+  "undirected_unique_endpoint_pairs": 12007,
+  "undirected_same_endpoint_collapsed_edges": 770,
+  "same_endpoint_group_count": 715,
+  "relation_variant_groups": 467,
+  "source_file_variant_groups": 0,
+  "source_location_variant_groups": 2,
+  "context_variant_groups": 256,
+  "post_build_graph_type": "DiGraph",
+  "post_build_node_count": 4796,
+  "post_build_edge_count": 13368,
+  "post_build_error": "",
+  "producer_suppression": {
+    "path": "graphify/extract.py (installed package)",
+    "total_sites": 12,
+    "sites": [
+      {
+        "line": 2056,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 2751,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 2753,
+        "name": "seen_doc_refs",
+        "tuple_arity": 0,
+        "sample": "seen_doc_refs: set[str] = set()"
+      },
+      {
+        "line": 3420,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 3567,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n.get(\"id\") for n in nodes}"
+      },
+      {
+        "line": 5319,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 5505,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 10315,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 10423,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 10502,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 11027,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 11028,
+        "name": "seen_edges",
+        "tuple_arity": 4,
+        "sample": "seen_edges: set[tuple[str, str, str, str | None]] = set()"
+      }
+    ],
+    "error": ""
+  },
+  "examples": [
+    {
+      "source": "ws_src_cube_task_cube_task_tools_common_apply_extra",
+      "target": "ws_src_cube_task_cube_task_core_config_config",
+      "edge_count": 4,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "ws/src/cube_task/cube_task/tools/common.py"
+      ],
+      "source_locations": [
+        "L124",
+        "L131"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "parameter_type",
+        "return_type"
+      ]
+    },
+    {
+      "source": "ws_src_cube_task_cube_task_assistant_catalog_make_catalog_object",
+      "target": "ws_src_cube_task_cube_task_sim_world_simobject",
+      "edge_count": 3,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "ws/src/cube_task/cube_task/assistant/catalog.py"
+      ],
+      "source_locations": [
+        "L48",
+        "L49",
+        "L62"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "return_type"
+      ]
+    },
+    {
+      "source": "ws_src_cube_task_cube_task_assistant_catalog_perception_classifier",
+      "target": "ws_src_cube_task_cube_task_perception_classify_knn_knnclassifier",
+      "edge_count": 3,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "ws/src/cube_task/cube_task/assistant/catalog_perception.py"
+      ],
+      "source_locations": [
+        "L264",
+        "L278"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "return_type"
+      ]
+    },
+    {
+      "source": "ws_src_cube_task_cube_task_camera_recorder_load_frame",
+      "target": "ws_src_cube_task_cube_task_core_types_frame",
+      "edge_count": 3,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "ws/src/cube_task/cube_task/camera/recorder.py"
+      ],
+      "source_locations": [
+        "L140",
+        "L191"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "generic_arg"
+      ]
+    },
+    {
+      "source": "ws_src_cube_task_cube_task_camera_ros_camera_camera_info_to_intrinsics",
+      "target": "ws_src_cube_task_cube_task_core_types_cameraintrinsics",
+      "edge_count": 3,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "ws/src/cube_task/cube_task/camera/ros_camera.py"
+      ],
+      "source_locations": [
+        "L153",
+        "L180"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "return_type"
+      ]
+    }
+  ]
+}

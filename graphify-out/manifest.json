@@ -1,0 +1,722 @@
+{
+  "ws/src/cube_task/cube_task/__init__.py": {
+    "mtime": 1794841719.461491,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/__main__.py": {
+    "mtime": 1794841719.4624927,
+    "seen": 1795230886.465848,
+    "ast_hash": "e71fdb08238c7a165b8ad162ac6fc193",
+    "semantic_hash": "e71fdb08238c7a165b8ad162ac6fc193"
+  },
+  "ws/src/cube_task/cube_task/assistant/__init__.py": {
+    "mtime": 1794841719.464499,
+    "seen": 1795230886.465848,
+    "ast_hash": "7331251e6daf9c3241faf2c9bd41c027",
+    "semantic_hash": "7331251e6daf9c3241faf2c9bd41c027"
+  },
+  "ws/src/cube_task/cube_task/assistant/active_observation.py": {
+    "mtime": 1795061965.6865819,
+    "seen": 1795230886.465848,
+    "ast_hash": "ac7d1027ef39832d916d1f85d7f23aa0",
+    "semantic_hash": "ac7d1027ef39832d916d1f85d7f23aa0"
+  },
+  "ws/src/cube_task/cube_task/assistant/batch.py": {
+    "mtime": 1795235725.852815,
+    "seen": 1795236841.0745907,
+    "ast_hash": "25ea732fd7c79cb431bdc0daa3be2525",
+    "semantic_hash": "25ea732fd7c79cb431bdc0daa3be2525"
+  },
+  "ws/src/cube_task/cube_task/assistant/catalog.py": {
+    "mtime": 1795020790.247808,
+    "seen": 1795230886.465848,
+    "ast_hash": "2e65607a677947635b5d972b794e40ea",
+    "semantic_hash": "2e65607a677947635b5d972b794e40ea"
+  },
+  "ws/src/cube_task/cube_task/assistant/catalog_perception.py": {
+    "mtime": 1795055691.8455944,
+    "seen": 1795230886.465848,
+    "ast_hash": "5f0604c6864ba78cec34516e6f04f402",
+    "semantic_hash": "5f0604c6864ba78cec34516e6f04f402"
+  },
+  "ws/src/cube_task/cube_task/assistant/conversation.py": {
+    "mtime": 1795010115.1705103,
+    "seen": 1795230886.465848,
+    "ast_hash": "5fbf4e6ebbfa95006d7af72ba7d9e34b",
+    "semantic_hash": "5fbf4e6ebbfa95006d7af72ba7d9e34b"
+  },
+  "ws/src/cube_task/cube_task/assistant/destinations.py": {
+    "mtime": 1795235725.8480172,
+    "seen": 1795236841.0745907,
+    "ast_hash": "091ed0dd574652a34b88f713f21981cf",
+    "semantic_hash": "091ed0dd574652a34b88f713f21981cf"
+  },
+  "ws/src/cube_task/cube_task/assistant/held_recovery.py": {
+    "mtime": 1795232899.3987527,
+    "seen": 1795236841.0745907,
+    "ast_hash": "5f48373ad48a30b10907c376abaa61d4",
+    "semantic_hash": "5f48373ad48a30b10907c376abaa61d4"
+  },
+  "ws/src/cube_task/cube_task/assistant/llm.py": {
+    "mtime": 1795055116.0857797,
+    "seen": 1795230886.465848,
+    "ast_hash": "bebda046f26142b0ae2270fa653afe28",
+    "semantic_hash": "bebda046f26142b0ae2270fa653afe28"
+  },
+  "ws/src/cube_task/cube_task/assistant/observation_policy.py": {
+    "mtime": 1795193947.8202384,
+    "seen": 1795230886.465848,
+    "ast_hash": "64c29a85d3d19f4ec4b3ec8f65741771",
+    "semantic_hash": "64c29a85d3d19f4ec4b3ec8f65741771"
+  },
+  "ws/src/cube_task/cube_task/assistant/observations.py": {
+    "mtime": 1795195771.6446743,
+    "seen": 1795230886.465848,
+    "ast_hash": "fb94cfad9814a454e870c9e29e42f5e4",
+    "semantic_hash": "fb94cfad9814a454e870c9e29e42f5e4"
+  },
+  "ws/src/cube_task/cube_task/assistant/obstacle_recovery.py": {
+    "mtime": 1795233097.3113134,
+    "seen": 1795236841.0745907,
+    "ast_hash": "d6a1a8b142595aafeedc47e4534d2c81",
+    "semantic_hash": "d6a1a8b142595aafeedc47e4534d2c81"
+  },
+  "ws/src/cube_task/cube_task/assistant/physics.py": {
+    "mtime": 1795231016.9292135,
+    "seen": 1795231067.8475132,
+    "ast_hash": "2c08455e21bccb997fe4b63093dc071d",
+    "semantic_hash": "2c08455e21bccb997fe4b63093dc071d"
+  },
+  "ws/src/cube_task/cube_task/assistant/placement_observation.py": {
+    "mtime": 1795061965.6947112,
+    "seen": 1795230886.465848,
+    "ast_hash": "d7346feb416b493051db0113a53a6e67",
+    "semantic_hash": "d7346feb416b493051db0113a53a6e67"
+  },
+  "ws/src/cube_task/cube_task/assistant/preview.py": {
+    "mtime": 1795003814.860188,
+    "seen": 1795230886.465848,
+    "ast_hash": "46df244fc3ae913430cb937495a29b66",
+    "semantic_hash": "46df244fc3ae913430cb937495a29b66"
+  },
+  "ws/src/cube_task/cube_task/assistant/recovery.py": {
+    "mtime": 1794935511.545226,
+    "seen": 1795230886.465848,
+    "ast_hash": "e530f33a6ae149f3fcd5ffc92306813a",
+    "semantic_hash": "e530f33a6ae149f3fcd5ffc92306813a"
+  },
+  "ws/src/cube_task/cube_task/assistant/server.py": {
+    "mtime": 1795231591.0880888,
+    "seen": 1795236841.0745907,
+    "ast_hash": "17cee1cc5d3a42ea394d6b676c89a81e",
+    "semantic_hash": "17cee1cc5d3a42ea394d6b676c89a81e"
+  },
+  "ws/src/cube_task/cube_task/assistant/simulation.py": {
+    "mtime": 1795234528.0169094,
+    "seen": 1795236841.0745907,
+    "ast_hash": "6c5f9256da1b94ad83c9ff8e6979f87c",
+    "semantic_hash": "6c5f9256da1b94ad83c9ff8e6979f87c"
+  },
+  "ws/src/cube_task/cube_task/assistant/skill_execution.py": {
+    "mtime": 1795193861.7177122,
+    "seen": 1795230886.465848,
+    "ast_hash": "b0b0c0d08bcef9b0046e717c3234fad7",
+    "semantic_hash": "b0b0c0d08bcef9b0046e717c3234fad7"
+  },
+  "ws/src/cube_task/cube_task/assistant/skill_orchestrator.py": {
+    "mtime": 1795232820.985448,
+    "seen": 1795236841.0745907,
+    "ast_hash": "8bcba1d2fbd5c658f0de0f2e22e50143",
+    "semantic_hash": "8bcba1d2fbd5c658f0de0f2e22e50143"
+  },
+  "ws/src/cube_task/cube_task/assistant/skill_protocol.py": {
+    "mtime": 1795193566.7591717,
+    "seen": 1795230886.465848,
+    "ast_hash": "589606398cc42640526fc50195b0cabb",
+    "semantic_hash": "589606398cc42640526fc50195b0cabb"
+  },
+  "ws/src/cube_task/cube_task/assistant/stack_perception.py": {
+    "mtime": 1795010670.2903416,
+    "seen": 1795230886.465848,
+    "ast_hash": "24691484e69a0df6f7d0fd120af0ca86",
+    "semantic_hash": "24691484e69a0df6f7d0fd120af0ca86"
+  },
+  "ws/src/cube_task/cube_task/assistant/stacking.py": {
+    "mtime": 1795193861.712058,
+    "seen": 1795230886.465848,
+    "ast_hash": "8e95a9f3683527551b44e99ca7924ef3",
+    "semantic_hash": "8e95a9f3683527551b44e99ca7924ef3"
+  },
+  "ws/src/cube_task/cube_task/assistant/static/app.js": {
+    "mtime": 1795230847.7437854,
+    "seen": 1795230886.465848,
+    "ast_hash": "1fda2b9de725c0b9be90c1d401cf8063",
+    "semantic_hash": "1fda2b9de725c0b9be90c1d401cf8063"
+  },
+  "ws/src/cube_task/cube_task/assistant/static/editor.js": {
+    "mtime": 1794975943.6655326,
+    "seen": 1795230886.465848,
+    "ast_hash": "848d9a31c05ddf06a2caebffcfbdcf87",
+    "semantic_hash": "848d9a31c05ddf06a2caebffcfbdcf87"
+  },
+  "ws/src/cube_task/cube_task/camera/__init__.py": {
+    "mtime": 1794841719.477924,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/camera/factory.py": {
+    "mtime": 1794841719.477924,
+    "seen": 1795230886.465848,
+    "ast_hash": "25507dd98bb4f8452fdf381f198ae87e",
+    "semantic_hash": "25507dd98bb4f8452fdf381f198ae87e"
+  },
+  "ws/src/cube_task/cube_task/camera/file_camera.py": {
+    "mtime": 1794841719.4789238,
+    "seen": 1795230886.465848,
+    "ast_hash": "b6a760a1b76d47a848c28500bc04fd16",
+    "semantic_hash": "b6a760a1b76d47a848c28500bc04fd16"
+  },
+  "ws/src/cube_task/cube_task/camera/recorder.py": {
+    "mtime": 1794841719.4799242,
+    "seen": 1795230886.465848,
+    "ast_hash": "cb658aab8ea406e41c6d66905712c754",
+    "semantic_hash": "cb658aab8ea406e41c6d66905712c754"
+  },
+  "ws/src/cube_task/cube_task/camera/registration.py": {
+    "mtime": 1794841719.480925,
+    "seen": 1795230886.465848,
+    "ast_hash": "2431a165177ab95e18d5d0133feb2472",
+    "semantic_hash": "2431a165177ab95e18d5d0133feb2472"
+  },
+  "ws/src/cube_task/cube_task/camera/ros_camera.py": {
+    "mtime": 1794841719.482235,
+    "seen": 1795230886.465848,
+    "ast_hash": "d699525884b51337a40337e9704f82f3",
+    "semantic_hash": "d699525884b51337a40337e9704f82f3"
+  },
+  "ws/src/cube_task/cube_task/camera/utils.py": {
+    "mtime": 1794841719.4832501,
+    "seen": 1795230886.465848,
+    "ast_hash": "2c4e88c9fe15c37d658b198a49aec35e",
+    "semantic_hash": "2c4e88c9fe15c37d658b198a49aec35e"
+  },
+  "ws/src/cube_task/cube_task/core/__init__.py": {
+    "mtime": 1794841719.4842403,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/core/clock.py": {
+    "mtime": 1794841719.486241,
+    "seen": 1795230886.465848,
+    "ast_hash": "d5c103eff4ecf4ae6991526002adaf29",
+    "semantic_hash": "d5c103eff4ecf4ae6991526002adaf29"
+  },
+  "ws/src/cube_task/cube_task/core/config.py": {
+    "mtime": 1794841719.486241,
+    "seen": 1795230886.465848,
+    "ast_hash": "592bde53266c8615e39fe142ff2a32f4",
+    "semantic_hash": "592bde53266c8615e39fe142ff2a32f4"
+  },
+  "ws/src/cube_task/cube_task/core/extrinsics.py": {
+    "mtime": 1794841719.4872444,
+    "seen": 1795230886.465848,
+    "ast_hash": "f1748316c6b2f52be284fef886a7cf8e",
+    "semantic_hash": "f1748316c6b2f52be284fef886a7cf8e"
+  },
+  "ws/src/cube_task/cube_task/core/interfaces.py": {
+    "mtime": 1794841719.4882405,
+    "seen": 1795230886.465848,
+    "ast_hash": "f620f2cee6189a2b961a8947a688ccea",
+    "semantic_hash": "f620f2cee6189a2b961a8947a688ccea"
+  },
+  "ws/src/cube_task/cube_task/core/logger.py": {
+    "mtime": 1794841719.4892395,
+    "seen": 1795230886.465848,
+    "ast_hash": "bba7ae91bb7a2a30f342db5fd64eb2e1",
+    "semantic_hash": "bba7ae91bb7a2a30f342db5fd64eb2e1"
+  },
+  "ws/src/cube_task/cube_task/core/transforms.py": {
+    "mtime": 1794841719.4892395,
+    "seen": 1795230886.465848,
+    "ast_hash": "7f346f54b14d0933f004ee97a75d9e30",
+    "semantic_hash": "7f346f54b14d0933f004ee97a75d9e30"
+  },
+  "ws/src/cube_task/cube_task/core/types.py": {
+    "mtime": 1795020869.9457953,
+    "seen": 1795230886.465848,
+    "ast_hash": "2df5d6ce6f3a6cca6841515046ba3aed",
+    "semantic_hash": "2df5d6ce6f3a6cca6841515046ba3aed"
+  },
+  "ws/src/cube_task/cube_task/core/zones.py": {
+    "mtime": 1794841719.4907439,
+    "seen": 1795230886.465848,
+    "ast_hash": "d2adb7fd7f55e6a9d21299a85b1ea8f5",
+    "semantic_hash": "d2adb7fd7f55e6a9d21299a85b1ea8f5"
+  },
+  "ws/src/cube_task/cube_task/perception/__init__.py": {
+    "mtime": 1794841719.4917495,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/perception/classify_color.py": {
+    "mtime": 1794841719.4927485,
+    "seen": 1795230886.465848,
+    "ast_hash": "0672140156b0888ef4a8bfea5199181e",
+    "semantic_hash": "0672140156b0888ef4a8bfea5199181e"
+  },
+  "ws/src/cube_task/cube_task/perception/classify_knn.py": {
+    "mtime": 1794841719.4927485,
+    "seen": 1795230886.465848,
+    "ast_hash": "fcbfd782ca28fb6afd782349c86ced7d",
+    "semantic_hash": "fcbfd782ca28fb6afd782349c86ced7d"
+  },
+  "ws/src/cube_task/cube_task/perception/detector_onnx.py": {
+    "mtime": 1794841719.493749,
+    "seen": 1795230886.465848,
+    "ast_hash": "f19c93a9dce21918e8439c5837f99531",
+    "semantic_hash": "f19c93a9dce21918e8439c5837f99531"
+  },
+  "ws/src/cube_task/cube_task/perception/factory.py": {
+    "mtime": 1794841719.49475,
+    "seen": 1795230886.465848,
+    "ast_hash": "71fca549522dd440c000a1c2ed50c46f",
+    "semantic_hash": "71fca549522dd440c000a1c2ed50c46f"
+  },
+  "ws/src/cube_task/cube_task/perception/features.py": {
+    "mtime": 1794841719.49475,
+    "seen": 1795230886.465848,
+    "ast_hash": "5ea5bce0a59d728aed391c4792400b59",
+    "semantic_hash": "5ea5bce0a59d728aed391c4792400b59"
+  },
+  "ws/src/cube_task/cube_task/perception/geometry.py": {
+    "mtime": 1795184665.438793,
+    "seen": 1795230886.465848,
+    "ast_hash": "89112fe69421a5a2b7341af79adb1857",
+    "semantic_hash": "89112fe69421a5a2b7341af79adb1857"
+  },
+  "ws/src/cube_task/cube_task/perception/grasp.py": {
+    "mtime": 1795235004.56792,
+    "seen": 1795236841.0756054,
+    "ast_hash": "957d5c0d9ac5f598e665a51da60deefc",
+    "semantic_hash": "957d5c0d9ac5f598e665a51da60deefc"
+  },
+  "ws/src/cube_task/cube_task/perception/l1_new.py": {
+    "mtime": 1794841719.4987514,
+    "seen": 1795230886.465848,
+    "ast_hash": "31fd6da98f3bed46f4de0057abba4eb5",
+    "semantic_hash": "31fd6da98f3bed46f4de0057abba4eb5"
+  },
+  "ws/src/cube_task/cube_task/perception/pipeline.py": {
+    "mtime": 1794841719.4997528,
+    "seen": 1795230886.465848,
+    "ast_hash": "cccaa9fd9b52a17814e507eddf472422",
+    "semantic_hash": "cccaa9fd9b52a17814e507eddf472422"
+  },
+  "ws/src/cube_task/cube_task/perception/segment.py": {
+    "mtime": 1794841719.5012548,
+    "seen": 1795230886.465848,
+    "ast_hash": "518911eec245a04efe1fe370bc0a2327",
+    "semantic_hash": "518911eec245a04efe1fe370bc0a2327"
+  },
+  "ws/src/cube_task/cube_task/perception/table.py": {
+    "mtime": 1794841719.502265,
+    "seen": 1795230886.465848,
+    "ast_hash": "ae205e19ebe286e9a83bea57a1071fda",
+    "semantic_hash": "ae205e19ebe286e9a83bea57a1071fda"
+  },
+  "ws/src/cube_task/cube_task/perception/visualize.py": {
+    "mtime": 1794841719.5032697,
+    "seen": 1795230886.465848,
+    "ast_hash": "55a5c2f1665cec2d4c3f50e8d73d19c1",
+    "semantic_hash": "55a5c2f1665cec2d4c3f50e8d73d19c1"
+  },
+  "ws/src/cube_task/cube_task/robot/__init__.py": {
+    "mtime": 1794841719.5042655,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/robot/factory.py": {
+    "mtime": 1794841719.5063431,
+    "seen": 1795230886.465848,
+    "ast_hash": "218fe0da388e12fa720a4c5ba34a689c",
+    "semantic_hash": "218fe0da388e12fa720a4c5ba34a689c"
+  },
+  "ws/src/cube_task/cube_task/robot/kinematics.py": {
+    "mtime": 1794978987.9416802,
+    "seen": 1795230886.465848,
+    "ast_hash": "4dfec43bc17d971827dc3fe112202f07",
+    "semantic_hash": "4dfec43bc17d971827dc3fe112202f07"
+  },
+  "ws/src/cube_task/cube_task/robot/moveit_bridge.py": {
+    "mtime": 1794841719.5083597,
+    "seen": 1795230886.465848,
+    "ast_hash": "da9513e9e09ed5bce7e05d1bfde9f995",
+    "semantic_hash": "da9513e9e09ed5bce7e05d1bfde9f995"
+  },
+  "ws/src/cube_task/cube_task/robot/pyagxarm_arm.py": {
+    "mtime": 1794841719.5093582,
+    "seen": 1795230886.465848,
+    "ast_hash": "d48b525f7aec6ce5fbe276f5d0827558",
+    "semantic_hash": "d48b525f7aec6ce5fbe276f5d0827558"
+  },
+  "ws/src/cube_task/cube_task/robot/safety.py": {
+    "mtime": 1794979225.1414168,
+    "seen": 1795230886.465848,
+    "ast_hash": "f26ea84a038db3a34137e0c9c9e87d09",
+    "semantic_hash": "f26ea84a038db3a34137e0c9c9e87d09"
+  },
+  "ws/src/cube_task/cube_task/robot/sim_arm.py": {
+    "mtime": 1794841719.510874,
+    "seen": 1795230886.465848,
+    "ast_hash": "e658b082463c6d1eee2728d80a3d2977",
+    "semantic_hash": "e658b082463c6d1eee2728d80a3d2977"
+  },
+  "ws/src/cube_task/cube_task/sim/__init__.py": {
+    "mtime": 1794841719.5118952,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/__init__.py": {
+    "mtime": 1794841719.5139115,
+    "seen": 1795230886.465848,
+    "ast_hash": "bc90d14a47490b92ac4cf8c1d3ce1654",
+    "semantic_hash": "bc90d14a47490b92ac4cf8c1d3ce1654"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/arm.py": {
+    "mtime": 1794841719.5149446,
+    "seen": 1795230886.465848,
+    "ast_hash": "c3197b03879109c15f4d6bb4aa535416",
+    "semantic_hash": "c3197b03879109c15f4d6bb4aa535416"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/camera.py": {
+    "mtime": 1794841719.515954,
+    "seen": 1795230886.465848,
+    "ast_hash": "1d1738bda957d764095b7b72c28aeaaf",
+    "semantic_hash": "1d1738bda957d764095b7b72c28aeaaf"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/engine.py": {
+    "mtime": 1794841719.5179229,
+    "seen": 1795230886.465848,
+    "ast_hash": "60d48f7ea4c1706aeef1ce26b45c7394",
+    "semantic_hash": "60d48f7ea4c1706aeef1ce26b45c7394"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/ik.py": {
+    "mtime": 1794841719.5201128,
+    "seen": 1795230886.465848,
+    "ast_hash": "82ccd506a9656b5c10aae9621255abe1",
+    "semantic_hash": "82ccd506a9656b5c10aae9621255abe1"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/run.py": {
+    "mtime": 1794841719.5216362,
+    "seen": 1795230886.465848,
+    "ast_hash": "a78f432196caee6a3abc8eb87433e51f",
+    "semantic_hash": "a78f432196caee6a3abc8eb87433e51f"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/scene.py": {
+    "mtime": 1795196075.6900315,
+    "seen": 1795230886.465848,
+    "ast_hash": "5150077431551096fdb93ca99332fabc",
+    "semantic_hash": "5150077431551096fdb93ca99332fabc"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/video.py": {
+    "mtime": 1794841719.5236328,
+    "seen": 1795230886.465848,
+    "ast_hash": "f4511a76a2da9b04e02f6a296b728e9d",
+    "semantic_hash": "f4511a76a2da9b04e02f6a296b728e9d"
+  },
+  "ws/src/cube_task/cube_task/sim/mujoco/world.py": {
+    "mtime": 1794841719.5236328,
+    "seen": 1795230886.465848,
+    "ast_hash": "b3dcc2b0cb508813e362d180c23482fc",
+    "semantic_hash": "b3dcc2b0cb508813e362d180c23482fc"
+  },
+  "ws/src/cube_task/cube_task/sim/render.py": {
+    "mtime": 1794841719.525101,
+    "seen": 1795230886.465848,
+    "ast_hash": "24fad8f5e22c1813f3c193a1f4c51f7c",
+    "semantic_hash": "24fad8f5e22c1813f3c193a1f4c51f7c"
+  },
+  "ws/src/cube_task/cube_task/sim/scenarios.py": {
+    "mtime": 1795020790.2439277,
+    "seen": 1795230886.465848,
+    "ast_hash": "89e9fe385ec9263d4d27ed709ed4fc0d",
+    "semantic_hash": "89e9fe385ec9263d4d27ed709ed4fc0d"
+  },
+  "ws/src/cube_task/cube_task/sim/sim_camera.py": {
+    "mtime": 1794841719.5275733,
+    "seen": 1795230886.465848,
+    "ast_hash": "abb2d7b0b1a637ce436ccdc36b9d3894",
+    "semantic_hash": "abb2d7b0b1a637ce436ccdc36b9d3894"
+  },
+  "ws/src/cube_task/cube_task/sim/teach.py": {
+    "mtime": 1794841719.5275733,
+    "seen": 1795230886.465848,
+    "ast_hash": "cd57a383fd815de4abfbafd52fbcdc26",
+    "semantic_hash": "cd57a383fd815de4abfbafd52fbcdc26"
+  },
+  "ws/src/cube_task/cube_task/sim/world.py": {
+    "mtime": 1794841719.5297985,
+    "seen": 1795230886.465848,
+    "ast_hash": "e9f4217651202e8099694f5a0a17374d",
+    "semantic_hash": "e9f4217651202e8099694f5a0a17374d"
+  },
+  "ws/src/cube_task/cube_task/task/__init__.py": {
+    "mtime": 1794841719.5313272,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/task/live.py": {
+    "mtime": 1794841719.5333483,
+    "seen": 1795230886.465848,
+    "ast_hash": "65e9b173e6b442cec8ce787fb23ad5c3",
+    "semantic_hash": "65e9b173e6b442cec8ce787fb23ad5c3"
+  },
+  "ws/src/cube_task/cube_task/task/operator.py": {
+    "mtime": 1794841719.5343468,
+    "seen": 1795230886.465848,
+    "ast_hash": "2963a514d15eb7c3ba02bbe5bbe06ed8",
+    "semantic_hash": "2963a514d15eb7c3ba02bbe5bbe06ed8"
+  },
+  "ws/src/cube_task/cube_task/task/reach.py": {
+    "mtime": 1795022175.577558,
+    "seen": 1795230886.465848,
+    "ast_hash": "aa9c16a2adf8df71fd4978c562abcde6",
+    "semantic_hash": "aa9c16a2adf8df71fd4978c562abcde6"
+  },
+  "ws/src/cube_task/cube_task/task/runner.py": {
+    "mtime": 1795236050.7831707,
+    "seen": 1795236841.0756054,
+    "ast_hash": "a9a607cda2f191ff5e38dc130610dfe2",
+    "semantic_hash": "a9a607cda2f191ff5e38dc130610dfe2"
+  },
+  "ws/src/cube_task/cube_task/task/selection.py": {
+    "mtime": 1794841719.5387506,
+    "seen": 1795230886.465848,
+    "ast_hash": "11090658dcc35cdb9925213c596a494e",
+    "semantic_hash": "11090658dcc35cdb9925213c596a494e"
+  },
+  "ws/src/cube_task/cube_task/task/selfcheck.py": {
+    "mtime": 1794841719.539775,
+    "seen": 1795230886.465848,
+    "ast_hash": "fdf491a48db201f1323fda0377318a14",
+    "semantic_hash": "fdf491a48db201f1323fda0377318a14"
+  },
+  "ws/src/cube_task/cube_task/task/skills.py": {
+    "mtime": 1795231206.10406,
+    "seen": 1795236841.0756054,
+    "ast_hash": "2512dfbc0f1a4a2484c64f7284005e10",
+    "semantic_hash": "2512dfbc0f1a4a2484c64f7284005e10"
+  },
+  "ws/src/cube_task/cube_task/task/views.py": {
+    "mtime": 1795184766.3106716,
+    "seen": 1795230886.465848,
+    "ast_hash": "e1571ec4def1c038713873689a06b0b0",
+    "semantic_hash": "e1571ec4def1c038713873689a06b0b0"
+  },
+  "ws/src/cube_task/cube_task/tools/__init__.py": {
+    "mtime": 1794841719.5412853,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/tools/assistant_ui.py": {
+    "mtime": 1795011309.1404426,
+    "seen": 1795230886.465848,
+    "ast_hash": "89b323abffa07cd5c68bd19f108d1a4e",
+    "semantic_hash": "89b323abffa07cd5c68bd19f108d1a4e"
+  },
+  "ws/src/cube_task/cube_task/tools/calib_points.py": {
+    "mtime": 1794841719.543303,
+    "seen": 1795230886.465848,
+    "ast_hash": "c4da2380334c06c4e9bce262e15506cf",
+    "semantic_hash": "c4da2380334c06c4e9bce262e15506cf"
+  },
+  "ws/src/cube_task/cube_task/tools/calib_verify.py": {
+    "mtime": 1794841719.5443087,
+    "seen": 1795230886.465848,
+    "ast_hash": "27f797a1550714431806a8af2998d743",
+    "semantic_hash": "27f797a1550714431806a8af2998d743"
+  },
+  "ws/src/cube_task/cube_task/tools/capture.py": {
+    "mtime": 1794841719.5452962,
+    "seen": 1795230886.465848,
+    "ast_hash": "1fc8e6b5ab7d6e1b7d13e33bff0c26f2",
+    "semantic_hash": "1fc8e6b5ab7d6e1b7d13e33bff0c26f2"
+  },
+  "ws/src/cube_task/cube_task/tools/check_setup.py": {
+    "mtime": 1794841719.5462961,
+    "seen": 1795230886.465848,
+    "ast_hash": "6656c5c0b618dfd2a7fbc3b36519a40c",
+    "semantic_hash": "6656c5c0b618dfd2a7fbc3b36519a40c"
+  },
+  "ws/src/cube_task/cube_task/tools/color_calib.py": {
+    "mtime": 1794841719.5492969,
+    "seen": 1795230886.465848,
+    "ast_hash": "1ade347e676303606758a6006305d45b",
+    "semantic_hash": "1ade347e676303606758a6006305d45b"
+  },
+  "ws/src/cube_task/cube_task/tools/common.py": {
+    "mtime": 1794841719.5508037,
+    "seen": 1795230886.465848,
+    "ast_hash": "e6773a058cb507ccaab537d834fdb2f7",
+    "semantic_hash": "e6773a058cb507ccaab537d834fdb2f7"
+  },
+  "ws/src/cube_task/cube_task/tools/motion_ctl.py": {
+    "mtime": 1794841719.55281,
+    "seen": 1795230886.465848,
+    "ast_hash": "83d96c0ec18158e8af1318b2f011e5a9",
+    "semantic_hash": "83d96c0ec18158e8af1318b2f011e5a9"
+  },
+  "ws/src/cube_task/cube_task/tools/onsite.py": {
+    "mtime": 1794841719.5538106,
+    "seen": 1795230886.465848,
+    "ast_hash": "03c76bf429f6539b5d23ce5d12f29ed1",
+    "semantic_hash": "03c76bf429f6539b5d23ce5d12f29ed1"
+  },
+  "ws/src/cube_task/cube_task/tools/run_task.py": {
+    "mtime": 1794841719.5553167,
+    "seen": 1795230886.465848,
+    "ast_hash": "e9bfb5d89934295e6a2b4f0de92b6ca5",
+    "semantic_hash": "e9bfb5d89934295e6a2b4f0de92b6ca5"
+  },
+  "ws/src/cube_task/cube_task/tools/sim_bench.py": {
+    "mtime": 1794841719.5553167,
+    "seen": 1795230886.465848,
+    "ast_hash": "d9131cbb705ce92778ca860c3b084090",
+    "semantic_hash": "d9131cbb705ce92778ca860c3b084090"
+  },
+  "ws/src/cube_task/cube_task/tools/teach_classes.py": {
+    "mtime": 1794841719.557323,
+    "seen": 1795230886.465848,
+    "ast_hash": "d7c8c78e15b58492d58526eba9c65320",
+    "semantic_hash": "d7c8c78e15b58492d58526eba9c65320"
+  },
+  "ws/src/cube_task/cube_task/tools/teach_poses.py": {
+    "mtime": 1794841719.557323,
+    "seen": 1795230886.465848,
+    "ast_hash": "5626cfe49cade5d64733e0cbc1d76bc8",
+    "semantic_hash": "5626cfe49cade5d64733e0cbc1d76bc8"
+  },
+  "ws/src/cube_task/cube_task/tools/teach_record.py": {
+    "mtime": 1794841719.5588288,
+    "seen": 1795230886.465848,
+    "ast_hash": "b9b1b41dfe96ba840f1fdfc719fad4bc",
+    "semantic_hash": "b9b1b41dfe96ba840f1fdfc719fad4bc"
+  },
+  "ws/src/cube_task/cube_task/tools/ui.py": {
+    "mtime": 1794841719.5588288,
+    "seen": 1795230886.465848,
+    "ast_hash": "c044c96b14c9a935a15c9c5e76af9f50",
+    "semantic_hash": "c044c96b14c9a935a15c9c5e76af9f50"
+  },
+  "ws/src/cube_task/cube_task/tools/view.py": {
+    "mtime": 1794841719.5598352,
+    "seen": 1795230886.465848,
+    "ast_hash": "745e4711d2bf8f45dde0a1f8828e3f9d",
+    "semantic_hash": "745e4711d2bf8f45dde0a1f8828e3f9d"
+  },
+  "ws/src/cube_task/cube_task/tools/yolo/__init__.py": {
+    "mtime": 1794841719.560835,
+    "seen": 1795230886.465848,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ws/src/cube_task/cube_task/tools/yolo/check_onnx.py": {
+    "mtime": 1794841719.560835,
+    "seen": 1795230886.465848,
+    "ast_hash": "2bcf70a1717de0242a1402edd4115775",
+    "semantic_hash": "2bcf70a1717de0242a1402edd4115775"
+  },
+  "ws/src/cube_task/cube_task/tools/yolo/export_onnx.py": {
+    "mtime": 1794841719.5622933,
+    "seen": 1795230886.465848,
+    "ast_hash": "ff62a4643b636e4db05b110f1237f558",
+    "semantic_hash": "ff62a4643b636e4db05b110f1237f558"
+  },
+  "ws/src/cube_task/cube_task/tools/yolo/make_dataset.py": {
+    "mtime": 1794841719.5643694,
+    "seen": 1795230886.4666476,
+    "ast_hash": "263d5d98444b3a0e0794563dd18a2fc7",
+    "semantic_hash": "263d5d98444b3a0e0794563dd18a2fc7"
+  },
+  "ws/src/cube_task/cube_task/tools/yolo/train_yolo.py": {
+    "mtime": 1794841719.5653682,
+    "seen": 1795230886.4666476,
+    "ast_hash": "3dc2f3294007467c7ae13965d626fc66",
+    "semantic_hash": "3dc2f3294007467c7ae13965d626fc66"
+  },
+  "ws/src/piper_vision/piper_vision/__init__.py": {
+    "mtime": 1794841719.7033026,
+    "seen": 1795230886.4666476,
+    "ast_hash": "afc87c983509f687abbc1b0ee34ff2e6",
+    "semantic_hash": "afc87c983509f687abbc1b0ee34ff2e6"
+  },
+  "ws/src/piper_vision/piper_vision/__main__.py": {
+    "mtime": 1794841719.7033026,
+    "seen": 1795230886.4666476,
+    "ast_hash": "3406ad120686871b432186a741381141",
+    "semantic_hash": "3406ad120686871b432186a741381141"
+  },
+  "ws/src/piper_vision/piper_vision/camera.py": {
+    "mtime": 1794841719.7043104,
+    "seen": 1795230886.4666476,
+    "ast_hash": "71caa944e705507f71c379c2f1f77702",
+    "semantic_hash": "71caa944e705507f71c379c2f1f77702"
+  },
+  "ws/src/piper_vision/piper_vision/cli.py": {
+    "mtime": 1794841719.7053096,
+    "seen": 1795230886.4666476,
+    "ast_hash": "4eb338a00b2c3bedebe2f174a22d3b84",
+    "semantic_hash": "4eb338a00b2c3bedebe2f174a22d3b84"
+  },
+  "ws/src/piper_vision/piper_vision/frames.py": {
+    "mtime": 1794841719.7063117,
+    "seen": 1795230886.4666476,
+    "ast_hash": "59b2cd04b861df5afd684587cd42ac8a",
+    "semantic_hash": "59b2cd04b861df5afd684587cd42ac8a"
+  },
+  "ws/src/piper_vision/piper_vision/handeye.py": {
+    "mtime": 1794841719.7073123,
+    "seen": 1795230886.4666476,
+    "ast_hash": "83da2b9facc66f89f32b1c6ce741574b",
+    "semantic_hash": "83da2b9facc66f89f32b1c6ce741574b"
+  },
+  "ws/src/piper_vision/piper_vision/l1.py": {
+    "mtime": 1794841719.70831,
+    "seen": 1795230886.4666476,
+    "ast_hash": "79bd4a5bd015e1cf6d7e35a8c65165c3",
+    "semantic_hash": "79bd4a5bd015e1cf6d7e35a8c65165c3"
+  },
+  "ws/src/piper_vision/piper_vision/live.py": {
+    "mtime": 1794841719.709309,
+    "seen": 1795230886.4666476,
+    "ast_hash": "d958329f9ddc82c4517efb1daadf51ab",
+    "semantic_hash": "d958329f9ddc82c4517efb1daadf51ab"
+  },
+  "ws/src/piper_vision/piper_vision/record.py": {
+    "mtime": 1794841719.709309,
+    "seen": 1795230886.4666476,
+    "ast_hash": "2689dd294e61de7418327a72cb5aa0de",
+    "semantic_hash": "2689dd294e61de7418327a72cb5aa0de"
+  },
+  "ws/src/piper_vision/piper_vision/transforms.py": {
+    "mtime": 1794841719.7108202,
+    "seen": 1795230886.4666476,
+    "ast_hash": "13e5676c6075d0493b86e1a3416c725a",
+    "semantic_hash": "13e5676c6075d0493b86e1a3416c725a"
+  },
+  "ws/src/cube_task/cube_task/perception/polygon_collision.py": {
+    "mtime": 1795233451.9260461,
+    "seen": 1795236841.0756054,
+    "ast_hash": "61b220d23335a87fda051d0c8250ff02",
+    "semantic_hash": "61b220d23335a87fda051d0c8250ff02"
+  }
+}

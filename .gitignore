@@ -60,6 +60,11 @@ local_validation/assistant_sim/
 local_validation/assistant_ui/
 local_validation/capacity_recovery/
 
+# Graphify: keep shareable graphs, exclude local runtime paths and extraction cache
+graphify-out/cache/
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+
 # 仅发布所需 PiPER 模型，排除嵌套仓库元数据和其他模型库文件
 local_assets/mujoco_menagerie/*
 !local_assets/mujoco_menagerie/agilex_piper/

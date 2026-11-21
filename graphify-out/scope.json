@@ -19,6 +19,7 @@
     "ws/src/cube_task/cube_task/assistant/__init__.py",
     "ws/src/cube_task/cube_task/assistant/active_observation.py",
     "ws/src/cube_task/cube_task/assistant/batch.py",
+    "ws/src/cube_task/cube_task/assistant/carried_observation.py",
     "ws/src/cube_task/cube_task/assistant/catalog.py",
     "ws/src/cube_task/cube_task/assistant/catalog_perception.py",
     "ws/src/cube_task/cube_task/assistant/conversation.py",

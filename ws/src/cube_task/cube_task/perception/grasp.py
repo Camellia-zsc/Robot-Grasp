@@ -1447,6 +1447,11 @@ class PlacePlanner:
         L, W = sorted((float(held['length']), float(held['width'])), reverse=True)
         grip = float(held.get('grip_width', W) or W)
         opening = min(self.open_width, grip + RELEASE_OPEN_EXTRA)
+        requested = held.get('requested_release_opening')
+        if requested is not None:
+            if not _finite(requested) or float(requested) <= 0.0 or float(requested) > self.open_width:
+                return None
+            opening = max(opening, float(requested))
         floor = self.release_height_flat - lower + float(held.get('grip_z', 0)) - PAD_HALF
         center = tuple(float(v) for v in zone.center[:2])
         candidates = []

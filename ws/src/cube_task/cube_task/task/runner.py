@@ -38,7 +38,7 @@ from ..perception.grasp import (CAPSULE_RATIO, expected_table_z, GraspPlanner, L
 from .operator import Operator
 from .selection import is_blacklisted, select_target
 from .selfcheck import observe_tcp_pose, self_check
-from .skills import PickPlaceSkill, is_fault_motion_error
+from .skills import PickPlaceSkill, RELEASE_OPEN_QUANTIZATION_TOL, is_fault_motion_error
 from .views import (drop_near, MERGE_DIST, merge_view_detections, nearest_view, observe_views,
                     tag_view, view_of, views_near)
 from .live import drop_live_seen
@@ -1054,7 +1054,8 @@ class TaskRunner:
     def _save_held_recovery(self, det, gp, pp, result) -> None:
         """Remember a measured pick-only grasp or a recoverable held failure."""
         errors = [s.get('error') for s in result.detail.get('steps', ()) if s.get('error')]
-        allowed = ('rejected', 'unreachable', 'timeout', 'stalled', 'scene_changed', 'placement_changed')
+        allowed = ('rejected', 'unreachable', 'timeout', 'stalled', 'scene_changed',
+                   'placement_changed', 'release_clearance_unconfirmed', 'held_anchor_unconfirmed')
         width = result.grasp_width
         picked = result.ok and result.detail.get('pick_only') and not result.error
         if (not result.detail.get('holding')
@@ -1315,6 +1316,16 @@ class TaskRunner:
         shape['grip_width'] = max(shape['grip_width'], width)
         shape['center_offset'] = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
         shape['grasp_closing'] = gp.closing_angle
+        if (det.extra or {}).get('_stack_support') is not None:
+            from ..perception.grasp import RELEASE_OPEN_EXTRA
+            # Grip feedback measures the narrow contact band of a curved body.
+            # A tilted exit needs clearance around its complete measured/nominal
+            # horizontal envelope, including the driver's width quantization.
+            required = (max(shape['length'], shape['width']) + .010 +
+                        RELEASE_OPEN_QUANTIZATION_TOL)
+            if required <= min(self.max_width, self.placer.open_width):
+                shape['requested_release_opening'] = max(required,
+                    min(self.placer.open_width, shape['grip_width'] + RELEASE_OPEN_EXTRA))
         neighbors = list(neighbors)
         self._neighbors = neighbors
         held = held_offset_of(planning_grasp)
@@ -1379,7 +1390,9 @@ class TaskRunner:
                 fixed_xy=bool(exact_xy),
                 pose_filter=self._strict_place_filter(det, search['grasp'], search['neighbors'],
                                                       search['polygon'],
-                                                      completion_zone=search['completion_zone']),
+                                                      completion_zone=search['completion_zone'],
+                                                      release_opening=search['shape'].get(
+                                                          'requested_release_opening')),
                 candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
                 center_first=self._center_first(search['zone'].name),
                 lower=self.release_lower.get(det.label, 0.0), cancelled=interrupted)
@@ -1459,7 +1472,8 @@ class TaskRunner:
                 center = pp.T_release[:3, 3] + rotation @ (source - gp.T_grasp[:3, 3])
             preferred_xy = (tuple(center[:2]),)
         allowed = self._strict_place_filter(det, planning_grasp, neighbors, polygon,
-                                            completion_zone=search['completion_zone'])
+                                            completion_zone=search['completion_zone'],
+                                            release_opening=shape.get('requested_release_opening'))
         def measured_allowed(x, y, closing):
             return (not interrupted() and
                     allowed(x, y, closing) and
@@ -1511,6 +1525,12 @@ class TaskRunner:
             if ok:
                 if interrupted():
                     return None, interruption_reason()
+                if (stacked and shape.get('requested_release_opening') is not None
+                        and observation_filter is not None):
+                    # The skill accepts this only for these exact poses and
+                    # aperture. Never certify a capacity-only or blind plan.
+                    candidate.release_opening_checked = dict(width=float(candidate.open_width),
+                        release_T=candidate.T_release.copy(), retreat_T=candidate.T_retreat.copy())
                 self._event('decision', action='replan_release', label=det.label, zone=zone.name,
                             release_xyz=[round(float(v), 4) for v in candidate.T_release[:3, 3]],
                             place=info, observed_neighbors=len(occupied),
@@ -1734,7 +1754,8 @@ class TaskRunner:
         """Release the first object at the zone center unless several labels share the zone."""
         return sum(1 for z in self.class_to_zone.values() if z == zone_name) <= 1
 
-    def _strict_place_filter(self, det, gp, neighbors, support_polygon, completion_zone=None):
+    def _strict_place_filter(self, det, gp, neighbors, support_polygon, completion_zone=None,
+                             release_opening=None):
         """Complete body envelopes bound the destination and the open fingers."""
         from ..perception.geometry import points_in_polygon, object_footprint, object_prism
         from ..perception.grasp import FINGER_OUTER, FINGER_HALF_BAND, RELEASE_OPEN_EXTRA
@@ -1777,12 +1798,16 @@ class TaskRunner:
         offset = np.asarray(det.center_base[:2]) - gp.T_grasp[:2, 3]
         margin_offsets = np.array([[.002, .002], [.002, -.002], [-.002, .002], [-.002, -.002]])
         opening = min(self.placer.open_width, gp.expected_width + RELEASE_OPEN_EXTRA)
-        fingers_length = opening + 2 * FINGER_OUTER
+        if release_opening is not None:
+            opening = float(release_opening)
         finger_floor = self.placer.release_height_flat + max(0.0, float(gp.T_grasp[2, 3]) -
                                                             (detection_table_z(det) or 0.0)) - .015
 
         def allowed(x, y, closing, final_yaw=None, tcp_xy=None, held_projection=None,
                     gripper_pose=None, gripper_open_width=None):
+            width = opening if gripper_open_width is None else float(gripper_open_width)
+            if not math.isfinite(width) or width <= 0.0 or width > self.placer.open_width:
+                return False
             if stack_support is not None:
                 from ..assistant.stacking import center_supported
                 if not center_supported([x, y], stack_support):
@@ -1814,14 +1839,13 @@ class TaskRunner:
                 return False
             obj = prepare_polygon(obj)
             fingers = prepare_polygon(corners(np.array([x, y]) - rotated if tcp_xy is None else tcp_xy,
-                              (fingers_length, 2 * FINGER_HALF_BAND), closing))
+                              (width + 2 * FINGER_OUTER, 2 * FINGER_HALF_BAND), closing))
             if any(not designated and (overlaps(obj, other)
                    or (height > finger_floor and overlaps(fingers, other)))
                    for other, height, _bottom, _top, designated in obstacles):
                 return False
             if gripper_pose is not None:
                 import cv2
-                width = opening if gripper_open_width is None else float(gripper_open_width)
                 # Fixed tool geometry, matching the physical fingers/palm.
                 # Project all eight box corners after the final reach tilt;
                 # only vertically overlapping obstacles can collide with it.
@@ -1865,7 +1889,8 @@ class TaskRunner:
             cloud = None
         source_axis = np.array([math.cos(float(det.yaw or 0)), math.sin(float(det.yaw or 0)), 0])
         allowed = self._strict_place_filter(det, gp, neighbors, polygon,
-                                            completion_zone=completion_zone)
+                                            completion_zone=completion_zone,
+                                            release_opening=pp.open_width)
         for _ in range(4):
             if _planning_cancelled(self.arm):
                 return False, 'aborted'

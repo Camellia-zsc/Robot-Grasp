@@ -7,6 +7,7 @@ import pytest
 
 from cube_task.core.transforms import rot_y, top_down_T
 from cube_task.core.types import MotionResult, PickResult, Stamped
+from cube_task.task.skills import _StepFailed
 from test_task_skills import _setup
 
 
@@ -259,3 +260,80 @@ def test_checked_opening_allows_sensor_quantization_but_not_real_shortfall(short
     assert len(arm.motions()) == (4 if accepted else 3)
     if not accepted:
         assert result.detail['holding'] and result.detail['fault']
+
+
+def test_before_open_runs_before_fresh_settling_feedback_and_opening():
+    arm, _log, skill, grasp, place, _checks = checked_wide_release()
+    order = []
+    original_pose, original_sleep, original_gripper = arm.get_tcp_pose, arm.clock.sleep, arm.gripper
+    def callback(g, p, result):
+        assert g is grasp and p is place and result.detail['holding']
+        assert not arm.gripper_cmds()
+        order.append('callback')
+        return True, ''
+    def pose():
+        order.append('feedback')
+        return original_pose()
+    def sleep(duration):
+        if duration == pytest.approx(.12):
+            order.append('settle')
+        original_sleep(duration)
+    def opened(*args, **kwargs):
+        order.append('opening')
+        return original_gripper(*args, **kwargs)
+    skill.before_open = callback
+    arm.get_tcp_pose, arm.clock.sleep, arm.gripper = pose, sleep, opened
+    result = skill.place_held(grasp, place, arm.width)
+    assert result.ok
+    start, settling, opening = [order.index(k) for k in ('callback', 'settle', 'opening')]
+    assert start < settling < opening
+    assert order[start+1:opening].count('feedback') >= 2
+
+
+@pytest.mark.parametrize('kind', ['refused', 'observation_error'])
+def test_before_open_refusal_never_opens_or_retreats(kind):
+    arm, _log, skill, grasp, place, checks = checked_wide_release()
+    def callback(*args):
+        if kind == 'observation_error':
+            raise RuntimeError('fresh RGB-D was unavailable')
+        return False, 'held anchor moved'
+    skill.before_open = callback
+    result = skill.place_held(grasp, place, arm.width)
+    assert not result.ok and result.detail['holding'] and not result.detail['fault']
+    assert result.stage == 'release' and result.error == 'held_anchor_unconfirmed'
+    assert not arm.gripper_cmds() and not checks
+    assert len(arm.motions()) == 3
+
+
+def test_before_open_stop_keeps_abort_and_closed_grip():
+    arm, _log, skill, grasp, place, checks = checked_wide_release()
+    def callback(*args):
+        arm.abort_event.set()
+        return False, 'stopped while observing'
+    skill.before_open = callback
+    result = skill.place_held(grasp, place, arm.width)
+    assert not result.ok and result.detail['holding'] and result.detail['fault']
+    assert result.error == 'aborted'
+    assert not arm.gripper_cmds() and not checks and len(arm.motions()) == 3
+
+
+def test_before_open_step_failure_retains_driver_fault():
+    arm, _log, skill, grasp, place, checks = checked_wide_release()
+    def callback(*args):
+        raise _StepFailed('open_release', 'arm_error', 'feedback disconnected', fault=True)
+    skill.before_open = callback
+    result = skill.place_held(grasp, place, arm.width)
+    assert not result.ok and result.detail['holding'] and result.detail['fault']
+    assert result.error == 'arm_error' and not arm.gripper_cmds() and not checks
+
+
+def test_before_open_cannot_bypass_current_tcp_release_feedback():
+    arm, _log, skill, grasp, place, checks = checked_wide_release()
+    def callback(*args):
+        arm.tcp[2, 3] += .02
+        return True, ''
+    skill.before_open = callback
+    result = skill.place_held(grasp, place, arm.width)
+    assert not result.ok and result.detail['holding']
+    assert result.error == 'release_pose_unconfirmed'
+    assert not arm.gripper_cmds() and not checks

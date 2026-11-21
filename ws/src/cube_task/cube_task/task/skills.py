@@ -168,6 +168,9 @@ class PickPlaceSkill:
         # Explicit execution hooks may refuse motion; display observers above cannot.
         self.execution_guard = None
         self.before_release = None
+        # Optional final visual holding check. It may refuse opening, but a
+        # successful callback never replaces actual TCP/settling feedback.
+        self.before_open = None
         # Interactive recovery may start at another camera pose. The optional
         # planner returns fully checked linear waypoints ending at T_pre.
         self.before_held_transit = None
@@ -722,6 +725,20 @@ class PickPlaceSkill:
         # A successful motion flag is insufficient: recovery and continuation
         # use this same gate, and no failed descent may turn into a high drop.
         self._check_abort('open_release')
+        callback = getattr(self, 'before_open', None)
+        if callback is not None:
+            self._guard('open_release')
+            try:
+                confirmed, reason = callback(g, p, r)
+            except RuntimeError as exc:
+                confirmed, reason = False, str(exc)
+            self._check_abort('open_release')
+            self._guard('open_release')
+            if not confirmed:
+                r.ok = False
+                r.stage, r.error = 'release', 'held_anchor_unconfirmed'
+                r.detail.update(holding=True, reason=str(reason or 'held anchor is unconfirmed'))
+                return
         before, why = self._release_feedback(p)
         after = None
         if before is not None:

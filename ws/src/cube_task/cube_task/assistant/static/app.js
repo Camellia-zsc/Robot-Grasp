@@ -254,7 +254,7 @@ function renderMessages(state){
   });
   for(const [key,node] of ui.messageNodes)if(!activeKeys.has(key)){node.remove();ui.messageNodes.delete(key);}
   for(const event of Array.isArray(state.events)?state.events:[]){
-    if(!(["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan","inspect_place","active_observation","recovery_observation","placement_planning","placement_progress","placement_refined","placement_changed"].includes(event.kind)||/^(stack_|stacking_|physics_|object_dropped|settling)/.test(event.kind))||!event.message)continue;
+    if(!(["decision","result","error","stopped","recovery_start","recovery_result","recovery_exhausted","scene_intervention_queued","scene_intervention_applied","scene_intervention_rejected","skill_plan","skill_step","skill_feedback","skill_replan","final_audit","inspect_place","active_observation","recovery_observation","placement_planning","placement_progress","placement_refined","placement_changed"].includes(event.kind)||/^(stack_|stacking_|physics_|object_dropped|settling)/.test(event.kind))||!event.message)continue;
     if(["decision","recovery_result"].includes(event.kind)&&messages.some(message=>message.role==="assistant"&&assistantText(message,String(message.content??message.text??""),false)===event.message))continue;
     const key=String(event.id??event.seq??`${event.time}-${event.message}`);
     if(ui.eventNodes.has(key))continue;
@@ -359,7 +359,7 @@ function renderSkillTask(state){
   panel.dataset.status=status;
   const names={observe:"观察",pick:"抓取保持",place:"放置",move:"搬移",verify:"验证",ask:"询问人工",finish:"最终核验"};
   const labels={thinking:"模型规划中",executing:"逐步执行中",awaiting_approval:"等待人工确认",replanning:"根据反馈重规划",complete:"原任务已核验完成",failed:"任务尚未完成",stopping:"正在停止",stopped:"已停止",declined:"已拒绝并停止"};
-  const stepLabels={pending:"等待",executing:"执行中",succeeded:"步骤通过",failed:"失败",cancelled:"已取消"};
+  const stepLabels={pending:"等待",executing:"执行中",succeeded:"步骤通过",failed:"失败",cancelled:"已取消",deferred:"暂缓确认"};
   const zoneName=name=>({zone_red:"红色区域",zone_green:"绿色区域",zone_yellow:"黄色区域"})[name]||String(name||"默认区域");
   const goals=Array.isArray(task.goals)?task.goals:[];
   const goalDestination=goal=>goal.destination?.type==="on_object"?`${displayLabel(goal.destination.label)}顶面`:goal.destination?.type==="region"?"抓取区":goal.destination?.type==="point"?`指定桌面点 (${(goal.destination.xy||[]).map(value=>number(value).toFixed(3)).join(", ")})`:zoneName(goal.zone_name);
@@ -375,7 +375,9 @@ function renderSkillTask(state){
   };
   setText("skill-state",labels[status]||status);
   setText("skill-budget",`计划 ${number(task.plan_number)} / ${number(task.max_plans,5)} · 已执行 ${number(task.executed)} / ${number(task.max_executed,64)} 步`);
-  setText("skill-goals",goals.length?`最终目标：${goals.map(goal=>`${displayLabel(goal.label)} → ${goalDestination(goal)}`).join("；")}`:"等待模型明确最终目标。");
+  const deferred=Array.isArray(task.goal_worklist)?task.goal_worklist.filter(item=>item.status==="deferred"):[];
+  const pendingNote=deferred.length?`。暂缓确认：${deferred.map(item=>displayLabel(item.label)).join("、")}（仍保留为最终目标）`:"";
+  setText("skill-goals",goals.length?`最终目标：${goals.map(goal=>`${displayLabel(goal.label)} → ${goalDestination(goal)}`).join("；")}${pendingNote}`:"等待模型明确最终目标。");
   const steps=Array.isArray(task.steps)?task.steps:[],current=Number.isInteger(task.current_index)?steps[task.current_index]:null;
   setText("skill-message",stop||progress||task.message||(current?`当前第 ${task.current_index+1} / ${steps.length} 步：${names[current.skill]||current.skill}`:status==="complete"?"所有原目标已通过最终核验。":"等待技能计划或后续反馈。"));
   $("skill-steps").replaceChildren(...steps.map((step,index)=>{
@@ -392,7 +394,7 @@ function renderSkillTask(state){
   const history=Array.isArray(task.history)?task.history:[];
   $("skill-feedback").replaceChildren(...history.slice(-8).map(item=>{
     const feedback=item.feedback||item.result||item,step=item.step||item;
-    const row=document.createElement("li");row.dataset.status=feedback.ok===false?"failed":"feedback";
+    const row=document.createElement("li");row.dataset.status=feedback.deferred===true?"deferred":feedback.ok===false?"failed":"feedback";
     row.textContent=`${names[step.skill]||"执行反馈"}${step.label?` · ${displayLabel(step.label)}`:""}：${feedback.message||feedback.error||(feedback.ok===false?"本步骤未通过":feedback.ok===true?"步骤已通过":"已收到执行反馈")}`;return row;
   }));
 }

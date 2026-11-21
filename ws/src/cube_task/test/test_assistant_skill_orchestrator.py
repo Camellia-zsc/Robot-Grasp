@@ -87,7 +87,7 @@ class Executor:
                     ok = all(abs(a-b) < .015 for a, b in zip(target['center_base'], goal['destination']['xy']))
                 else:
                     ok = target.get('zone') == goal['zone_name']
-                items.append(dict(goal=goal, ok=ok, truth={'success': ok}))
+                items.append(dict(goal=goal, ok=ok, camera_verified=ok, truth={'success': ok}))
             ok = bool(items) and all(i['ok'] for i in items) and not s.bad_verification
             result.update(ok=ok, items=items, truth={'success': ok}, camera_verified=ok)
         if s.hook:
@@ -387,7 +387,11 @@ def test_planning_stagnation_without_held_object_or_fault_allows_scene_adjustmen
     ctl.submit('把苹果放红区')
     assert ctl.wait_idle(3)
     state = ctl.snapshot()
-    assert state['last_result']['error'] == 'planning_stagnation'
+    # An unchanged view now receives one complete audit and one model
+    # decision, ending without the old redundant observation-only rounds.
+    assert state['last_result']['error'] == 'goal_not_finished'
+    assert [action['skill'] for action in session.calls] == ['observe', 'verify', 'observe']
+    assert state['skill_task']['final_audit']['items'][0]['ok'] is False
     assert not state['last_result']['ok'] and state['metrics']['successes'] == 0
     assert state['can_resume_recovery'] and ctl._skill_memory['goals'] == GOALS
     assert not state['needs_reset']
@@ -424,9 +428,14 @@ def test_model_stop_after_unheld_geometry_failure_preserves_task_and_only_locks_
     ctl.submit('把苹果放红区')
     assert ctl.wait_idle(3)
     state = ctl.snapshot()
-    assert state['skill_task']['status'] == 'failed' and not state['last_result']['ok']
+    # This fake physically reaches the goal before its hook changes the action
+    # report to a geometry failure. A healthy final audit can prove completion;
+    # a real arm fault must stop before any audit camera command.
+    assert state['skill_task']['status'] == ('failed' if fault else 'complete')
+    assert state['last_result']['ok'] is not fault
+    assert [action['skill'] for action in session.calls] == (['move'] if fault else ['move', 'verify'])
     assert ctl._skill_memory['goals'] == GOALS
-    assert state['can_resume_recovery'] is not fault
+    assert not state['can_resume_recovery']
     assert state['needs_reset'] is fault
     assert state['simulation']['editor']['editable'] is not fault
 
@@ -493,9 +502,11 @@ def test_actual_observation_information_resets_stagnation(create, monkeypatch):
     ctl, _session, client = create(lambda c, n: [step(n, 'observe')])
     ctl.submit('把苹果放红区')
     assert ctl.wait_idle(3)
-    assert len(client.contexts) == 5
-    assert [c['planning_budget']['stagnation'] for c in client.contexts] == [0, 1, 0, 1, 2]
-    assert ctl.snapshot()['last_result']['error'] == 'planning_stagnation'
+    # New information permits another audit. The following unchanged view
+    # cannot repeat that camera audit or prolong the post-audit decision.
+    assert [c['planning_budget']['stagnation'] for c in client.contexts] == [0, 1, 0]
+    assert [a['skill'] for a in _session.calls] == ['observe', 'verify', 'observe', 'verify', 'observe']
+    assert ctl.snapshot()['last_result']['error'] == 'goal_not_finished'
 
 
 def test_plan_limit_scales_with_goals_and_initial_steps_but_remains_finite():

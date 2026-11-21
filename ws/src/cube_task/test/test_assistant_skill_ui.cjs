@@ -112,6 +112,15 @@ const base={status:"executing",busy:true,skill_task:task,messages:[],events:[],
   has(get("task-result").textContent,/原目标未完成/);eq(get("skill-feedback").children.at(-1).dataset.status,"failed");
   has(get("skill-feedback").textContent,/放置 · 苹果：空位被占用/);eq(get("resume-recovery-button").textContent,"继续未完成任务");
   has(get("command-hint").textContent,/继续未完成任务/);has(get("resume-recovery-status").textContent,/保留未完成的原目标/);
+  update({...failed,skill_task:{...failed.skill_task,
+    goal_worklist:[{goal_index:0,label:"apple",status:"deferred",reason:"target_partial"}],
+    steps:[{id:"deferred",skill:"move",label:"apple",destination:{type:"goal",index:0},status:"deferred"}],
+    history:[{skill:"move",label:"apple",ok:false,deferred:true,message:"目标待确认，先处理其他物品"}]}});
+  has(get("skill-goals").textContent,/暂缓确认：苹果（仍保留为最终目标）/);
+  eq(get("skill-steps").children[0].children[2].textContent,"暂缓确认");
+  eq(get("skill-feedback").children[0].dataset.status,"deferred");
+  eq(get("skill-state").textContent,"任务尚未完成");
+  update(failed);
   await get("resume-recovery-button").dispatch("click");eq(requests.length,1);eq(requests[0].url,"/api/resume-recovery");
   await get("resume-recovery-button").dispatch("click");eq(requests.length,1);
 

@@ -21,6 +21,10 @@ class _PlanChanged(RuntimeError):
     pass
 
 
+class _TargetUnavailable(ValueError):
+    """No grasp was dispatched because fresh camera identity is unresolved."""
+
+
 class SkillExecutor:
     """Execute one controller step without changing the user's final goals."""
 
@@ -120,6 +124,47 @@ class SkillExecutor:
             except (ValueError, KeyError) as exc:
                 return self._failure(step, 'invalid_step', str(exc))
 
+    @staticmethod
+    def _independent_goal_move(step, goals):
+        """Only a final single-object move can be postponed independently."""
+        if step.get('skill') != 'move':
+            return None
+        destination = step.get('destination') or {}
+        for index, goal in enumerate(goals):
+            if goal.get('label') != step.get('label'):
+                continue
+            if destination.get('type') == 'goal' and destination.get('index') == index:
+                return index
+            if (destination.get('type') == 'zone' and goal.get('destination') is None
+                    and destination.get('name') == goal.get('zone_name')):
+                return index
+            if destination == goal.get('destination') and destination.get('type') == 'region':
+                return index
+        return None
+
+    def _can_defer(self, step, goals):
+        session = self.session
+        if (self._independent_goal_move(step, goals) is None or self._holding()
+                or self._stopped(None) or not self._plan_current()):
+            return False
+        health_fn = getattr(getattr(session, 'arm', None), 'health', None)
+        health = health_fn() if health_fn is not None else None
+        return health is not None and health.ok
+
+    def _deferred_target(self, step, reason):
+        return dict(self._failure(step, 'target_not_observed',
+            '该目标尚未获得唯一可靠测量，暂缓搬运；保留最终目标，先处理其他可确认物品'),
+            deferred=True, manipulation_started=False, changed=False, reason=str(reason)[:200])
+
+    def defer_unobserved(self, step, goals):
+        """Refuse an unresolved final move without scanning or commanding a grasp."""
+        if not self._can_defer(step, goals):
+            return None
+        from .goal_readiness import goal_worklist
+        index = self._independent_goal_move(step, goals)
+        item = goal_worklist(self.session.scene, goals)[index]
+        return self._deferred_target(step, item['reason']) if item['status'] == 'deferred' else None
+
     def execute(self, step, goals, protected_goals=(), cancel_event=None, expected_revision=None):
         """Run observe/pick/place/move/verify; ask/finish/stop belong to the controller."""
         step = dict(step)
@@ -130,6 +175,9 @@ class SkillExecutor:
                     return self._failure(step, 'aborted', '任务已停止')
                 self._check_plan()
                 skill = step.get('skill')
+                deferred = self.defer_unobserved(step, goals)
+                if deferred is not None:
+                    return deferred
                 if skill == 'observe':
                     return self._observe(step, goals)
                 if skill == 'pick':
@@ -147,6 +195,11 @@ class SkillExecutor:
                     result = session.verify_goals(copy.deepcopy(list(selected)))
                     camera_ok = bool(result.get('ok'))
                     for item in result.get('items', ()):
+                        # verify_goals owns the camera-only verdict here.
+                        # Keep each camera result before combining it with
+                        # independent physical truth, including partial audits.
+                        item['camera_verified'] = (item.get('ok') is True
+                                                   and item.get('camera_verified', True) is True)
                         goal = item['goal']
                         measured = unique_target(session._observed_detections, goal['label'])
                         evaluation = session._evaluation_object(measured) if measured is not None else None
@@ -179,6 +232,10 @@ class SkillExecutor:
                 return self._failure(step, 'invalid_skill', '该步骤不是可执行的基本技能')
             except _PlanChanged as exc:
                 return self._failure(step, 'scene_changed', str(exc))
+            except _TargetUnavailable as exc:
+                if self._can_defer(step, goals):
+                    return self._deferred_target(step, str(exc))
+                return self._failure(step, 'invalid_step', str(exc))
             except (ValueError, KeyError) as exc:
                 return self._failure(step, 'invalid_step', str(exc))
 
@@ -188,13 +245,22 @@ class SkillExecutor:
             raise ValueError('目标编号超出任务范围')
         return goals[index]
 
-    def _reference(self, label):
+    def _reference(self, label, *, allow_partial=False):
         """Use only task-start or current camera summaries as observation hints."""
         scene = self.session.scene
         current = [o for o in scene.get('objects', ())
                    if o.get('valid') and o.get('label') == label and o.get('center_base') is not None]
         if len(current) == 1:
             return copy.deepcopy(current[0])
+        if allow_partial:
+            hints = [o for o in scene.get('objects', ())
+                     if o.get('label') == label and o.get('center_base') is not None]
+            if len(hints) == 1:
+                # A cropped silhouette can aim a new camera view, but it never
+                # becomes an executable detection or a replacement grasp.
+                hint = copy.deepcopy(hints[0])
+                hint['_observation_hint_only'] = True
+                return hint
         original = self.originals.values() if isinstance(self.originals, Mapping) else self.originals
         matches = [o for o in original if o.get('label') == label and o.get('center_base') is not None]
         return copy.deepcopy(matches[0]) if len(matches) == 1 else {'label': label}
@@ -216,8 +282,10 @@ class SkillExecutor:
             scene = session.observe(target=reference, purpose=purpose)
         det = unique_target(session._last_fresh, label,
                             partial=lambda d: session._target_partial(d, reference))
-        if det is None or session._observation_revision != session._environment_revision:
-            raise ValueError('新相机图像未唯一确认目标，未执行旧坐标抓取')
+        if session._observation_revision != session._environment_revision:
+            raise _PlanChanged('新相机观测期间现场变化，未执行旧坐标抓取')
+        if det is None:
+            raise _TargetUnavailable('新相机图像未唯一确认目标，未执行旧坐标抓取')
         if support_label is not None and not session._support_observed(
                 reference, session._last_fresh, session._observation_revision):
             raise ValueError('新相机观测未同时完整确认抓取物品与指定底座，未执行抓取')
@@ -226,7 +294,7 @@ class SkillExecutor:
                    and obj.get('center_base') is not None]
         if (len(matches) != 1 or
                 np.linalg.norm(np.asarray(matches[0]['center_base'][:2]) - det.center_base[:2]) >= .025):
-            raise ValueError('相机目标身份存在歧义')
+            raise _TargetUnavailable('相机目标身份存在歧义')
         return det, matches[0]
 
     def _stationary(self):
@@ -327,16 +395,25 @@ class SkillExecutor:
             scene = session.scene
         else:
             label = step.get('label')
-            reference = self._reference(label) if label else None
-            if step.get('destination') is not None:
+            reference = self._reference(label, allow_partial=True) if label else None
+            source_hint = bool(reference and (reference.get('center_base') is not None
+                                             or reference.get('xy') is not None))
+            if source_hint:
+                # An object search aims at its measured source. A placement
+                # destination is only a fallback when its location is unknown.
+                reference['_observe_source'] = True
+            elif step.get('destination') is not None:
                 xy, _polygon = self._observation_focus(step, goals)
                 destination = {'type': 'point', 'xy': xy.tolist()}
                 session._ensure_destination_view(destination)
                 reference = {'xy': xy.tolist()}
                 if label:
                     reference['label'] = label
-            scene = session.observe(target=reference,
-                                    purpose='skill_observe')
+            from .simulation import _SourceObservationUnavailable
+            try:
+                scene = session.observe(target=reference, purpose='skill_observe')
+            except _SourceObservationUnavailable as exc:
+                return self._failure(step, 'no_safe_observation_path', str(exc))
         session._status = 'ready'
         session._publish_snapshot()
         return dict(ok=True, skill='observe', stage='observed', holding=self._held(),

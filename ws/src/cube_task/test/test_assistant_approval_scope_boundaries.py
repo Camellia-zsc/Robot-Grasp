@@ -210,7 +210,9 @@ def test_approval_preserves_pending_restore_and_cannot_claim_scene_progress(cont
     state = approve_until_idle(ctl)
 
     assert state['status'] != 'complete' and not state['last_result']['ok']
-    assert session.scene == before and not session.calls
+    # Natural task termination may now perform its required final audit.
+    # Approval itself still changes no scene and dispatches no manipulation.
+    assert session.scene == before and all(call['skill'] == 'verify' for call in session.calls)
     assert state['last_result']['pending_obligations'] == {'banana': 'pending'}
     assert ctl._skill_memory['goals'] == goals
     feedback = state['skill_task']['history'][0]

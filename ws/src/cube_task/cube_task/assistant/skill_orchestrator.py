@@ -24,7 +24,7 @@ SKILLS = {'observe': '观察', 'pick': '抓取并保持', 'place': '放置',
 def idle_skill_task():
     return dict(status='idle', plan_number=0, max_plans=MIN_PLANS, stagnation=0,
                 executed=0, max_executed=MAX_EXECUTED, current_index=None,
-                goals=[], steps=[], history=[], message='')
+                goals=[], steps=[], history=[], message='', goal_worklist=[], final_audit=None)
 
 
 def plan_limit(goals, initial_steps=()):
@@ -115,7 +115,7 @@ class SkillOrchestrator:
                        dict(type='named_region', name=goal.get('zone_name')))
         if result.get('resolved_destination') != destination:
             return None
-        item = dict(goal=contract, label=step['label'], ok=True,
+        item = dict(goal=contract, label=step['label'], ok=True, camera_verified=True,
                     truth={'success': True}, verified_revision=result['verified_revision'])
         return self._proof(dict(result, items=[item]), [goal])
 
@@ -207,6 +207,7 @@ class SkillOrchestrator:
         return contract
 
     def _context(self, memory, failure, executor=None):
+        from .goal_readiness import goal_worklist
         snap = self.session.snapshot()
         scene = self.session.scene
         scene['scene_version'] = snap.get('scene_version', scene['scene_version'])
@@ -237,7 +238,138 @@ class SkillOrchestrator:
         if memory.get('task_contract') is not None:
             context.update(task_contract=copy.deepcopy(memory['task_contract']),
                            task_inventory=copy.deepcopy(memory['task_inventory']))
+        context['goal_worklist'] = goal_worklist(scene, memory['goals'])
+        audit = copy.deepcopy(memory.get('final_audit')) if self._audit_current(memory) else None
+        if audit is not None:
+            context['final_audit'] = audit
+        self._publish(goal_worklist=context['goal_worklist'], final_audit=audit)
         return context
+
+    def _audit_current(self, memory):
+        return bool(memory.get('final_audit')
+                    and memory.get('_audit_stamp') == (self._revision(), memory.get('_audit_epoch', 0))
+                    and not self._pending_interventions())
+
+    def _proof_updates_audit(self, memory, proof):
+        """A new confirmed goal can supersede an earlier unconfirmed review."""
+        if not proof or not self._audit_current(memory):
+            return False
+        if any(item.get('camera_verified') is not True for item in proof['result']['items']):
+            return False
+        goals = [self._goal_contract(goal) for goal in memory['goals']]
+        for contract in proof['goals']:
+            if contract not in goals:
+                continue
+            index = goals.index(contract)
+            previous = next((item for item in memory['final_audit']['items']
+                             if item['goal_index'] == index and item['label'] == contract['label']), {})
+            if previous.get('ok') is not True or previous.get('camera_verified') is not True:
+                return True
+        return False
+
+    def _verification_updates_audit(self, memory, result, selected):
+        """A fresh explicit recheck can confirm or revoke a reviewed item."""
+        if (not self._audit_current(memory) or not self._verification_current(result)
+                or result.get('fault') or result.get('aborted') or result.get('holding')):
+            return False
+        contracts = [self._goal_contract(goal) for goal in memory['goals']]
+        for goal in selected:
+            contract = self._goal_contract(goal)
+            if contract not in contracts:
+                continue
+            index = contracts.index(contract)
+            previous = next((item for item in memory['final_audit']['items']
+                             if item['goal_index'] == index and item['label'] == goal['label']), {})
+            matches = [item for item in result.get('items', ()) if isinstance(item.get('goal'), dict)
+                       and item['goal'].get('label') and self._goal_contract(item['goal']) == contract]
+            item = matches[0] if len(matches) == 1 else {}
+            evidence = dict(result, items=[item], ok=item.get('ok') is True,
+                            camera_verified=item.get('camera_verified') is True,
+                            truth=copy.deepcopy(item.get('truth', {})))
+            confirmed = self._proof(evidence, [goal]) is not None
+            # A missing/cropped recheck revokes old positive evidence; it does
+            # not assert that an unseen object physically failed its goal.
+            if (previous.get('ok') is True) != confirmed:
+                return True
+        return False
+
+    @staticmethod
+    def _invalidate_audit(memory):
+        memory['_audit_epoch'] = memory.get('_audit_epoch', 0)+1
+        memory.pop('_audit_stamp', None)
+        memory.pop('_audit_result', None)
+
+    def _can_audit(self, memory, failure):
+        snap = self.session.snapshot()
+        if (not memory['goals'] or self.ctl._cancel.is_set() or self.session.cancel_event.is_set()
+                or snap.get('held_object') or snap.get('status') == 'stopped'
+                or getattr(self.session.runner, 'has_held_recovery', False)
+                or self._pending_interventions()
+                or any(r.get('fault') or r.get('aborted') for r in
+                       (failure or {}, memory.get('last_action_failure', {})))):
+            return False
+        health = getattr(getattr(self.session, 'arm', None), 'health', None)
+        return not callable(health) or bool(health().ok)
+
+    def _end_audit(self, executor, memory, failure, result=None, expected_revision=None):
+        """One measured review per unchanged scene, with no model or grasp call."""
+        if not self._can_audit(memory, failure):
+            return None, False
+        if self._audit_current(memory):
+            return copy.deepcopy(memory['_audit_result']), False
+        attempt_revision = self._revision() if expected_revision is None else expected_revision
+        self.ctl._set_status('verifying', '正在审核全部原始目标，暂缓项仍保留在任务中')
+        result = self._verify_all(executor, memory) if result is None else result
+        self._check_stop()
+        if result.get('fault') or result.get('aborted'):
+            memory['last_action_failure'] = copy.deepcopy(result)
+            raise RuntimeError(result.get('message') or '审核未完成，已保留现场')
+        if result.get('ok') and self._proof(result, self._final_goals(memory)) is None:
+            result = dict(result, ok=False, error='task_scope_incomplete', message='完整审核缺少部分原目标的证据')
+        if not result.get('ok') and not result.get('error'):
+            result = dict(result, error='goal_not_finished')
+        current = self._verification_current(result)
+        items = []
+        for index, goal in enumerate(memory['goals']):
+            matches = [item for item in result.get('items', ())
+                       if isinstance(item.get('goal'), dict) and item['goal'].get('label')
+                       and self._goal_contract(item['goal']) == self._goal_contract(goal)]
+            item = matches[0] if len(matches) == 1 else {}
+            camera = item.get('camera_verified') is True
+            ok = bool(current and camera and item.get('ok') is True
+                      and item.get('truth', {}).get('success') is True)
+            items.append(dict(goal_index=index, label=goal['label'], ok=ok,
+                camera_verified=bool(current and camera is True),
+                error='' if ok else str(item.get('error') or result.get('error') or 'goal_unconfirmed')[:200],
+                message=str(item.get('message') or ('目标已核验' if ok else '该目标尚未通过完整核验'))[:500]))
+        audit = dict(phase='reviewed', scene_version=self.session.snapshot().get('scene_version'), items=items)
+        memory['final_audit'] = audit
+        memory['_audit_result'] = copy.deepcopy(result)
+        unchanged = attempt_revision == self._revision() and not self._pending_interventions()
+        # An inconclusive attempt is still one review, never a success proof.
+        memory['_audit_stamp'] = (attempt_revision, memory.get('_audit_epoch', 0)) if unchanged else None
+        from .goal_readiness import goal_worklist
+        self._publish(final_audit=audit, goal_worklist=goal_worklist(self.session.scene, memory['goals']))
+        self.ctl._event('final_audit', dict(message='全部原始目标已审核，未确认项交由模型继续决策',
+                                           final_audit=audit))
+        return result, True
+
+    def _is_deferred(self, step, result, goals):
+        return bool(result and result.get('deferred') is True
+                    and result.get('manipulation_started') is False
+                    and result.get('holding') is False
+                    and not result.get('fault') and not result.get('aborted')
+                    and step['skill'] == 'move' and self._final_destination(step, goals)
+                    and not self.session.snapshot().get('held_object'))
+
+    def _defer_step(self, step, result, memory, steps, number):
+        if not self._is_deferred(step, result, memory['goals']):
+            return False
+        self._feedback(step, result, number)
+        step.update(status='deferred', message=result.get('message', '暂缓未可靠测量的目标'))
+        self._publish(steps=steps)
+        self._check_stop()
+        return True
 
     def _request(self, instruction, context, number):
         ctl = self.ctl
@@ -333,7 +465,7 @@ class SkillOrchestrator:
         for name in ('detail', 'diagnostics', 'observation_mode', 'reason'):
             if isinstance(result.get(name), str):
                 entry[name] = result[name][:1000]
-        for name in ('changed', 'progress', 'skipped', 'verification_reused'):
+        for name in ('changed', 'progress', 'skipped', 'verification_reused', 'deferred', 'manipulation_started'):
             if type(result.get(name)) is bool:
                 entry[name] = result[name]
         checks = placement_checks_summary(result.get('placement_checks'))
@@ -453,7 +585,10 @@ class SkillOrchestrator:
                 return self._finish_locked(ok, message, memory, result)
 
     def _finish_locked(self, ok, message, memory, result=None):
+        from .goal_readiness import goal_worklist
         ctl, snap = self.ctl, self.session.snapshot()
+        worklist = goal_worklist(self.session.scene, memory['goals'])
+        audit = copy.deepcopy(memory.get('final_audit')) if self._audit_current(memory) else None
         pending = dict(memory.get('obligations', {}))
         held = bool(snap.get('held_object'))
         ok = bool(ok and not held and not pending and not ctl._cancel.is_set()
@@ -471,6 +606,7 @@ class SkillOrchestrator:
         result = dict(result or {}, ok=ok, holding=held, skill_task=True,
                       goals=copy.deepcopy(memory['goals']),
                       pending_obligations=pending,
+                      goal_worklist=worklist, final_audit=audit,
                       message=message if not pending else message+'；仍有物品尚未按承诺复位')
         with ctl._lock:
             ctl._last_result = result
@@ -484,7 +620,8 @@ class SkillOrchestrator:
             ctl._stage = result['message']
             ctl._error = '' if ok else result['message']
             ctl._skill_task.update(status='complete' if ok else 'stopped' if ctl._cancel.is_set() else 'failed',
-                                   message=result['message'], current_index=None)
+                                   message=result['message'], current_index=None,
+                                   goal_worklist=worklist, final_audit=audit)
             if ok:
                 ctl._metrics['successes'] += 1
             if ctl._batch.get('total'):
@@ -513,6 +650,9 @@ class SkillOrchestrator:
                           originals=originals, obligations={}, restorations=[],
                           selected_destination=copy.deepcopy(selected_destination))
         memory.setdefault('restorations', [])
+        memory.setdefault('_audit_epoch', 0)
+        if resuming:
+            self._invalidate_audit(memory)
         initial_failure = failure if isinstance(failure, dict) else {}
         action_failed = initial_failure.get('ok') is not True and (
             initial_failure.get('fault')
@@ -543,12 +683,25 @@ class SkillOrchestrator:
                     executor.originals = copy.deepcopy(memory['originals'])
             number = 0
             while number < ctl._skill_task['max_plans']:
+                # Reserve the last model request for a measured final review.
+                if number == ctl._skill_task['max_plans']-1 and not self._audit_current(memory):
+                    reviewed, _new = self._end_audit(executor, memory, failure)
+                    if reviewed is not None:
+                        if reviewed.get('ok'):
+                            return self._finish(True, '全部原始目标和复位义务已通过最终核验', memory, reviewed)
+                        failure = reviewed
                 number += 1
                 self._check_stop()
                 remaining = MAX_EXECUTED-ctl._skill_task['executed']
                 if remaining <= 0:
-                    break
+                    reviewed, _new = self._end_audit(executor, memory, failure)
+                    if reviewed is None:
+                        break
+                    if reviewed.get('ok'):
+                        return self._finish(True, '全部原始目标和复位义务已通过最终核验', memory, reviewed)
+                    failure = reviewed
                 self._publish(status='thinking' if number == 1 else 'replanning', plan_number=number)
+                post_audit_decision = self._audit_current(memory)
                 context, revision = self._context(memory, failure, executor), self._revision()
                 try:
                     plan = self._request(instruction, context, number)
@@ -563,7 +716,16 @@ class SkillOrchestrator:
                     memory['stagnation'] += 1
                     self._publish(stagnation=memory['stagnation'])
                     ctl._event('skill_replan', dict(message=failure['message'], failure=failure))
+                    if self._audit_current(memory):
+                        return self._finish(False, failure['message'], memory, failure)
                     if memory['stagnation'] >= MAX_STAGNATION:
+                        reviewed, new = self._end_audit(executor, memory, failure)
+                        if reviewed is not None:
+                            if reviewed.get('ok'):
+                                return self._finish(True, '全部原始目标和复位义务已通过最终核验', memory, reviewed)
+                            if new:
+                                failure = reviewed
+                                continue
                         return self._finish(False, '连续三轮方案未产生进展，已保留现场和未完成事项',
                                             memory, dict(failure, error='planning_stagnation'))
                     continue
@@ -576,6 +738,13 @@ class SkillOrchestrator:
                         self._publish(status='idle', message=plan['message'])
                         ctl._set_status('ready', plan['message'])
                         return dict(ok=True, readonly=True, message=plan['message'])
+                    reviewed, new = self._end_audit(executor, memory, failure)
+                    if reviewed is not None:
+                        if reviewed.get('ok'):
+                            return self._finish(True, '全部原始目标和复位义务已通过最终核验', memory, reviewed)
+                        failure = reviewed
+                        if new:
+                            continue
                     return self._finish(False, plan['message'], memory, failure)
                 if not memory['goals']:
                     memory['goals'] = copy.deepcopy(plan['goals'])
@@ -595,6 +764,8 @@ class SkillOrchestrator:
                 skipped_pairs = set()
                 finished = False
                 round_progress = False
+                queue_completed = False
+                finish_failed = False
                 for index, step in enumerate(steps):
                     self._check_stop()
                     if revision != self._revision() or self._pending_interventions():
@@ -611,6 +782,10 @@ class SkillOrchestrator:
                         failure = dict(ok=False, error='scene_changed', stage='before_dispatch',
                                        message='技能开始前现场变化，旧方案已取消')
                         break
+                    deferred = getattr(executor, 'defer_unobserved', None)
+                    candidate = deferred(step, memory['goals']) if callable(deferred) else None
+                    if self._defer_step(step, candidate, memory, steps, number):
+                        continue
                     # Register physical obligations before a skill can move.
                     # Stop/driver exceptions must not erase an unpaid restore.
                     self._obligations(step, dict(ok=False), memory, steps)
@@ -635,6 +810,7 @@ class SkillOrchestrator:
                                 message='已完成状态不再成立，未执行空爪放置，等待重新规划')
                     # Every actual manipulation invalidates all earlier proofs,
                     # even when no human edit (and hence no revision) occurred.
+                    prior_verified = verified
                     if physical and not (result and result.get('skipped') is True):
                         verified = None
                     if step['skill'] == 'ask':
@@ -644,8 +820,11 @@ class SkillOrchestrator:
                             message='已获操作授权；不代表人工已调整现场或目标已完成'
                             if accepted else '人工拒绝，未继续执行')
                     elif step['skill'] == 'finish':
-                        result = self._verify_all(executor, memory, verified)
+                        result = (copy.deepcopy(memory['_audit_result']) if self._audit_current(memory)
+                                  else self._verify_all(executor, memory, verified))
+                        self._end_audit(executor, memory, result, result=result, expected_revision=revision)
                         finished = bool(result.get('ok'))
+                        finish_failed = not finished
                     elif step['skill'] == 'verify':
                         selected = ([memory['goals'][step['goal_index']]]
                                     if 'goal_index' in step else memory['goals'])
@@ -654,6 +833,9 @@ class SkillOrchestrator:
                         result = executor.execute(step, memory['goals'],
                             protected_goals=memory['protected_goals'], cancel_event=ctl._cancel,
                             expected_revision=revision)
+                    if self._defer_step(step, result, memory, steps, number):
+                        verified = prior_verified
+                        continue
                     if result.get('ok') and (result.get('fault') or result.get('aborted')):
                         # Opening can succeed before a retreat/driver failure.
                         # Physical release success cannot authorize another step.
@@ -667,6 +849,10 @@ class SkillOrchestrator:
                         result = dict(result, ok=False, error='scene_changed',
                                       message='核验后现场发生变化，旧结果不能计作步骤完成')
                     self._feedback(step, result, number)
+                    if ((physical and result.get('skipped') is not True)
+                            or (step['skill'] == 'observe' and result.get('changed') is True)
+                            or held_before != bool(self.session.snapshot().get('held_object'))):
+                        self._invalidate_audit(memory)
                     if physical and not result.get('ok'):
                         memory['last_action_failure'] = copy.deepcopy(result)
                     if ((physical and result.get('ok'))
@@ -677,12 +863,16 @@ class SkillOrchestrator:
                     step.update(status='succeeded' if result.get('ok') else 'failed', message=result.get('message', ''))
                     self._publish(steps=steps)
                     self._check_stop()
-                    if not memory['protected_goals'] and not memory['restorations']:
-                        if physical:
-                            proof = self._action_proof(proof_step, result, memory['goals'])
-                            if proof is not None:
-                                verified = proof
-                        elif step['skill'] == 'verify':
+                    if physical:
+                        proof = self._action_proof(proof_step, result, memory['goals'])
+                        if self._proof_updates_audit(memory, proof):
+                            self._invalidate_audit(memory)
+                        if proof is not None and not memory['protected_goals'] and not memory['restorations']:
+                            verified = proof
+                    elif step['skill'] == 'verify':
+                        if self._verification_updates_audit(memory, result, selected):
+                            self._invalidate_audit(memory)
+                        if not memory['protected_goals'] and not memory['restorations']:
                             verified = self._proof(result, selected)
                     if not result.get('ok'):
                         failure = result
@@ -695,8 +885,16 @@ class SkillOrchestrator:
                             break
                         return self._finish(True, '全部原始目标和复位义务已通过最终核验', memory, result)
                 else:
-                    if verified and not memory['obligations'] and not self.session.snapshot().get('held_object'):
-                        result = self._verify_all(executor, memory, verified)
+                    queue_completed = True
+                    from .goal_readiness import goal_worklist
+                    worklist = goal_worklist(self.session.scene, memory['goals'])
+                    ready = any(item['status'] == 'observed_pending' for item in worklist)
+                    full_proof = self._cached_verification(verified, self._final_goals(memory))
+                    if (verified and not memory['obligations'] and not self.session.snapshot().get('held_object')
+                            and (not ready or full_proof is not None)):
+                        result = (copy.deepcopy(memory['_audit_result']) if self._audit_current(memory)
+                                  else self._verify_all(executor, memory, verified))
+                        self._end_audit(executor, memory, result, result=result, expected_revision=revision)
                         if result.get('ok'):
                             return self._finish(True, '全部原始目标已通过核验', memory, result)
                         failure = result
@@ -709,7 +907,21 @@ class SkillOrchestrator:
                 self._publish(steps=steps)
                 memory['stagnation'] = 0 if round_progress else memory['stagnation']+1
                 self._publish(stagnation=memory['stagnation'])
+                from .goal_readiness import goal_worklist
+                worklist = goal_worklist(self.session.scene, memory['goals'])
+                self._publish(goal_worklist=worklist)
+                work_done = queue_completed and not any(item['status'] == 'observed_pending' for item in worklist)
+                if work_done or finish_failed or memory['stagnation'] >= MAX_STAGNATION:
+                    reviewed, new = self._end_audit(executor, memory, failure)
+                    if reviewed is not None:
+                        if reviewed.get('ok'):
+                            return self._finish(True, '全部原始目标和复位义务已通过最终核验', memory, reviewed)
+                        failure = reviewed
+                        if not new and post_audit_decision:
+                            return self._finish(False, '全部目标审核后仍有未完成项，已保留原目标与暂缓项', memory, reviewed)
                 if memory['stagnation'] >= MAX_STAGNATION:
+                    if self._audit_current(memory):
+                        continue
                     message = '连续三轮没有新的执行进展或观测信息，已保留持物和未完成事项'
                     return self._finish(False, message, memory,
                         dict(failure or {}, error='planning_stagnation', message=message))

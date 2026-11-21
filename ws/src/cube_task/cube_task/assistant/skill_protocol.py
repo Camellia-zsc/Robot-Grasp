@@ -34,6 +34,18 @@ task_contract 是用户全体任务的固定范围；task_inventory 仅含摆场
 不是新相机测量，不能提供抓取坐标或执行许可。全体归默认区时，goals 必须覆盖完整清单，
 即使某些物品被遮挡、无效或尚未测到，也不能删掉。先观察取得有效测量再执行对应动作。
 每轮 steps 可以只处理一部分物品，但最终 goals 不能随局部计划缩小；finish 须核验全部。
+goal_worklist 是按 goal_index 对应完整 goals 的相机工作清单，表示操作顺序提示，不是执行许可。
+优先处理 observed_pending 中当前唯一有效、可安全执行的目标，不必按 goals 列表固定顺序执行。
+observed_at_goal 只表示相机轮廓疑似到位，不能当成已核验成功或重复搬运的理由。
+deferred 表示目标缺测、无效、几何不完整或身份歧义，先暂缓该目标操作并处理其他可做目标；
+不要因一个目标暂缓就停止整项多目标任务，也不要在同一处理轮内反复扫描没有新信息的缺项。
+暂缓不删除目标、不算完成，也不算已经开始的抓取失败；动作仍必须通过唯一有效测量检查。
+只有 move 引用同一物品的最终 goal 时，可在计划中保留未可靠测量的目标语义引用；本地执行器
+会先暂缓该项、零抓取继续其他独立目标。这不允许盲抓，pick、place 和临时搬移仍要求有效测量。
+完成一轮可做目标后审核全部 goals。final_audit.phase=reviewed 是本地完整审核的逐项摘要，
+再集中分析未完成或未确认项。它不是新坐标或动作许可，旧 scene_version 的摘要只能作为历史。
+终审后可利用已有无效/局部测量作为寻找线索，选择有新依据的局部 observe，或在取得有效测量后
+先搬走可确认的上层物体以露出遮挡目标，再完成剩余目标；不能抓取仍未确认的物品。
 pending_obligations 列出尚未履行的非目标物品原位复位义务：必须用 original 引用恢复，
 不能把这些义务改写成用户goals或偷偷放弃；finish前必须完成，否则控制器不会判为成功。
 history、failure 和 last_action_failure 是真实逐步执行反馈；观察成功不代表上次动作失败已解决。
@@ -200,6 +212,51 @@ def placement_checks_summary(value):
     return result
 
 
+def _goal_worklist_summary(value, goals):
+    if not isinstance(value, list) or len(value) != len(goals):
+        raise ValueError('目标工作清单没有覆盖完整最终目标。')
+    result, seen = [], set()
+    for item in value:
+        if not isinstance(item, dict):
+            raise ValueError('目标工作清单项目无效。')
+        index = item.get('goal_index')
+        if (type(index) is not int or not 0 <= index < len(goals) or index in seen
+                or item.get('label') != goals[index]['label']
+                or item.get('status') not in ('observed_pending', 'observed_at_goal', 'deferred')):
+            raise ValueError('目标工作清单与最终目标不一致。')
+        seen.add(index)
+        record = dict(goal_index=index, label=goals[index]['label'], status=item['status'])
+        if isinstance(item.get('reason'), str):
+            record['reason'] = item['reason'][:200]
+        result.append(record)
+    return sorted(result, key=lambda item: item['goal_index'])
+
+
+def _final_audit_summary(value, goals):
+    if (not isinstance(value, dict) or value.get('phase') != 'reviewed'
+            or type(value.get('scene_version')) is not int or value['scene_version'] < 0
+            or not isinstance(value.get('items'), list) or len(value['items']) != len(goals)):
+        raise ValueError('最终目标审核摘要无效或未覆盖完整目标。')
+    items, seen = [], set()
+    for item in value['items']:
+        if not isinstance(item, dict):
+            raise ValueError('最终目标审核项目无效。')
+        index = item.get('goal_index')
+        if (type(index) is not int or not 0 <= index < len(goals) or index in seen
+                or item.get('label') != goals[index]['label']
+                or type(item.get('ok')) is not bool or type(item.get('camera_verified')) is not bool):
+            raise ValueError('最终目标审核项目与完整目标不一致。')
+        seen.add(index)
+        record = dict(goal_index=index, label=goals[index]['label'],
+                      ok=item['ok'], camera_verified=item['camera_verified'])
+        for key in ('error', 'message'):
+            if isinstance(item.get(key), str):
+                record[key] = item[key][:500]
+        items.append(record)
+    return dict(phase='reviewed', scene_version=value['scene_version'],
+                items=sorted(items, key=lambda item: item['goal_index']))
+
+
 def _failure_summary(value):
     if not isinstance(value, dict):
         raise ValueError('技能执行失败反馈无效。')
@@ -207,7 +264,8 @@ def _failure_summary(value):
     # use their own narrow allowlist, never arbitrary motion or truth data.
     result = _fields(value,
                    strings=('stage', 'error', 'message', 'detail', 'diagnostics', 'observation_error'),
-                   flags=('holding', 'fault', 'aborted', 'controller_ok', 'ok', 'progress'),
+                   flags=('holding', 'fault', 'aborted', 'controller_ok', 'ok', 'progress',
+                          'deferred', 'manipulation_started'),
                    numbers=('duration',))
     checks = placement_checks_summary(value.get('placement_checks'))
     if checks is not None:
@@ -384,6 +442,10 @@ def model_skill_context(context: dict) -> dict:
         visible['planning_budget'] = _planning_budget(context['planning_budget'])
     if 'last_action_failure' in context:
         visible['last_action_failure'] = _failure_summary(context['last_action_failure'])
+    if 'goal_worklist' in context:
+        visible['goal_worklist'] = _goal_worklist_summary(context['goal_worklist'], visible['goals'])
+    if 'final_audit' in context and context['final_audit'] is not None:
+        visible['final_audit'] = _final_audit_summary(context['final_audit'], visible['goals'])
     obligations = context.get('pending_obligations', [])
     if not isinstance(obligations, list) or len(obligations) > 100:
         raise ValueError('待复位义务列表无效。')
@@ -407,7 +469,8 @@ def model_skill_context(context: dict) -> dict:
         record = _fields(
             item, strings=('id', 'step_id', 'skill', 'label', 'action', 'stage', 'error',
                            'message', 'detail', 'diagnostics', 'held_label', 'observation_mode', 'reason'),
-            flags=('ok', 'holding', 'progress', 'camera_verified', 'aborted', 'approved', 'changed'),
+            flags=('ok', 'holding', 'progress', 'camera_verified', 'aborted', 'approved', 'changed',
+                   'deferred', 'manipulation_started'),
             numbers=('attempt', 'scene_version', 'duration'))
         destination = _destination_summary(item.get('destination'))
         if destination is not None:
@@ -553,7 +616,17 @@ def validate_skill_plan(plan: dict, context: dict) -> dict:
                     raise ValueError('观察只能引用已有目标、区域或原始观测。')
                 item['destination'] = destination
         elif skill in ('pick', 'place', 'move'):
-            item['label'] = _unique_label(step['label'], visible, held=True)
+            destination = step.get('destination')
+            deferred_reference = bool(skill == 'move' and isinstance(destination, dict)
+                and set(destination) == {'type', 'index'} and destination.get('type') == 'goal'
+                and type(destination.get('index')) is int and 0 <= destination['index'] < len(goals)
+                and goals[destination['index']]['label'] == step['label'])
+            # A final-goal reference is not permission to grasp its unseen
+            # source. The executor can defer this one independent move before
+            # it observes or sends manipulation commands, leaving later goals
+            # runnable. Other actions retain their strict measured identity.
+            item['label'] = (_known_label(step['label'], visible) if deferred_reference
+                             else _unique_label(step['label'], visible, held=True))
             if not goals:
                 raise ValueError('执行技能前必须明确用户最终目标。')
         if skill in ('pick', 'move'):

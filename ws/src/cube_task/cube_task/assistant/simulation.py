@@ -56,6 +56,10 @@ _STAGE_MESSAGES = {
 }
 
 
+class _SourceObservationUnavailable(ValueError):
+    """No source-view motion passed the final current-state path check."""
+
+
 class _PlacementInterrupted(Exception):
     pass
 
@@ -1036,6 +1040,14 @@ class SimulationSession:
             grasp_geometry_ready = False
             self._last_fresh = []
             order = self._view_order(target) if local else list(range(self._base_view_count))
+            source_views = []
+            source_focus = bool(local and target.get('_observe_source')
+                                and target.get('_observation_hint_only'))
+            if source_focus:
+                source_views = self._source_observation_views(target)
+                # Repeating all fixed cameras cannot repair a crop shared by
+                # those same cameras. Spend this action on bounded new views.
+                order = source_views if source_views else order[:2]
             if local and purpose == 'verify_place':
                 order = order[:2]
             self._scan_stats['local_scans' if local else 'full_scans'] += 1
@@ -1049,6 +1061,11 @@ class SimulationSession:
             verified_merge = None
             revision = self._environment_revision
             for step, view in enumerate(order, 1):
+                if source_focus and not self._safe_observation_joints(
+                        self.runner.views[view], self._observed_detections):
+                    # Previous observations may have changed the start joints
+                    # or the environment. Recheck the entire actual sweep.
+                    continue
                 self._emit_scan_view(view, step=step, total=len(order), local=local)
                 status, next_result, frame = self.runner._observe(view)
                 if status != 'ok' or next_result is None:
@@ -1144,6 +1161,14 @@ class SimulationSession:
                         continue
                     if (reliable and (geometry_ready or purpose == 'verify_place')) or (not label and len(coverage) >= 1):
                         break
+            if not captured_views:
+                self._observation_revision = -1
+                self._status = 'stopped' if self.cancel_event.is_set() else 'ready'
+                self._publish_snapshot()
+                if self.cancel_event.is_set():
+                    raise RuntimeError('source observation stopped before capture')
+                raise _SourceObservationUnavailable(
+                    '局部观察视角均未通过当前路径检查，未取得新的相机证据')
             detections, diagnostics = verified_merge or merge_observations(
                 views, dist=self.runner.view_merge,
                 partial=lambda d: not d.valid or self.runner._partial(d))
@@ -1619,6 +1644,98 @@ class SimulationSession:
                     size=tuple(float(v) for v in size), label=destination_label(destination))
         return dict(placement_zone=zone, placement_polygon=polygon,
                     exact_xy=destination['type'] == 'point')
+
+    def _source_observation_views(self, reference):
+        """Aim bounded, checked local views using a partial camera hint only.
+
+        The measured silhouette gives an aiming envelope, not grasp evidence.
+        Side baselines expose support surfaces hidden by a tall upper object;
+        new images must still pass every existing completeness/support gate.
+        """
+        from ..perception.geometry import check_intrinsics, project_points
+        from ..sim.scenarios import look_at
+
+        try:
+            center = np.asarray(reference.get('center_base') or reference.get('xy'), float)
+            top = float(reference['top_z'])
+            measured = np.asarray([reference['length'], reference['width']], float)
+            table = float(self.cfg.get('perception.table.expected_z', 0.) or 0.)
+            if (center.shape not in ((2,), (3,))
+                    or not np.all(np.isfinite(np.r_[center, measured, top, table]))
+                    or np.any(measured <= 0.) or not table < top < table + .45):
+                return []
+            xy = center[:2]
+            intrinsics = self.camera.intrinsics()
+            check_intrinsics(intrinsics)
+            ext = self.runner.ext
+            T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
+            seeds = [self.arm.get_joints().value, self.runner.views[len(self.runner.views) // 2]]
+        except (KeyError, ValueError, TypeError, AttributeError):
+            return []
+        half_extent = max(.04, float(np.max(measured)) / 2.)
+        radial = xy / max(float(np.linalg.norm(xy)), 1e-6)
+        lateral = np.array([-radial[1], radial[0]])
+        distance, baseline = 4 * half_extent, 2 * half_extent
+        eye_z = max(table + .30, top + .16)
+        # Include the support height and the uncertain silhouette's top inside
+        # the calibrated image, leaving room for the missing cropped part.
+        outline = np.array([[xy[0] + dx, xy[1] + dy, z]
+                            for dx in (-half_extent, half_extent)
+                            for dy in (-half_extent, half_extent)
+                            for z in (table, top + .015)])
+        accepted = []
+        revision = self._environment_revision
+        for fraction in (.75, .5):
+            gaze = np.r_[xy, table + fraction * (top - table)]
+            for side in (1., -1.):
+                if (self.cancel_event.is_set() or self._interventions
+                        or revision != self._environment_revision):
+                    return []
+                eye = np.r_[xy - distance * radial + side * baseline * lateral, eye_z]
+                pose = look_at(eye, gaze)
+                pixels = project_points(outline, pose, intrinsics)
+                if (not np.all(np.isfinite(pixels)) or np.any(pixels < 12)
+                        or np.any(pixels[:, 0] >= intrinsics.width - 12)
+                        or np.any(pixels[:, 1] >= intrinsics.height - 12)):
+                    continue
+                for seed in seeds:
+                    q, _ep, _er = self.arm.kin.ik(pose @ inv_T(T_fc), q_seed=seed)
+                    if q is None:
+                        continue
+                    # IK tolerance must not turn a predicted in-frame envelope
+                    # into an actually cropped source at the solved joints.
+                    actual = project_points(outline, self.arm.kin.fk(q) @ T_fc, intrinsics)
+                    covered = (np.all(np.isfinite(actual)) and np.all(actual >= 12)
+                               and np.all(actual[:, 0] < intrinsics.width - 12)
+                               and np.all(actual[:, 1] < intrinsics.height - 12))
+                    if (covered and self._safe_observation_joints(q, self._observed_detections)
+                            and not any(np.max(np.abs(np.asarray(q) - old)) < math.radians(2)
+                                        for old in accepted)):
+                        accepted.append(np.asarray(q, float))
+                        break
+        if not accepted:
+            return []
+        # Reserve one destination slot plus at most four source-view slots.
+        # Full scans continue to use only the original fixed view count.
+        first = self._base_view_count + 1
+        while len(self.runner.views) < first:
+            self.runner.views.append(list(self.runner.views[0]))
+            self._view_labels.append('桌面目标点视角')
+        indices = []
+        for offset, q in enumerate(accepted):
+            index = first + offset
+            if index == len(self.runner.views):
+                self.runner.views.append(q.tolist())
+                self._view_labels.append('目标局部补充视角')
+            else:
+                self.runner.views[index] = q.tolist()
+                self._view_labels[index] = '目标局部补充视角'
+                if self.runner._at_view == index:
+                    self.runner._at_observe = False
+            indices.append(index)
+        if indices:
+            self.runner.multi_view = True
+        return indices
 
     def _ensure_destination_view(self, destination):
         """Add a reachable camera view of a requested point for later instructions."""

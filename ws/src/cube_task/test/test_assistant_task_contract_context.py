@@ -44,7 +44,7 @@ def test_scope_keeps_unobserved_identity_without_turning_it_into_an_action_targe
     assert all(set(item) == {'label', 'count'} for item in visible['task_inventory'])
     assert not any(o['label'] == 'pear' for o in visible['scene']['objects'])
     with pytest.raises(ValueError):
-        validate_skill_plan(plan(value, [step(1, 'move', 'pear', dict(type='goal', index=2))]), value)
+        validate_skill_plan(plan(value, [step(1, 'pick', 'pear')]), value)
     assert validate_skill_plan(plan(value, [step(1, 'observe', 'pear')]), value)
 
 

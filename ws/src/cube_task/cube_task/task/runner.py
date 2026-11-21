@@ -172,6 +172,24 @@ def held_shape(det: Detection, gp, nominal: Optional[Sequence[float]] = None
     return shape
 
 
+def _placement_anchor_center(det, grasp):
+    """Return the validated original source centre of a carried visual anchor."""
+    for target in (grasp.target, det):
+        anchor = (target.extra or {}).get('_held_translation_anchor')
+        if not isinstance(anchor, dict) or anchor.get('translation_only') is not True:
+            continue
+        pair = anchor.get('pair')
+        if not isinstance(pair, dict) or pair.get('ok') is not True or pair.get('translation_only') is not True:
+            continue
+        try:
+            center = np.asarray(anchor['source_center'], float)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if center.shape == (3,) and np.all(np.isfinite(center)):
+            return center.copy()
+    return None
+
+
 def _seg_point_dist(p, a, b) -> float:
     a, b, p = (np.asarray(v, dtype=float)[:2] for v in (a, b, p))
     d = b - a
@@ -294,6 +312,7 @@ class TaskRunner:
         self.placer = PlacePlanner(cfg)
         self.max_width = max_gripper_width(cfg)
         self.skill = PickPlaceSkill(cfg, arm, clock, self.logger, task=self.task)
+        self.skill.current_release_exit_check = self.current_release_exit_check
         from .reach import free_tilt_limit
         self.free_tilt = free_tilt_limit(arm, cfg)
         g = 'grasp.'
@@ -1459,10 +1478,13 @@ class TaskRunner:
         held, transit = search['held'], search['transit']
         neighbors, occupied = search['neighbors'], search['occupied']
         preferred_xy = ()
-        if not exact_xy:
+        if not exact_xy and not stacked:
             rotation = pp.T_release[:3, :3] @ gp.T_grasp[:3, :3].T
+            anchor_center = _placement_anchor_center(det, gp)
             cloud = np.asarray((det.extra or {}).get('_placement_points_base'), float)
-            if (cloud.ndim == 2 and cloud.shape[1:] == (3,) and len(cloud) >= 40
+            if anchor_center is not None:
+                center = pp.T_release[:3, 3] + rotation @ (anchor_center - gp.T_grasp[:3, 3])
+            elif (cloud.ndim == 2 and cloud.shape[1:] == (3,) and len(cloud) >= 40
                     and np.all(np.isfinite(cloud))):
                 carried = (cloud - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3]
                 center = (carried.min(axis=0) + carried.max(axis=0)) / 2
@@ -1536,7 +1558,16 @@ class TaskRunner:
                     # The skill accepts this only for these exact poses and
                     # aperture. Never certify a capacity-only or blind plan.
                     candidate.release_opening_checked = dict(width=float(candidate.open_width),
-                        release_T=candidate.T_release.copy(), retreat_T=candidate.T_retreat.copy())
+                        release_T=candidate.T_release.copy(), retreat_T=candidate.T_retreat.copy(),
+                        support_polygon=polygon.copy(), measured_neighbors=[Detection(
+                            other.label, other.score,
+                            center_base=None if other.center_base is None else np.asarray(
+                                other.center_base, float).copy(),
+                            top_z=other.top_z, height=other.height, yaw=other.yaw,
+                            length=other.length, width=other.width, valid=other.valid,
+                            extra=copy.deepcopy({key: other.extra[key]
+                                for key in ('resting_pose', 'table_z') if key in other.extra}))
+                            for other in neighbors if other is not det])
                 self._event('decision', action='replan_release', label=det.label, zone=zone.name,
                             release_xyz=[round(float(v), 4) for v in candidate.T_release[:3, 3]],
                             place=info, observed_neighbors=len(occupied),
@@ -1915,6 +1946,31 @@ class TaskRunner:
                 return False, 'open gripper retreat intersects measured occupancy'
         return True, ''
 
+    def current_release_exit_check(self, grasp, place, actual, width):
+        """Recheck the measured tool exit from the actual settled release TCP."""
+        proof = getattr(place, 'release_opening_checked', None)
+        if not isinstance(proof, dict) or self._aborted():
+            return False
+        try:
+            if (abs(float(width) - float(proof['width'])) > 1e-9
+                    or not np.array_equal(proof['release_T'], place.T_release)
+                    or not np.array_equal(proof['retreat_T'], place.T_retreat)):
+                return False
+            neighbors = proof['measured_neighbors']
+            polygon = np.asarray(proof['support_polygon'], float)
+            actual = np.asarray(actual, float)
+            if (not isinstance(neighbors, list) or actual.shape != (4, 4)
+                    or not np.all(np.isfinite(actual))):
+                return False
+            current = copy.copy(place)
+            current.T_release = actual.copy()
+            current.open_width = float(width)
+            ok, _why = self._release_retreat_clear(
+                grasp.target, grasp, current, neighbors, polygon, self._aborted)
+            return bool(ok and not self._aborted())
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return False
+
     def _adjust_strict_release(self, det, gp, pp, neighbors, polygon, desired_xy, held,
                                held_only=False, completion_zone=None):
         """Recheck final leaned poses and compensate their measured center shift."""
@@ -1924,6 +1980,7 @@ class TaskRunner:
         desired = np.asarray(desired_xy, float)
         table = detection_table_z(det) or 0.0
         source_center = np.r_[det.center_base[:2], table + float(det.height or 0.0) / 2]
+        anchor_center = _placement_anchor_center(det, gp)
         cloud = np.asarray((det.extra or {}).get('_placement_points_base'), float)
         if cloud.ndim != 2 or cloud.shape[1:] != (3,) or len(cloud) < 40 or not np.all(np.isfinite(cloud)):
             cloud = None
@@ -1935,7 +1992,9 @@ class TaskRunner:
             if _planning_cancelled(self.arm):
                 return False, 'aborted'
             rotation = pp.T_release[:3, :3] @ gp.T_grasp[:3, :3].T
-            if cloud is not None:
+            if anchor_center is not None:
+                carried_center = pp.T_release[:3, 3] + rotation @ (anchor_center - gp.T_grasp[:3, 3])
+            elif cloud is not None:
                 carried_cloud = (cloud - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3]
                 carried_center = (carried_cloud.min(axis=0) + carried_cloud.max(axis=0)) / 2
             else:
@@ -1957,6 +2016,9 @@ class TaskRunner:
                 table, float(det.height or 0), label=det.label,
                 resting_pose=(det.extra or {}).get('resting_pose'))
             projection = ((box - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3])[:, :2]
+            if cloud is not None:
+                projection = np.vstack((projection,
+                    ((cloud - gp.T_grasp[:3, 3]) @ rotation.T + pp.T_release[:3, 3])[:, :2]))
             if not allowed(*desired, closing, final_yaw=yaw, tcp_xy=pp.T_release[:2, 3],
                            held_projection=projection, gripper_pose=pp.T_release,
                            gripper_open_width=pp.open_width):

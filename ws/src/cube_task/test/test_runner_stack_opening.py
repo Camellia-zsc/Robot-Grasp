@@ -49,6 +49,10 @@ def test_checked_stack_opening_covers_nominal_body_and_binds_owned_matrices():
     assert checks[-1]['opening'] == pytest.approx(candidate.open_width)
     proof = candidate.release_opening_checked
     assert proof['width'] == pytest.approx(candidate.open_width)
+    assert not np.shares_memory(proof['support_polygon'], parts[-1])
+    assert len(proof['measured_neighbors']) == 1
+    assert not np.shares_memory(proof['measured_neighbors'][0].center_base,
+                                parts[4].center_base)
     for name, attr in [('release_T', 'T_release'), ('retreat_T', 'T_retreat')]:
         np.testing.assert_array_equal(proof[name], getattr(candidate, attr))
         assert not np.shares_memory(proof[name], getattr(candidate, attr))

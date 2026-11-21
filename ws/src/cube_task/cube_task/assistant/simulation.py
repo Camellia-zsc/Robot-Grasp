@@ -783,10 +783,18 @@ class SimulationSession:
                 annotate(grasp.target, support)
                 self._active_placement = (target, destination, zone_name, options)
             self._refresh_placement_occupancy(target, neighbors, destination)
+            landing_support = (target.extra or {}).get('_stack_support')
+            if landing_support is not None:
+                landing_z = float(landing_support['top_z'])
+            else:
+                landing_zone = options.get('placement_zone')
+                if landing_zone is None:
+                    landing_zone = self.runner.zones[zone_name]
+                landing_z = float(landing_zone.center[2])
             visible = candidate_visibility_filter(target, grasp, frame, pose,
                         nominal=self.runner.nominal.get(target.label),
                         max_open_width=self.runner.placer.open_width,
-                        observations=support_views[:-1])
+                        observations=support_views[:-1], landing_z=landing_z)
             # A fresh measurement owns these exclusions. A timed slice must
             # not restart the same expensive, fully rejected edge slots; nor
             # may those rejections survive a new view or changed scene/seed.

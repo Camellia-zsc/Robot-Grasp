@@ -44,20 +44,24 @@ def _samples(polygon, step):
 
 def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
                                 max_open_width=.1, sample_step=.008,
-                                margin_px=8, depth_tolerance=.008, *, observations=()):
+                                margin_px=8, depth_tolerance=.008, *, observations=(), landing_z=None):
     """Return a pose filter proving full support/finger footprints are observed.
 
     Every sample must see the landing plane in a supplied fresh view. A
     foreground object, the carried target itself, a depth hole or image crop
     cannot establish a clear landing area. This complements measured collision
-    checks; it never interprets an unobserved area as empty.
+    checks; it never interprets an unobserved area as empty. ``landing_z`` is
+    the actual destination support height. Source geometry keeps its original
+    support frame when carrying an object from a pedestal to the table.
     """
     length, width, height = _dimensions(det, nominal)
     table = detection_table_z(det)
     if table is None:
         raise ValueError('candidate visibility requires a measured table height')
     stack_support = (det.extra or {}).get('_stack_support')
-    landing_z = table if stack_support is None else float(stack_support['top_z'])
+    if landing_z is None:
+        landing_z = table if stack_support is None else stack_support['top_z']
+    landing_z = float(landing_z)
     if not math.isfinite(landing_z):
         raise ValueError('candidate visibility requires a measured landing height')
     views = []

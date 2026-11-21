@@ -285,10 +285,14 @@ def execute_clearance(session, option, cancel_event=None):
     obligation = False
     main = None
 
+    def controller_halted(outcome):
+        return bool(outcome and (outcome.get('fault') or outcome.get('aborted')))
+
     def perform(which, object_label, destination=None, zone_name=None, restore_yaw=None):
         if _cancelled(session, cancel_event):
             result = {'ok': False, 'stage': which, 'error': 'aborted', 'aborted': True}
         else:
+            dispatched = False
             try:
                 scene, obj = _bind(session, object_label)
                 decision = {'action': 'pick', 'scene_version': scene['scene_version'],
@@ -297,10 +301,12 @@ def execute_clearance(session, option, cancel_event=None):
                     decision['destination'] = copy.deepcopy(destination)
                 if restore_yaw is not None:
                     decision['_restore_yaw'] = float(restore_yaw)
+                dispatched = True
                 result = session.execute(decision, cancel_event=cancel_event)
             except Exception as exc:
                 result = {'ok': False, 'stage': which, 'error': 'clearance_step_refused',
-                          'message': str(exc)}
+                          'message': str(exc), 'fault': dispatched,
+                          'aborted': _cancelled(session, cancel_event)}
         steps.append({'step': which, 'label': object_label, 'result': copy.deepcopy(result)})
         if hasattr(session, '_emit'):
             names = {'move_obstacle': '临时移开遮挡物', 'original_task': '完成原抓取任务',
@@ -319,15 +325,17 @@ def execute_clearance(session, option, cancel_event=None):
         # A held blocker may still have its old cached table observation. That
         # stale XY must never erase the obligation to put it back.
         obligation = True
-    if displaced.get('ok'):
+    if displaced.get('ok') or controller_halted(displaced):
         obligation = True
+    if displaced.get('ok') and not controller_halted(displaced):
         main = perform('original_task', goal['label'], goal.get('destination'), goal.get('zone_name'))
     holding = _holding(session)
     restore = None
-    if obligation and not holding and not _cancelled(session, cancel_event):
+    if (obligation and not holding and not _cancelled(session, cancel_event)
+            and not controller_halted(main or displaced)):
         restore = perform('restore_obstacle', label, {'type': 'point', 'xy': plan['original_xy']},
                           restore_yaw=plan['original_yaw'])
-        if restore.get('ok'):
+        if restore.get('ok') and not controller_halted(restore):
             try:
                 _, current = _bind(session, label)
                 obligation = not _at_origin(current, plan)
@@ -339,7 +347,10 @@ def execute_clearance(session, option, cancel_event=None):
     result = copy.deepcopy(main or displaced)
     result.update(clearance_steps=steps, pending_restore=pending,
                   clearance_option_id=option_id, target_result=copy.deepcopy(main),
-                  holding=_holding(session))
+                  holding=_holding(session),
+                  fault=any(step['result'].get('fault') for step in steps),
+                  aborted=bool(_cancelled(session, cancel_event) or
+                               any(step['result'].get('aborted') for step in steps)))
     if pending is not None:
         result.update(ok=False, stage='obstacle_restore', error='pending_restore',
                       message='原任务%s；临时移开的物品尚未复位，请查看恢复记录。' % ('已完成' if main and main.get('ok') else '未完成'))
@@ -352,9 +363,12 @@ def execute_clearance(session, option, cancel_event=None):
             try:
                 verification = session.verify_goals([copy.deepcopy(goal)])
             except Exception as exc:
-                verification = {'ok': False, 'items': [], 'message': str(exc)}
+                verification = {'ok': False, 'items': [], 'message': str(exc), 'fault': True}
             result['final_goal_verification'] = copy.deepcopy(verification)
-            if not verification.get('ok'):
+            result['fault'] = bool(result['fault'] or verification.get('fault'))
+            result['aborted'] = bool(result['aborted'] or verification.get('aborted')
+                                     or _cancelled(session, cancel_event))
+            if not verification.get('ok') or controller_halted(result):
                 result.update(ok=False, stage='clearance_final_verify',
                               error='goal_changed_after_restore', camera_verified=False,
                               message=verification.get('message') or

@@ -90,15 +90,58 @@ def test_transaction_rebinds_each_step_and_preserves_exact_original_goal():
     assert len(session.calls) == 3
 
 
-@pytest.mark.parametrize('failure', [{'ok': False, 'stage': 'grasp_miss', 'error': 'grasp_miss'},
-                                     OSError('adapter disconnected')])
-def test_failed_main_still_restores_obstacle_and_does_not_claim_goal_success(failure):
-    session = TransactionSession({2: failure})
+def test_failed_main_still_restores_obstacle_and_does_not_claim_goal_success():
+    session = TransactionSession({2: {'ok': False, 'stage': 'grasp_miss', 'error': 'grasp_miss'}})
     result = recovery.execute_clearance(session, 'clear_restore_yellow')
     assert not result['ok'] and result['pending_restore'] is None
     assert len(session.calls) == 3
     assert session.calls[2]['object_id'].startswith('yellow-')
     assert not result['target_result']['ok']
+
+
+@pytest.mark.parametrize('step', [1, 2, 3])
+@pytest.mark.parametrize('flag', ['fault', 'aborted'])
+def test_controller_failure_stops_clearance_and_remains_visible_in_summary(step, flag):
+    session = TransactionSession({step: dict(ok=False, holding=False, error='comm', **{flag: True})})
+
+    result = recovery.execute_clearance(session, 'clear_restore_yellow')
+
+    assert not result['ok'] and result[flag] is True
+    assert len(session.calls) == step
+    assert result['pending_restore']['label'] == 'yellow'
+    assert result['clearance_steps'][-1]['result'][flag] is True
+
+
+def test_exception_after_main_dispatch_stops_motion_and_preserves_driver_fault():
+    session = TransactionSession({2: OSError('adapter disconnected')})
+
+    result = recovery.execute_clearance(session, 'clear_restore_yellow')
+
+    assert not result['ok'] and result['fault'] is True
+    assert len(session.calls) == 2
+    assert result['pending_restore']['label'] == 'yellow'
+    assert result['target_result']['fault'] is True
+
+
+@pytest.mark.parametrize('step', [1, 2, 3])
+@pytest.mark.parametrize('flag', ['fault', 'aborted'])
+def test_verified_release_with_controller_failure_does_not_complete_clearance(step, flag):
+    session = TransactionSession()
+    original_execute = session.execute
+
+    def execute_with_failure(decision, **kwargs):
+        result = original_execute(decision, **kwargs)
+        if len(session.calls) == step:
+            result[flag] = True
+        return result
+
+    session.execute = execute_with_failure
+
+    result = recovery.execute_clearance(session, 'clear_restore_yellow')
+
+    assert not result['ok'] and result[flag] is True
+    assert len(session.calls) == step
+    assert result['pending_restore']['label'] == 'yellow'
 
 
 def test_restore_failure_is_visible_even_when_original_target_succeeded():
@@ -287,6 +330,31 @@ def test_original_target_is_reverified_if_user_changes_scene_during_restoration(
     assert result['final_goal_verification']['ok'] is False
     assert session.goal_verifications == [[session.plan['goal']]]
     assert len(session.calls) == 3
+    assert not result['fault']
+
+
+def test_final_observation_exception_preserves_driver_fault_after_successful_restoration():
+    session = TransactionSession()
+    original_execute = session.execute
+
+    def changed_during_restore(decision, **kwargs):
+        result = original_execute(decision, **kwargs)
+        if len(session.calls) == 3:
+            session._environment_revision += 1
+        return result
+
+    def disconnected(_goals):
+        raise OSError('observation driver disconnected')
+
+    session.execute = changed_during_restore
+    session.verify_goals = disconnected
+
+    result = recovery.execute_clearance(session, 'clear_restore_yellow')
+
+    assert not result['ok'] and result['fault'] is True
+    assert result['pending_restore'] is None
+    assert len(session.calls) == 3
+    assert 'observation driver disconnected' in result['message']
 
 
 def test_unchanged_transaction_does_not_repeat_destination_scan():

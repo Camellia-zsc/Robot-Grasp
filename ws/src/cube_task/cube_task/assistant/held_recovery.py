@@ -17,6 +17,18 @@ NAMES = {'red': '红色方块', 'green': '绿色方块', 'yellow': '黄色方块
          'apple': '苹果', 'banana': '香蕉', 'pear': '梨'}
 
 
+class _ActionFailed(RuntimeError):
+    pass
+
+
+def _action(call, *args, **kwargs):
+    """Distinguish an interrupted robot operation from a local planning refusal."""
+    try:
+        return call(*args, **kwargs)
+    except Exception as exc:
+        raise _ActionFailed(str(exc)) from exc
+
+
 def _destination(session, goal):
     return copy.deepcopy(goal.get('destination') or
                          {'type': 'named_region', 'name': goal['zone_name']})
@@ -81,7 +93,8 @@ def propose_held_recovery(session, goal, protected_goals=()):
 
 
 def _fresh_target(session, label, xy, purpose):
-    scene = session.observe(target={'label': label, 'xy': list(xy), 'require_grasp': True}, purpose=purpose)
+    scene = _action(session.observe, target={'label': label, 'xy': list(xy), 'require_grasp': True},
+                    purpose=purpose)
     fresh = [d for d in session._last_fresh if d.valid and d.label == label
              and d.center_base is not None]
     if len(fresh) != 1 or session._observation_revision != session._environment_revision:
@@ -106,7 +119,7 @@ def _pick(session, label, xy, destination, cancel):
         decision['zone_name'] = destination['name']
     else:
         decision['destination'] = destination
-    return session.execute(decision, cancel_event=cancel)
+    return _action(session.execute, decision, cancel_event=cancel)
 
 
 def _shift_candidates(session, obstacle, target, destination, protected):
@@ -176,8 +189,9 @@ def execute_held_recovery(session, option_id, cancel_event=None, confirmed=False
 
     def record(name, outcome):
         steps.append(dict(step=name, result=copy.deepcopy(outcome)))
-        session._emit('rearrangement_step', {'message': name + ('：完成' if outcome.get('ok') else '：未完成')})
-        if not outcome.get('ok'):
+        healthy_success = bool(outcome.get('ok') and not outcome.get('fault') and not outcome.get('aborted'))
+        session._emit('rearrangement_step', {'message': name + ('：完成' if healthy_success else '：未完成')})
+        if not healthy_success:
             raise RuntimeError(outcome.get('message') or name + '未通过核验')
         if stopped():
             raise RuntimeError('任务已停止')
@@ -189,8 +203,8 @@ def execute_held_recovery(session, option_id, cancel_event=None, confirmed=False
         session._active_placement = (original_target, plan['staging'], options['placement_zone'].name, options)
         session._active_revision = session._environment_revision
         session._status = 'executing'
-        pick_result, why = session.runner.execute_held_transfer(plan['bundle'])
-        result = session._finish_attempt(pick_result, why, 'staged-held-target',
+        pick_result, why = _action(session.runner.execute_held_transfer, plan['bundle'])
+        result = _action(session._finish_attempt, pick_result, why, 'staged-held-target',
             options['placement_zone'].name, original_target, evaluation, plan['staging'])
         staged = bool(result.get('ok'))
         record('安全暂放原目标', result)
@@ -226,7 +240,7 @@ def execute_held_recovery(session, option_id, cancel_event=None, confirmed=False
         phase = 'goal_requires_verification'
         goals = [original_goal] + list(plan['protected_goals'])
         goals += [{'label': item['label'], 'zone_name': item['preserved_zone']} for item in rearranged]
-        verified = session.verify_goals(goals)
+        verified = _action(session.verify_goals, goals)
         final_verification = copy.deepcopy(verified)
         if not verified['ok']:
             raise RuntimeError('重排后部分原定目标未通过相机核验')
@@ -243,7 +257,10 @@ def execute_held_recovery(session, option_id, cancel_event=None, confirmed=False
             zone=original_goal.get('zone_name'), controller_ok=False, camera_verified=False,
             truth={'success': False}, target_result=target_result,
             final_goal_verification=final_verification,
-            holding=holding, aborted=stopped(),
+            # The transaction wrapper must not clear the last action's driver
+            # fault or abort; the controller uses these flags to refuse resume.
+            holding=holding, fault=bool(isinstance(exc, _ActionFailed) or result.get('fault')),
+            aborted=bool(result.get('aborted') or stopped()),
             message=str(exc), error='held_rearrangement_incomplete',
             pending_rearrangement=dict(goal=original_goal, target_staged=staged,
                 staging_destination=plan['staging'], adjustment_attempts=copy.deepcopy(rearranged),

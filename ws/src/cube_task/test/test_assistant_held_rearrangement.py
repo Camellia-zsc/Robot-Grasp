@@ -206,6 +206,7 @@ def test_invalid_fresh_obstacle_never_becomes_a_grasp_input(transaction):
     assert not result['ok'] and result['pending_rearrangement']['target_staged']
     assert '新相机图像' in result['message']
     assert not transaction.actions
+    assert not result.get('fault')
 
 
 def test_failed_staging_keeps_held_target_and_never_starts_observation_or_regrasp(transaction):
@@ -216,6 +217,113 @@ def test_failed_staging_keeps_held_target_and_never_starts_observation_or_regras
     assert result['pending_rearrangement']['target_location_status'] == 'held'
     assert not result['pending_rearrangement']['target_staged']
     assert not transaction.observations and not transaction.actions
+    assert not result.get('fault')
+
+
+@pytest.mark.parametrize('phase', ['stage', 'green', 'red'])
+def test_transaction_keeps_action_fault_visible_to_the_resume_gate(transaction, monkeypatch, phase):
+    from cube_task.assistant.server import DashboardController
+
+    failure = dict(ok=False, fault=True, holding=True, error='holding_object',
+                   message='机械臂动作故障，保持夹持')
+    if phase == 'stage':
+        monkeypatch.setattr(transaction, '_finish_attempt', lambda *_args: copy.deepcopy(failure))
+    else:
+        original_execute = transaction.execute
+
+        def execute_with_fault(decision, cancel_event=None):
+            label = decision['object_id'].split('-')[0]
+            if label == phase:
+                transaction.actions.append(copy.deepcopy(decision))
+                transaction.held = label
+                return dict(failure, label=label)
+            return original_execute(decision, cancel_event=cancel_event)
+
+        monkeypatch.setattr(transaction, 'execute', execute_with_fault)
+
+    result = execute(transaction)
+
+    assert not result['ok'] and result['fault'] is True
+    assert result['holding'] and result['pending_rearrangement']
+    assert result['rearrangement_steps'][-1]['result']['fault'] is True
+    assert len(transaction.actions) == {'stage': 0, 'green': 1, 'red': 2}[phase]
+    controller = object.__new__(DashboardController)
+    controller._last_result, controller._skill_memory = result, None
+    assert controller._has_controller_fault()
+
+
+def test_transaction_keeps_an_action_abort_even_before_cancel_is_observed(transaction, monkeypatch):
+    monkeypatch.setattr(transaction, '_finish_attempt', lambda *_args: dict(
+        ok=False, aborted=True, fault=True, holding=True, error='aborted', message='动作已停止'))
+
+    result = execute(transaction)
+
+    assert not result['ok'] and result['aborted'] is True
+    assert not transaction.cancel_event.is_set()
+    assert not transaction.observations and not transaction.actions
+
+
+@pytest.mark.parametrize('phase', ['stage', 'stage_check', 'observe', 'green', 'red', 'verify'])
+def test_action_exception_cannot_reuse_a_previous_success_as_healthy(transaction, monkeypatch, phase):
+    def fail(*_args, **_kwargs):
+        raise OSError('adapter disconnected')
+
+    if phase == 'stage':
+        transaction.runner.execute_held_transfer.side_effect = fail
+    elif phase == 'stage_check':
+        monkeypatch.setattr(transaction, '_finish_attempt', fail)
+    elif phase == 'observe':
+        monkeypatch.setattr(transaction, 'observe', fail)
+    elif phase == 'verify':
+        monkeypatch.setattr(transaction, 'verify_goals', fail)
+    else:
+        original_execute = transaction.execute
+
+        def execute_with_exception(decision, cancel_event=None):
+            if decision['object_id'].split('-')[0] == phase:
+                transaction.actions.append(copy.deepcopy(decision))
+                fail()
+            return original_execute(decision, cancel_event=cancel_event)
+
+        monkeypatch.setattr(transaction, 'execute', execute_with_exception)
+
+    result = execute(transaction)
+
+    assert not result['ok'] and result['fault'] is True
+    assert result['pending_rearrangement']
+    assert len(transaction.actions) == {
+        'stage': 0, 'stage_check': 0, 'observe': 0, 'green': 1, 'red': 2, 'verify': 2}[phase]
+    assert 'adapter disconnected' in result['message']
+
+
+@pytest.mark.parametrize('phase', ['stage', 'green', 'red'])
+def test_verified_release_with_a_retreat_fault_stops_the_transaction(transaction, monkeypatch, phase):
+    if phase == 'stage':
+        original_finish = transaction._finish_attempt
+
+        def finish_with_fault(*args):
+            return dict(original_finish(*args), fault=True)
+
+        monkeypatch.setattr(transaction, '_finish_attempt', finish_with_fault)
+    else:
+        original_execute = transaction.execute
+
+        def execute_with_fault(decision, cancel_event=None):
+            result = original_execute(decision, cancel_event=cancel_event)
+            if decision['object_id'].split('-')[0] == phase:
+                result['fault'] = True
+            return result
+
+        monkeypatch.setattr(transaction, 'execute', execute_with_fault)
+
+    result = execute(transaction)
+
+    assert not result['ok'] and result['fault'] is True
+    assert result['pending_rearrangement']
+    assert len(transaction.actions) == {'stage': 0, 'green': 1, 'red': 2}[phase]
+    assert result['rearrangement_steps'][-1]['result']['ok'] is True
+    assert result['rearrangement_steps'][-1]['result']['fault'] is True
+    assert not hasattr(transaction, 'checked_goals')
 
 
 def test_stale_proposal_cannot_start_a_held_release(transaction):
@@ -292,6 +400,7 @@ def test_lost_original_target_does_not_reuse_the_obstacles_success_metadata(tran
     assert result['label'] == 'red'
     assert result.get('camera_verified') is not True
     assert (result.get('truth') or {}).get('object_name') != 'evaluated-green'
+    assert not result.get('fault')
 
 
 def geometric_session():

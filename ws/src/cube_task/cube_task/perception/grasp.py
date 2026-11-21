@@ -934,20 +934,34 @@ def release_slots(zone: Zone, footprint: float, margin: float = SLOT_MARGIN
 
 def _seg_dist(p1: np.ndarray, q1: np.ndarray, p2: np.ndarray, q2: np.ndarray) -> float:
     """Return the distance (m) between 2D segments p1-q1 and p2-q2."""
-    def pt_seg(p, a, b):
-        d = b - a
-        L2 = float(d @ d)
-        t = 0.0 if L2 < 1e-18 else min(1.0, max(0.0, float((p - a) @ d) / L2))
-        return float(np.linalg.norm(p - (a + t * d)))
+    # These are always two-dimensional. Scalar arithmetic keeps the same
+    # projection/intersection rules without allocating many tiny arrays.
+    p1x, p1y = float(p1[0]), float(p1[1])
+    q1x, q1y = float(q1[0]), float(q1[1])
+    p2x, p2y = float(p2[0]), float(p2[1])
+    q2x, q2y = float(q2[0]), float(q2[1])
 
-    d1, d2, r = q1 - p1, q2 - p2, p2 - p1
-    den = float(d1[0] * d2[1] - d1[1] * d2[0])
+    def pt_seg(px, py, ax, ay, bx, by):
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = (0.0 if L2 < 1e-18 else
+             min(1.0, max(0.0, ((px - ax) * dx + (py - ay) * dy) / L2)))
+        ex, ey = px - (ax + t * dx), py - (ay + t * dy)
+        return math.sqrt(ex * ex + ey * ey)
+
+    d1x, d1y = q1x - p1x, q1y - p1y
+    d2x, d2y = q2x - p2x, q2y - p2y
+    rx, ry = p2x - p1x, p2y - p1y
+    den = d1x * d2y - d1y * d2x
     if abs(den) > 1e-15:
-        t = float(r[0] * d2[1] - r[1] * d2[0]) / den
-        u = float(r[0] * d1[1] - r[1] * d1[0]) / den
+        t = (rx * d2y - ry * d2x) / den
+        u = (rx * d1y - ry * d1x) / den
         if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
             return 0.0
-    return min(pt_seg(p1, p2, q2), pt_seg(q1, p2, q2), pt_seg(p2, p1, q1), pt_seg(q2, p1, q1))
+    return min(pt_seg(p1x, p1y, p2x, p2y, q2x, q2y),
+               pt_seg(q1x, q1y, p2x, p2y, q2x, q2y),
+               pt_seg(p2x, p2y, p1x, p1y, q1x, q1y),
+               pt_seg(q2x, q2y, p1x, p1y, q1x, q1y))
 
 
 def footprint_capsule(x: float, y: float, length: float, width: float,
@@ -1503,12 +1517,15 @@ class PlacePlanner:
                     continue
                 cap = footprint_capsule(x, y, L, W, axis)
                 edge = capsule_edge_margin(zone, cap)
-                if edge < -1e-9 or (pose_filter is not None and not pose_filter(x, y, closing)):
+                if edge < -1e-9:
                     continue
                 fp, fg = self._clearance(cap, closing,
                                          opening/2 + FINGER_OUTER - FINGER_HALF_BAND,
                                          floor, occupied)
                 if min(fp, fg) < 0:
+                    continue
+                # Proven capsule collisions need no full body/visibility work.
+                if pose_filter is not None and not pose_filter(x, y, closing):
                     continue
                 info = {'xy': [x, y], 'axis': axis, 'closing_angle': closing, 'edge_margin': edge,
                         'footprint_clearance': None if not math.isfinite(fp) else fp,

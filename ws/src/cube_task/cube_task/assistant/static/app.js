@@ -541,7 +541,9 @@ function refreshCamera(){
     url=`/api/camera.jpg?mode=observation&view=${encodeURIComponent(observation.id)}&v=${encodeURIComponent(state.scene?.scene_version??"")}`;
   }else if(camera.mode==="live"){
     if(!camera.available||now-ui.lastCameraAt<350)return;
-    key="live";url=`/api/camera.jpg?mode=live&t=${now}`;
+    key=camera.updated_at==null?`live:${now}`:`live:${camera.updated_at}`;
+    if(key===ui.cameraKey)return;
+    url=`/api/camera.jpg?mode=live&t=${encodeURIComponent(camera.updated_at??now)}`;
   }else{
     if(state.camera_available===false||!state.scene?.scene_version)return;
     key=`legacy:${state.scene.scene_version}`;if(key===ui.cameraKey)return;
@@ -555,7 +557,7 @@ $("camera-select").addEventListener("change",event=>{
   if(ui.state)renderCamera(ui.state);
 });
 $("camera-image").addEventListener("load",()=>{ui.cameraLoading=false;$("camera-image").hidden=false;$("camera-placeholder").hidden=true;});
-$("camera-image").addEventListener("error",()=>{ui.cameraLoading=false;$("camera-image").hidden=true;$("camera-placeholder").hidden=false;setText("camera-placeholder-text","暂时无法读取相机画面");});
+$("camera-image").addEventListener("error",()=>{ui.cameraLoading=false;ui.cameraKey=null;$("camera-image").hidden=true;$("camera-placeholder").hidden=false;setText("camera-placeholder-text","暂时无法读取相机画面");});
 function cameraRefreshLoop(){refreshCamera();setTimeout(cameraRefreshLoop,350);}
 setTimeout(cameraRefreshLoop,350);
 function selectedId(state){
@@ -582,6 +584,13 @@ function selectedTruthId(state){
   const matching=truth.filter(object=>object.label===observed.label);
   return matching.length===1?String(matching[0].id??matching[0].object_id):"";
 }
+function sceneVisualSignature(state){
+  const sim=state.simulation||{};
+  return JSON.stringify([sim.table_z,sim.table_bounds,sim.zones??state.scene?.zones,
+    state.scene?.class_to_zone,sim.objects,sim.link_frames,sim.link_points,
+    sim.tcp_xyz,sim.tcp_transform,sim.tcp_pose,sim.tcp_rotation,sim.gripper_width,
+    selectedTruthId(state),ui.trail]);
+}
 function renderState(state){
   if(ui.networkError){showError("");ui.networkError=false;}
   if(ui.backendError&&!state.error){showError("");ui.backendError=false;}
@@ -603,13 +612,14 @@ function renderState(state){
     if(Array.isArray(sim.tcp_xyz)){
       const point=vec(sim.tcp_xyz);if(!ui.trail.length||length(sub(point,ui.trail.at(-1)))>.002){ui.trail.push(point);if(ui.trail.length>180)ui.trail.shift();}
     }
-    view.dirty=true;
+    const signature=sceneVisualSignature(state);
+    if(signature!==ui.sceneVisualSignature){ui.sceneVisualSignature=signature;view.dirty=true;}
   }
   const metrics=state.metrics||{};
   setText("request-metrics",number(metrics.requests)>0?`${number(metrics.requests)} 次指令 · ${number(metrics.successes)} 次成功` :"等待实验");
 }
 async function poll(){
-  try{renderState(await api("/api/state"));}
+  try{renderState(await api("/api/state?view=dashboard"));}
   catch(error){setConnection(false);updateControls();setText("scene-state","服务连接中断");$("scene-state-dot").className="error";if(!ui.state){showError("暂时无法连接实验台服务，正在重试…");ui.networkError=true;}}
   finally{setTimeout(poll,200);}
 }

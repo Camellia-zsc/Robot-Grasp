@@ -19,6 +19,18 @@ from .batch import (bind_item, build_items, completed_position, idle_batch,
 
 _LOG = logging.getLogger(__name__)
 STATIC = Path(__file__).with_name('static')
+_DASHBOARD_EVENT_FIELDS = ('id', 'seq', 'kind', 'time', 'message', 'stage',
+                           'ok', 'request_id')
+
+
+def _dashboard_event(event):
+    """Copy the event fields used by both dashboard views, retaining full audits elsewhere."""
+    result = {key: copy.deepcopy(event[key]) for key in _DASHBOARD_EVENT_FIELDS
+              if key in event}
+    feedback = event.get('feedback')
+    if isinstance(feedback, dict) and 'ok' in feedback:
+        result['feedback'] = {'ok': copy.deepcopy(feedback['ok'])}
+    return result
 
 
 class BusyError(ValueError):
@@ -1051,7 +1063,7 @@ class DashboardController:
         if session is not None:
             session.set_speed(self._speed)
 
-    def snapshot(self):
+    def snapshot(self, *, dashboard=False):
         with self._lock:
             session = self._session
             preview = self._preview
@@ -1064,7 +1076,8 @@ class DashboardController:
                      'metrics': copy.deepcopy(self._metrics),
                      'usage': copy.deepcopy(self._last_usage),
                      'messages': copy.deepcopy(self._messages),
-                     'events': copy.deepcopy(list(self._events)),
+                     'events': ([_dashboard_event(event) for event in self._events]
+                                if dashboard else copy.deepcopy(list(self._events))),
                      'last_result': copy.deepcopy(self._last_result)}
             state['skill_task'] = copy.deepcopy(self._skill_task)
             state['batch'] = copy.deepcopy(self._batch)
@@ -1187,7 +1200,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         path = urlsplit(self.path).path
         if path == '/api/state':
-            self._send(200, self.server.controller.snapshot())
+            params = parse_qs(urlsplit(self.path).query)
+            if params.get('view') == ['dashboard']:
+                state = self.server.controller.snapshot(dashboard=True)
+            else:
+                state = self.server.controller.snapshot()
+            self._send(200, state)
         elif path == '/api/camera.jpg':
             params = parse_qs(urlsplit(self.path).query)
             mode = params.get('mode', ['live'])[0]

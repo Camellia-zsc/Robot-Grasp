@@ -162,6 +162,37 @@ def test_http_rejects_cross_origin_and_no_key_in_state():
         ctl.close()
 
 
+def test_dashboard_polling_preserves_ui_events_without_copying_audit_payloads():
+    ctl = controller()
+    server = DashboardServer(('127.0.0.1', 0), ctl)
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base = 'http://127.0.0.1:%s' % server.server_port
+    try:
+        ctl._event('scene_intervention_applied', {
+            'request_id': 42, 'message': '干预已生效', 'stage': 'inspect_place',
+            'ok': False, 'feedback': {'ok': False, 'audit': ['detail'] * 1000},
+            'result': {'trajectory': ['large audit'] * 1000}})
+        with urlopen(base + '/api/state?view=dashboard', timeout=3) as response:
+            dashboard = json.loads(response.read())
+        with urlopen(base + '/api/state', timeout=3) as response:
+            full = json.loads(response.read())
+        event = dashboard['events'][-1]
+        assert event == {key: full['events'][-1][key] for key in
+                         ('id', 'kind', 'time', 'request_id', 'message', 'stage', 'ok')} | {
+                             'feedback': {'ok': False}}
+        assert full['events'][-1]['result']['trajectory'] == ['large audit'] * 1000
+        assert full['events'][-1]['feedback']['audit'] == ['detail'] * 1000
+        assert {key: value for key, value in dashboard.items() if key != 'events'} == {
+            key: value for key, value in full.items() if key != 'events'}
+        event['message'] = 'changed browser copy'
+        assert ctl.snapshot()['events'][-1]['message'] == '干预已生效'
+    finally:
+        server.shutdown()
+        server.server_close()
+        ctl.close()
+
+
 def test_stop_during_session_construction_stops_the_new_session():
     constructing = threading.Event()
     release = threading.Event()

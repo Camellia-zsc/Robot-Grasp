@@ -70,3 +70,24 @@ def test_display_overrun_never_causes_a_negative_wait_or_skips_ticks(monkeypatch
     clock.sleep(.1)
     assert len(ticks) == 2
     assert not waits
+
+
+@pytest.mark.parametrize('physics_cost', [.004, .03])
+def test_physics_computation_is_included_in_pacing_and_every_step_is_preserved(monkeypatch, physics_cost):
+    wall, waits, advances = [0.], [], []
+    monkeypatch.setattr(simulation.time, 'monotonic', lambda: wall[0])
+    def wait(dt):
+        waits.append(dt)
+        wall[0] += dt
+    event = SimpleNamespace(is_set=lambda: False, wait=wait)
+    clock = simulation._ViewerClock(event, realtime=True)
+    clock.paced, clock.speed = True, 4.
+    def physics(old, new):
+        advances.append(new-old)
+        wall[0] += physics_cost
+    clock.add_listener(physics)
+    clock.sleep(.1)
+    assert advances == pytest.approx([.05, .05])
+    assert wall[0] == pytest.approx(2*max(.05/4, physics_cost))
+    if physics_cost > .05/4:
+        assert not waits

@@ -62,25 +62,36 @@ def test_off_center_stack_stays_put_but_still_falls_when_support_moves(build):
     assert not physics.support_status(apple.name, base.label)['success']
 
 
-def test_rest_precision_ends_before_manipulation_and_never_applies_to_holding(build):
+def test_resting_stack_precision_survives_other_manipulation_and_held_recovery(build):
     physics, _base, apple, _events = build(offset=.013)
     physics.settle(.6)
     session = session_tick(physics)
-    for phase, active in [('ready', True), ('executing', False), ('error', True),
-                          ('observing', True), ('initializing', False), ('settling', True)]:
+    for phase in ('ready', 'executing', 'error', 'observing', 'settling'):
         session._status = phase
         session._tick()
-        assert physics.state()['contact_solver']['rest_precision'] is active
-        assert physics.mujoco_world.model.opt.noslip_iterations == (30 if active else 5)
+        assert physics.state()['contact_solver']['rest_precision']
+        assert physics.mujoco_world.model.opt.noslip_iterations == 30
+    session.runner.has_held_recovery = True
+    session._tick()
+    assert physics.state()['contact_solver']['rest_precision']
+    # A different held object cannot disable accuracy for this real resting
+    # stack. Contact discovery already excludes either body being held.
+    physics.world.held = SimpleNamespace(name='unrelated-held-object')
+    physics.set_rest_contact_precision(True)
+    assert physics.state()['contact_solver']['rest_precision']
+    physics.sync()
+
+
+def test_manipulation_keeps_normal_precision_without_released_body_support(build):
+    physics, base, apple, _events = build(offset=.013)
+    apple.place_upright(.45, -.15, 0., physics.world.table_z)
+    physics.apply_scene_changes()
+    physics.settle(.8)
+    session = session_tick(physics, 'executing')
     session.runner.has_held_recovery = True
     session._tick()
     assert not physics.state()['contact_solver']['rest_precision']
-    # The numerical adapter itself also rejects a held-state input, even if a
-    # caller mistakenly labels that phase as resting.
-    physics.world.held = apple
-    physics.set_rest_contact_precision(True)
-    assert not physics.state()['contact_solver']['rest_precision']
-    physics.sync()
+    assert physics.mujoco_world.model.opt.noslip_iterations == 5
 
 
 @pytest.mark.parametrize('iterations,tolerance', [(7, 1e-8), (60, 1e-12)])

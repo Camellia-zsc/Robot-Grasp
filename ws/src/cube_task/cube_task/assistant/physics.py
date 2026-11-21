@@ -323,14 +323,17 @@ class DashboardPhysics:
         return self.sync()
 
     def set_rest_contact_precision(self, eligible):
-        """Reduce released-stack creep without changing manipulation dynamics.
+        """Keep released stacks accurate while other bodies are manipulated.
 
         Called after sync and before the next clock advance. Real contacts only
         select numerical precision; they do not supply a placement or success.
         No body state, forces, friction or contact constraints are modified.
         """
         with self._lock, self.mujoco_world._locked():
-            active = bool(eligible and self.world.held is None and any(
+            # _support_contacts already excludes contacts involving a held
+            # body. An unrelated grasp must not disable a resting stack's
+            # numerical precision during execution, observation or inference.
+            active = bool(eligible and any(
                 relation['support'] not in ('table', 'floor') for relation in self._supports))
             iterations, tolerance = self._contact_solver_config
             if active:

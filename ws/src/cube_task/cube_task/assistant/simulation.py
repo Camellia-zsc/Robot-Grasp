@@ -129,11 +129,13 @@ class _ViewerClock(SimClock):
             started = time.monotonic()
             if self.on_tick is not None:
                 self.on_tick()
+            # Physics is work within this playback interval too. Waiting
+            # before advancing would add the full solver cost to every frame.
+            super().sleep(step)
             if self.realtime and self.paced and not self.cancel_event.is_set():
                 delay = step / self.speed - (time.monotonic() - started)
                 if delay > 0:
                     self.cancel_event.wait(delay)
-            super().sleep(step)
             remaining -= step
 
 
@@ -296,9 +298,9 @@ class SimulationSession:
     def _tick(self):
         if getattr(self, '_physics', None) is not None:
             self._physics.sync()
-            self._physics.set_rest_contact_precision(
-                self._status in ('settling', 'ready', 'error', 'observing')
-                and not self.runner.has_held_recovery)
+            # Contacts already exclude held bodies. A resting stack elsewhere
+            # still needs accurate integration while another target is handled.
+            self._physics.set_rest_contact_precision(True)
             self._check_physical_changes()
         revision = self._environment_revision
         self._apply_interventions()
@@ -346,8 +348,10 @@ class SimulationSession:
         if self._physics is None or self._idle_thread is not None or not self.clock.realtime:
             return
         def idle():
-            while not self._idle_stop.wait(.025):
+            while not self._idle_stop.is_set():
+                started = time.monotonic()
                 if not self._operation_lock.acquire(blocking=False):
+                    self._idle_stop.wait(.025)
                     continue
                 try:
                     if (self._prepared and not self._closed and not self.cancel_event.is_set()
@@ -355,6 +359,10 @@ class SimulationSession:
                         self.clock.sleep(.025)
                 finally:
                     self._operation_lock.release()
+                # The viewer clock has already paced its physics interval.
+                # Only idle/backoff work needs an additional interruptible wait.
+                self._idle_stop.wait(max(.001, .025 / self.clock.speed -
+                                         (time.monotonic() - started)))
         self._idle_thread = threading.Thread(target=idle, name='dashboard-physics', daemon=True)
         self._idle_thread.start()
 

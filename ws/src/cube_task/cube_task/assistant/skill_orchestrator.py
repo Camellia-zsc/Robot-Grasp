@@ -582,6 +582,12 @@ class SkillOrchestrator:
                         result = executor.execute(step, memory['goals'],
                             protected_goals=memory['protected_goals'], cancel_event=ctl._cancel,
                             expected_revision=revision)
+                    if result.get('ok') and (result.get('fault') or result.get('aborted')):
+                        # Opening can succeed before a retreat/driver failure.
+                        # Physical release success cannot authorize another step.
+                        result = dict(result, ok=False, message=(
+                            '执行报告包含机械臂故障，已停止后续动作并保留现场'
+                            if result.get('fault') else '任务已停止，保留当前现场与未完成事项'))
                     if (step['skill'] == 'verify' and result.get('ok') is True
                             and result.get('camera_verified') is True
                             and 'verified_revision' in result

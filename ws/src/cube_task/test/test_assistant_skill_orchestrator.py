@@ -159,6 +159,28 @@ def test_default_planner_executes_composed_skills_and_verifies_once(create):
     assert state['skill_task']['executed'] == 3
 
 
+@pytest.mark.parametrize('halt_flag', ['fault', 'aborted'])
+def test_completed_release_with_later_controller_halt_never_dispatches_next_step(create, halt_flag):
+    # Production can finish opening before retreat fails: ok describes release,
+    # while fault/aborted still forbids any subsequent movement or verification.
+    ctl, session, client = create(normal)
+    def release_then_halt(action, result):
+        if action['skill'] == 'move':
+            result.update(ok=True, **{halt_flag: True})
+    session.hook = release_then_halt
+    ctl.submit('把苹果放红区')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert [action['skill'] for action in session.calls] == ['move']
+    assert not state['last_result']['ok']
+    assert state['last_result'][halt_flag] is True
+    assert state['needs_reset']
+    assert state['metrics']['successes'] == 0
+    assert len(client.contexts) == 1
+    if halt_flag == 'fault':
+        assert not state['can_resume_recovery']
+
+
 def test_arbitrary_two_obstacles_and_repeated_object_require_real_approval(create):
     def compose(_context, _number):
         return [step(1, 'move', 'banana', {'type': 'auto_free'}),

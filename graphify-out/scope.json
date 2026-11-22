@@ -109,6 +109,7 @@
     "ws/src/cube_task/cube_task/task/skills.py",
     "ws/src/cube_task/cube_task/task/views.py",
     "ws/src/cube_task/cube_task/tools/__init__.py",
+    "ws/src/cube_task/cube_task/tools/assistant_bench.py",
     "ws/src/cube_task/cube_task/tools/assistant_ui.py",
     "ws/src/cube_task/cube_task/tools/calib_points.py",
     "ws/src/cube_task/cube_task/tools/calib_verify.py",

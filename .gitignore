@@ -59,6 +59,7 @@ local_validation/*.stderr.log
 local_validation/assistant_sim/
 local_validation/assistant_ui/
 local_validation/capacity_recovery/
+local_validation/typical_tasks_20261122/
 
 # Graphify: keep shareable graphs, exclude local runtime paths and extraction cache
 graphify-out/cache/

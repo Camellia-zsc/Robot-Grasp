@@ -324,7 +324,7 @@ def test_empty_camera_lifts_via_gateway_only_when_both_joint_sweeps_are_checked(
     gateway = np.array([.5,0.,0.,0.,0.,0.])
     session.arm._ik_tcp = lambda *a:(gateway,0.,0.)
     checked,moved = [],[]
-    def safe(q,ds,*,start_joints=None):
+    def safe(q,ds,*,start_joints=None,escaping=False):
         checked.append((np.asarray(q).copy(),start_joints))
         return bool(q[0]==.5 or (start_joints is not None and case!='blocked_second_leg'))
     def move_joints(q):
@@ -348,12 +348,23 @@ def test_empty_camera_can_use_a_checked_taught_gateway_when_fixed_attitude_ik_fa
     gateway = np.array([.5, 0., 0., 0., 0., 0.])
     session.runner.views = [gateway]
     session.arm._ik_tcp = lambda *a: (None, 1., 1.)
-    session._safe_observation_joints = lambda q, ds, start_joints=None: bool(
+    session._safe_observation_joints = lambda q, ds, start_joints=None, escaping=False: bool(
         np.allclose(q, gateway) or start_joints is not None)
     moves = []
     session.arm.move_joints = lambda q: moves.append(q) or SimpleNamespace(ok=True)
     assert session._prepare_observation_motion(np.ones(6), [])
     np.testing.assert_array_equal(moves, [gateway])
+
+
+@pytest.mark.parametrize('case', ['raise', 'lower', 'actual_collision'])
+def test_empty_gateway_can_only_leave_an_existing_margin_by_a_clear_upward_exit(case):
+    start = .162 if case == 'actual_collision' else .177
+    session, _ = route_session(lambda x: start+(.2*x if case != 'lower' else -.05*x))
+    obstacle = block('green', xy=(0., .3), top=.16, height=.16)
+    obstacle.length = obstacle.width = .2
+    q = [.3, 0., 0., 0., 0., 0.]
+    assert not session._safe_observation_joints(q, [obstacle])
+    assert session._safe_observation_joints(q, [obstacle], escaping=True) is (case == 'raise')
 
 
 def test_observation_route_never_shrinks_known_object_to_a_short_camera_measurement():
@@ -374,6 +385,21 @@ def test_physical_final_audit_skips_a_taught_view_whose_joint_sweep_hits_the_sta
     session._safe_observation_joints = lambda q, ds: checked.append(q[0]) or q[0] != 0.
     session.observe(target=dict(xy=[.2,.3],verify_goals=[STACK_GOAL]),purpose='verify_place')
     assert checked == [0.,1.] and seen == [1]
+
+
+def test_full_refresh_also_checks_known_physical_obstacles_before_camera_motion():
+    pear = block('pear', top=.16, height=.11)
+    session, seen = scan_session([[pear], [pear], [pear]])
+    session._physics = object()
+    session._observed_detections = [pear]
+    session.runner.views = [[float(i)]*6 for i in range(3)]
+    session._base_view_count = 3
+    session._cache_lock = threading.Lock()
+    checked = []
+    session._safe_observation_joints = lambda q, ds: checked.append(q[0]) or q[0] != 0.
+    session.observe()
+    assert checked == [0., 1., 2.]
+    assert seen == [1, 2]
 
 
 def test_just_released_geometry_blocks_camera_sweep_before_a_fresh_image_exists():

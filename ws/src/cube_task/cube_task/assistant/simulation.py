@@ -1135,13 +1135,14 @@ class SimulationSession:
             verified_merge = None
             revision = self._environment_revision
             for step, view in enumerate(order, 1):
-                guarded_view = source_focus or (local and getattr(self, '_physics', None) is not None)
+                guarded_view = source_focus or (getattr(self, '_physics', None) is not None
+                                               and (local or bool(self._observed_detections)))
                 if guarded_view and not self._prepare_observation_motion(
                         self.runner.views[view], self._observed_detections):
                     # Previous observations may have changed the start joints
                     # or the environment. Recheck the entire actual sweep.
                     if step == len(order) and stack_fallbacks < 3:
-                        goals = target.get('verify_goals', ())
+                        goals = (target or {}).get('verify_goals', ())
                         hint = getattr(self, '_released_observation_obstacle', None)
                         extra_view = self._verification_view(
                             goals, [] if hint is None else [hint], revision, attempted_views)
@@ -1888,7 +1889,7 @@ class SimulationSession:
         now = getattr(self.arm,'planning_time',time.monotonic)
         deadline = now()+8.
         def via(gateway):
-            if not self._safe_observation_joints(gateway,detections):
+            if not self._safe_observation_joints(gateway,detections,escaping=True):
                 return None
             if not self._safe_observation_joints(q,detections,start_joints=gateway):
                 return None
@@ -1930,7 +1931,7 @@ class SimulationSession:
                 return reached
         return False
 
-    def _safe_observation_joints(self, q, detections, *, start_joints=None):
+    def _safe_observation_joints(self, q, detections, *, start_joints=None, escaping=False):
         """Check an empty-gripper joint sweep against measured object envelopes."""
         import cv2
         from ..perception.geometry import object_footprint
@@ -1981,7 +1982,7 @@ class SimulationSession:
             # Sweep each solid separately. One hull around both fingers and
             # the higher palm falsely fills the open grasp and projects the
             # whole palm down to fingertip height, trapping valid view starts.
-            for before,after in zip(start,end):
+            for part,(before,after) in enumerate(zip(start,end)):
                 corners = np.vstack([before,after])
                 xy = (corners[:, None, :2] + np.array([[-.005, -.005], [-.005, .005],
                                                       [.005, .005], [.005, -.005]])).reshape(-1, 2)
@@ -1989,9 +1990,21 @@ class SimulationSession:
                 low = float(corners[:, 2].min()) - .005
                 if low <= float(table_z) + .005:
                     return False
-                if any(low <= top + .015 and polygons_overlap(hull,footprint,clearance=1e-9)
-                       for footprint,top in obstacles):
-                    return False
+                for footprint,top in obstacles:
+                    if low > top+.015 or not polygons_overlap(hull,footprint,clearance=1e-9):
+                        continue
+                    # A stopped inspection can already be inside the extra
+                    # stand-off, while the measured solid remains clear. A
+                    # checked gateway may leave that margin only upward: every
+                    # swept part stays clear, never lowers its near surface,
+                    # and finishes outside the full original stand-off.
+                    initial = float(swept[0][part][:,2].min())-.005
+                    upward_exit = (escaping and initial >= top+.005
+                        and low >= initial-1e-6
+                        and float(after[:,2].min()) >= float(before[:,2].min())-1e-6
+                        and float(swept[-1][part][:,2].min())-.005 > top+.015)
+                    if not upward_exit:
+                        return False
         return True
 
     def _remember_released_obstacle(self, det, result):

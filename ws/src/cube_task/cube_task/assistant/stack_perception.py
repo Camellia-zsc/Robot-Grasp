@@ -106,6 +106,80 @@ def _support_evidence(frame, points, flat_mask, det, color):
                 bbox=(int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1))
 
 
+def _box_side_surfaces(frame, points, table_z, color, max_top=math.inf):
+    """Fresh vertical faces can identify a base whose top is covered.
+
+    Catalogue height proposes the hidden top plane. A long, tall, planar,
+    coloured face must actually be measured down to the table; this is never
+    a complete base outline or permission to grasp the occluded base.
+    """
+    from .catalog import catalog_entries
+    entries = [entry for entry in catalog_entries() if entry['shape'] in ('box','cube')
+               and entry['label'] in color.labels
+               and max_top > table_z+float(entry['dimensions'][2])+.025]
+    if not entries:
+        return []
+    finite = np.all(np.isfinite(points), axis=-1)
+    smooth = np.stack([cv2.GaussianBlur(np.where(finite,points[...,axis],0.).astype(np.float32),
+                                      (7,7),0) for axis in range(3)],axis=-1)
+    normals = np.cross(np.roll(smooth,-3,1)-np.roll(smooth,3,1),
+                       np.roll(smooth,-3,0)-np.roll(smooth,3,0))
+    magnitude = np.linalg.norm(normals,axis=-1)
+    vertical = finite & (magnitude>1e-10) & (np.abs(normals[...,2]) < .10*magnitude)
+    hsv = cv2.cvtColor(frame.color,cv2.COLOR_BGR2HSV)
+    classes = color.pixel_classes(hsv.reshape(-1,3)).reshape(finite.shape)
+    surfaces = []
+    for entry in entries:
+        height = float(entry['dimensions'][2])
+        level = table_z+height
+        mask = vertical & (classes==color.labels.index(entry['label']))
+        mask &= (points[...,2]>table_z+.003) & (points[...,2]<level-.004)
+        horizontal = np.linalg.norm(normals[...,:2],axis=-1)
+        # Adjacent faces have the same colour and touch in the image. Split
+        # by measured normal before fitting, rather than rejecting the corner
+        # as one nonplanar face or including the upper body's curved foot.
+        for angle in np.arange(12)*math.pi/12:
+            aligned = np.abs(normals[...,0]*math.cos(angle)+normals[...,1]*math.sin(angle))
+            oriented = mask & (aligned>math.cos(math.radians(12))*horizontal)
+            count,labels = cv2.connectedComponents(oriented.astype(np.uint8),connectivity=8)
+            for index in range(1,count):
+                selected = labels==index
+                p = points[selected]
+                if len(p)<80 or np.ptp(p[:,2])<.022 or p[:,2].min()>table_z+.018 or p[:,2].max()<level-.015:
+                    continue
+                xy = p[:,:2]
+                values = np.linalg.eigvalsh(np.cov(xy.T))
+                if values[0]>.0012**2 or np.sqrt(values[-1])<.0045:
+                    continue
+                if any(old['label']==entry['label'] and np.count_nonzero(old['mask']&selected)>.8*len(p)
+                       for old in surfaces):
+                    continue
+                surfaces.append(dict(label=entry['label'],level=level,mask=selected))
+    return surfaces
+
+
+def _side_support_evidence(points,det,surfaces,level):
+    for surface in surfaces:
+        if abs(surface['level']-level)>.006:
+            continue
+        mask = surface['mask'].copy()
+        radius = max(float(det.length),float(det.width))/2+.012
+        mask &= np.linalg.norm(points[...,:2]-det.center_base[:2],axis=-1)<=radius
+        p = points[mask]
+        if len(p)<80 or np.ptp(p[:,2])<.022:
+            continue
+        xy = p[:,:2]
+        center,yaw,length,width = rect_geometry(xy)
+        polygon = cv2.convexHull(xy.astype(np.float32)).reshape(-1,2)
+        if len(polygon)<3 or length<.015:
+            continue
+        ys,xs = np.nonzero(mask)
+        return dict(label=surface['label'],level=level,polygon=polygon.tolist(),points=len(p),
+                    mask=mask,center=center,yaw=yaw,length=length,width=width,
+                    surface_kind='vertical_face',bbox=(int(xs.min()),int(ys.min()),int(xs.max())+1,int(ys.max())+1))
+    return None
+
+
 def refine_supported_objects(frame, T_base_camera, zones, result, pipeline, complete):
     """Replace measured merged stacks with complete upper-layer observations.
 
@@ -126,6 +200,11 @@ def refine_supported_objects(frame, T_base_camera, zones, result, pipeline, comp
     levels = _observed_levels(points, table_z)
     color = ColorClassifier(pipeline.cfg.get('perception.classifier.color.classes'),
                             allowed_labels=['red', 'green', 'yellow'])
+    sides = _box_side_surfaces(frame,points,table_z,color,
+                              max_top=max((d.top_z for d in result.detections if d.top_z is not None),default=-math.inf))
+    for surface in sides:
+        if not any(abs(surface['level']-old[0])<.003 for old in levels):
+            levels.append((surface['level'],np.zeros(frame.depth.shape,dtype=bool)))
     accepted, patches, ambiguous = [], [], []
     for level, flat_mask in levels:
         # Do not spend a complete perception pass on the highest visible cap.
@@ -139,6 +218,8 @@ def refine_supported_objects(frame, T_base_camera, zones, result, pipeline, comp
             if not det.valid or not complete(det):
                 continue
             evidence = _support_evidence(frame, points, flat_mask, det, color)
+            if evidence is None:
+                evidence = _side_support_evidence(points,det,sides,level)
             if evidence is None:
                 continue
             # One measured top instance cannot be accepted at competing support
@@ -159,7 +240,8 @@ def refine_supported_objects(frame, T_base_camera, zones, result, pipeline, comp
                 continue
             det.extra.update(support_z=evidence['level'], support_label=evidence['label'],
                 support_polygon=evidence['polygon'], support_pixel_count=evidence['points'],
-                support_observed=True, layered_observation=True)
+                support_observed=True, layered_observation=True,
+                support_surface_kind=evidence.get('surface_kind','horizontal_top'))
             accepted.append(det)
             patches.append(evidence)
     if ambiguous:

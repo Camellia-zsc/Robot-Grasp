@@ -62,6 +62,17 @@ def test_centered_apple_has_real_support_contact_without_rigid_attachment(build)
                    for t in physics.mujoco_world.model.eq_type)
 
 
+def test_planning_uses_the_controllers_actual_joint_limits_after_scene_rebuild(build):
+    physics, _base, _apple, _events = build()
+    for rebuild in (False, True):
+        if rebuild:
+            physics.apply_scene_changes()
+        np.testing.assert_array_equal(physics.arm.kin.limits, physics.arm.inner.ik.limits)
+        q = np.array([0., .5, -.5, 0., 0., 3.137])
+        assert not physics.arm.inner.ik.within_limits(q)
+        assert not physics.arm.kin.within_limits(q)
+
+
 def test_pear_success_requires_actual_upright_supported_rest(build):
     physics, _base, pear, _events = build(upper='pear')
     physics.settle(1.2)
@@ -159,3 +170,15 @@ def test_physical_finger_stroke_matches_the_explicit_project_configuration(build
     for joint in ('joint7', 'joint8'):
         ident = mj.mj_name2id(model, mj.mjtObj.mjOBJ_JOINT, joint)
         assert max(abs(model.jnt_range[ident])) >= configured / 2 - 1e-9
+
+
+def test_planning_cancellation_reaches_the_iterative_physics_solver(build):
+    physics, _base, _apple, _events = build()
+    target = physics.arm.get_flange_pose().value.copy()
+    target[:3, 3] += [.1, .1, .1]
+    calls = []
+    def cancelled():
+        calls.append(True)
+        return len(calls) >= 4
+    result, _ep, _eo = physics.arm.kin.ik(target, cancelled=cancelled)
+    assert result is None and 4 <= len(calls) <= 6

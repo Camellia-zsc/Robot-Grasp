@@ -85,7 +85,7 @@ def test_preference_still_runs_final_checks_and_advances_after_a_rejected_pose(m
     original_final = runner._adjust_strict_release
 
     def adjusted(arm, gp, pp, *args, **kwargs):
-        visited.append(tuple(pp.T_release[:2, 3]))
+        visited.append(pp.T_release.copy())
         if len(visited) == 1:
             if failure == 'ik':
                 return False, 'unreachable', {}
@@ -103,8 +103,8 @@ def test_preference_still_runs_final_checks_and_advances_after_a_rejected_pose(m
     updated, why = runner.replan_release(target, grasp, previous, .05, [target], max_attempts=2)
     assert updated is not None, why
     assert len(visited) >= 2
-    np.testing.assert_allclose(visited[0], [.34, -.06])
-    assert not np.allclose(runner.placer.last_info['xy'], [.34, -.06])
+    np.testing.assert_allclose(visited[0][:2, 3], [.34, -.06])
+    assert not np.array_equal(updated.T_release, visited[0])
 
 
 @pytest.mark.parametrize('cloud_kind', ['complete', 'asymmetric', 'short', 'nonfinite', 'missing'])
@@ -138,7 +138,8 @@ def test_preference_uses_measured_cloud_or_measured_box_through_the_actual_grasp
     dx, dy, dz = ({'complete': (.027, .018, .015),
                   'asymmetric': (.0245, .0105, -.010)}.get(cloud_kind, (.012, .003, .010)))
     expected = [.34 + dx * math.cos(tilt) + dz * math.sin(tilt), -.06 + dy]
-    np.testing.assert_allclose(captured, [[expected]])
+    np.testing.assert_allclose([points[0] for points in captured], [expected])
+    assert len(captured[0]) == 9  # measured anchor, then broad region alternatives
 
 
 def test_preferred_xy_does_not_change_an_exact_destination():

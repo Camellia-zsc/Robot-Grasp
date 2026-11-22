@@ -400,3 +400,12 @@ def test_capabilities_do_not_forward_nested_or_mistyped_values(context):
         'active_observe_requires_geometry': None,
     }
     assert model_skill_context(context)['capabilities'] == {}
+
+
+def test_model_center_region_fields_do_not_imply_full_footprint_completion(context):
+    context['scene']['objects'][0].update(zone='zone_red',in_zone=True)
+    before=deepcopy(context)
+    item=model_skill_context(context)['scene']['objects'][0]
+    assert item['center_region']=='zone_red' and item['center_in_region'] is True
+    assert 'zone' not in item and 'in_zone' not in item
+    assert context==before

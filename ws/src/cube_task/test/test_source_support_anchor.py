@@ -23,10 +23,10 @@ def test_large_seating_of_a_measured_supported_source_requires_rgbd_feedback():
 
 @pytest.mark.parametrize('evidence', [dict(support_observed=False), dict(support_label=None),
                                         dict(support_z=None), dict(support_z=float('nan'))])
-def test_unconfirmed_source_support_does_not_create_a_calibration_prior(evidence):
+def test_unconfirmed_support_does_not_bypass_a_measured_large_seating_change(evidence):
     grasp, result = supported_source()
     grasp.target.extra.update(evidence)
-    assert not seating_requires_feedback(grasp, result, .038)
+    assert seating_requires_feedback(grasp, result, .038)
 
 
 @pytest.mark.parametrize('pose,label', [('side', 'pear'), ('flat', 'banana'), ('upright', 'red')])
@@ -37,8 +37,9 @@ def test_supported_source_without_a_known_spherical_section_keeps_existing_behav
     assert not seating_requires_feedback(grasp, result, .038)
 
 
-def test_plain_table_source_does_not_gain_extra_calibration_captures():
+def test_plain_table_source_only_requests_calibration_after_material_seating():
     grasp, result = supported_source()
     for key in ('support_observed', 'support_label', 'support_z'):
         grasp.target.extra.pop(key)
-    assert not seating_requires_feedback(grasp, result, .038)
+    assert seating_requires_feedback(grasp, result, .038)
+    assert not seating_requires_feedback(grasp, result, .0475)

@@ -84,6 +84,23 @@ def test_region_final_tilt_failure_keeps_other_wrist_directions_at_same_center()
     assert not np.allclose(visited[0][1], visited[1][1])
 
 
+def test_tapered_landing_rejects_a_lean_that_unbalances_measured_finger_heights():
+    from cube_task.core.transforms import rot_x
+    runner, target, grasp, previous = scene()
+    target.extra.update(catalog_shape='compound', grasp={'neck': True})
+    checked = []
+    def final_check(det, gp, pp, *args, **kwargs):
+        checked.append(pp)
+        if len(checked) == 1:
+            pp.T_pre[:3, :3] = pp.T_pre[:3, :3] @ rot_x(.2)
+        return True, ''
+    runner._adjust_strict_release = final_check
+    updated, why = runner.replan_release(target, grasp, previous, .05, [target])
+    assert updated is not None, why
+    assert len(checked) >= 2
+    assert abs(updated.T_pre[2, 1]) * .05 <= .002
+
+
 def test_interrupted_release_search_resumes_completed_rejections_in_same_measurement(monkeypatch):
     runner, target, grasp, previous = scene()
     visited, stopped = [], [False]
@@ -304,3 +321,28 @@ def test_held_release_checks_only_future_poses_and_never_replans_the_grasp():
     assert len(checked) == 3
     for attr in ('T_grasp', 'T_pre', 'T_lift'):
         np.testing.assert_array_equal(getattr(grasp, attr), getattr(before, attr))
+
+
+def test_region_release_does_not_spend_every_attempt_on_unreachable_first_center():
+    runner,target,grasp,previous=scene()
+    attempted=[]
+    def reachable(_det,_grasp,place,_neighbors,_polygon,xy,*args,**kwargs):
+        attempted.append(tuple(xy))
+        return (False,'this center is unreachable') if np.linalg.norm(np.asarray(xy)-[.4,0.])<1e-7 else (True,'')
+    runner._adjust_strict_release=reachable
+    candidate,why=runner.replan_release(target,grasp,previous,.05,[target])
+    assert candidate is not None,why
+    assert np.linalg.norm(candidate.T_release[:2,3]-[.4,0.])>.001
+    assert len(attempted)<7
+
+
+def test_region_release_checks_other_areas_before_exhausting_adjacent_fine_points():
+    runner,target,grasp,previous=scene()
+    attempted=[]
+    def check(_det,_grasp,place,_neighbors,_polygon,xy,*args,**kwargs):
+        attempted.append(tuple(xy))
+        return (abs(xy[1]) >= .04, 'central band has no safe leaned release')
+    runner._adjust_strict_release=check
+    candidate,why=runner.replan_release(target,grasp,previous,.05,[target])
+    assert candidate is not None, (why,attempted)
+    assert len(attempted) <= 16

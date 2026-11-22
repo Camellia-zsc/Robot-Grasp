@@ -91,6 +91,20 @@ def move(destination=None, label='red'):
                 destination=destination or {'type': 'goal', 'index': 0})
 
 
+@pytest.mark.parametrize('label,pose,symmetric',[('pear','upright',True),('apple',None,True),
+                                                ('pear','side',False),('banana','flat',False)])
+def test_original_restore_uses_geometry_symmetry_instead_of_round_surface_pca_yaw(label,pose,symmetric):
+    measured = make_det(label,.3,.12,size=.085)
+    if pose is not None:
+        measured.extra['resting_pose'] = pose
+    session = CameraSession(measured)
+    original = dict(measured.summary(),yaw=1.2)
+    executor = SkillExecutor(session,originals=[original])
+    destination,yaw = executor._resolve({'type':'original','label':label},[])
+    assert (yaw is None) is symmetric
+    assert destination=={'type':'point','xy':[.3,.12]}
+
+
 def test_initially_completed_goal_sends_no_grasp_or_extra_observation():
     session = CameraSession(make_det('red', .17, -.35, size=.05))
     result = SkillExecutor(session).execute(move(), GOALS, expected_revision=0)

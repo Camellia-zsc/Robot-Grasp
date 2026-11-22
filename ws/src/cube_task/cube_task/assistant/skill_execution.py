@@ -194,14 +194,19 @@ class SkillExecutor:
                         return self._failure(step, 'holding_object', '请先放置当前物品，再核验最终目标')
                     result = session.verify_goals(copy.deepcopy(list(selected)))
                     camera_ok = bool(result.get('ok'))
-                    for item in result.get('items', ()):
+                    targets = getattr(result, 'targets', ())
+                    for index, item in enumerate(result.get('items', ())):
                         # verify_goals owns the camera-only verdict here.
                         # Keep each camera result before combining it with
                         # independent physical truth, including partial audits.
                         item['camera_verified'] = (item.get('ok') is True
                                                    and item.get('camera_verified', True) is True)
                         goal = item['goal']
-                        measured = unique_target(session._observed_detections, goal['label'])
+                        # Each destination can require a different camera view.
+                        # A later crop must not replace the earlier full target
+                        # before its independent physical check.
+                        measured = (targets[index] if len(targets) == len(result['items'])
+                                    else unique_target(session._observed_detections, goal['label']))
                         evaluation = session._evaluation_object(measured) if measured is not None else None
                         truth = None
                         if evaluation is not None:
@@ -262,16 +267,65 @@ class SkillExecutor:
                 hint['_observation_hint_only'] = True
                 return hint
         original = self.originals.values() if isinstance(self.originals, Mapping) else self.originals
+        original = list(original)
         matches = [o for o in original if o.get('label') == label and o.get('center_base') is not None]
-        return copy.deepcopy(matches[0]) if len(matches) == 1 else {'label': label}
+        if len(matches) == 1:
+            return copy.deepcopy(matches[0])
+        if allow_partial:
+            # An upper object's measured support patch can aim a camera at
+            # the hidden base after the upper object has been moved away.
+            # The patch supplies no complete base outline or grasp authority.
+            hints = []
+            for upper in list(scene.get('objects', ())) + original:
+                if upper.get('support_observed') is not True or upper.get('support_label') != label:
+                    continue
+                try:
+                    polygon = np.asarray(upper['support_polygon'], float)
+                    top = float(upper['support_z'])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if (polygon.ndim != 2 or polygon.shape[1:] != (2,) or len(polygon) < 3
+                        or not np.all(np.isfinite(polygon)) or not math.isfinite(top)):
+                    continue
+                hints.append(np.r_[polygon.mean(axis=0), top])
+            if hints and max(np.linalg.norm(point - hints[0]) for point in hints) <= .04:
+                return dict(label=label, valid=False, center_base=hints[0].tolist(),
+                    top_z=float(hints[0][2]), reject_reason='remembered_support_aiming_hint',
+                    _observation_hint_only=True)
+            editor = getattr(self.session, 'editor', None)
+            if editor is not None and editor.metadata().get('one_per_class'):
+                complete = [o for o in scene.get('objects', ()) if o.get('valid')
+                            and o.get('center_base') is not None]
+                unexplained = []
+                for fragment in scene.get('objects', ()):
+                    point = fragment.get('center_base')
+                    if fragment.get('valid') or point is None:
+                        continue
+                    if any(np.linalg.norm(np.asarray(point[:2])-np.asarray(o['center_base'][:2])) < .065
+                           for o in complete):
+                        continue
+                    if not any(np.linalg.norm(np.asarray(point[:2])-np.asarray(o['center_base'][:2])) < .04
+                               for o in unexplained):
+                        unexplained.append(fragment)
+                if len(unexplained) == 1:
+                    # Cropping can change the classifier's label. Reinspect
+                    # the sole unexplained fragment; never relabel it as a
+                    # graspable object or assert it is the missing target.
+                    hint = copy.deepcopy(unexplained[0])
+                    hint.update(label=label, valid=False, _observation_hint_only=True,
+                                reject_reason='unexplained_fragment_aiming_hint')
+                    return hint
+        return {'label': label}
 
     def _fresh_target(self, label, purpose, support_label=None):
         session = self.session
         if support_label is not None:
             from .stacking import require_flat_support
             require_flat_support(support_label)
-        reference = self._reference(label)
+        reference = self._reference(label, allow_partial=True)
         reference.update(label=label, require_grasp=True)
+        if reference.get('_observation_hint_only'):
+            reference['_observe_source'] = True
         if support_label is not None:
             reference['required_support'] = self._reference(support_label)
         reusable = getattr(session, '_reusable_target', lambda target: False)(reference)
@@ -306,6 +360,7 @@ class SkillExecutor:
         session._apply_interventions()
         revision = session._environment_revision
         fresh = session._stationary_recovery_observation()
+        captured = fresh
         flange = session.arm.get_flange_pose()
         pose = camera_pose_in_base(session.runner.ext, flange.value, session.runner.T_flange_tcp)
         frame = session.camera._last
@@ -323,7 +378,8 @@ class SkillExecutor:
         session._observed_detections = copy.deepcopy(neighbors)
         session._recovery_neighbors = copy.deepcopy(neighbors)
         session._publish_scene(neighbors, [], [], session.runner._last_stamp)
-        return neighbors
+        from .carried_observation import CarriedDetections
+        return CarriedDetections(neighbors, getattr(captured, 'anchor_detections', captured))
 
     def _observation_focus(self, step, goals):
         specification = step.get('destination')
@@ -499,6 +555,10 @@ class SkillExecutor:
             item = matches[0]
             xy = item.get('center_base')
             yaw = item.get('yaw')
+            from .catalog import restoration_yaw_period
+            period = restoration_yaw_period(item['label'],item.get('resting_pose'))
+            if period is None and xy is not None:
+                return validate_destination({'type':'point','xy':list(xy[:2])},self.session.scene),None
             if xy is None or yaw is None or not math.isfinite(float(yaw)):
                 raise ValueError('原位置缺少完整相机坐标或朝向')
             return validate_destination({'type': 'point', 'xy': list(xy[:2])}, self.session.scene), float(yaw)
@@ -562,12 +622,10 @@ class SkillExecutor:
                 det.height is None or not math.isfinite(float(det.height)) or det.height <= 0):
             return False
         if yaw is not None:
-            from .catalog import catalog_entries
-            entry = next((e for e in catalog_entries() if e['label'] == det.label), {})
-            dims = entry.get('dimensions', [])
-            square = (entry.get('shape') in ('box', 'cube') and len(dims) >= 2
-                      and abs(dims[0] - dims[1]) < .001)
-            period = math.pi / 2 if square else math.pi
+            from .catalog import restoration_yaw_period
+            period = restoration_yaw_period(det.label,det.extra.get('resting_pose'))
+            if period is None:
+                return True
             if (det.yaw is None or not math.isfinite(float(det.yaw)) or
                     abs(math.remainder(float(det.yaw) - yaw, period)) > math.radians(10)):
                 return False
@@ -732,6 +790,17 @@ class SkillExecutor:
             saved_target.extra.pop('_stack_support', None)
         target.extra.pop('_stack_support', None)
         neighbors = self._stationary()
+        calibrate = getattr(session, '_calibrate_carried_anchor', None)
+        if callable(calibrate):
+            from ..core.types import PickResult
+            confirmed_context, width, reason = session.runner._held_transfer_feedback(context['det'])
+            if confirmed_context is None:
+                return self._failure(step, 'held_feedback_changed', reason)
+            feedback = PickResult(False, grasp_width=width, detail={'holding': True})
+            confirmed, reason, _fresh = calibrate(context['grasp'], feedback, width, neighbors)
+            if not confirmed:
+                return dict(self._failure(step, 'held_anchor_unconfirmed',
+                            '夹持位置尚未得到可靠测量，保持夹持'), diagnostics=reason)
         if destination['type'] == 'on_object':
             from .stacking import planning_options, annotate
             _options, support = planning_options(session, destination)
@@ -853,7 +922,13 @@ class SkillExecutor:
                     break
             if selected is None:
                 return self._failure(step, 'placement_infeasible', '没有通过严格检查的桌面空位')
-            destination = selected
+            # auto_free grants a choice of safe support, not this provisional
+            # point. Seat and measure the grip before binding its real landing.
+            picked = self._pick(dict(step, skill='pick'), goals, cancel)
+            if not picked.get('ok') or not picked.get('holding'):
+                return dict(picked, skill='move')
+            placed = self._place(dict(step, skill='place'), goals, protected, cancel)
+            return dict(placed, skill='move')
         decision = dict(action='pick', scene_version=session.scene['scene_version'],
                         object_id=obj['object_id'], zone_name=None)
         if destination['type'] == 'named_region':

@@ -192,3 +192,27 @@ def test_invalid_explicit_opening_does_not_silently_clamp_or_get_a_plan(aperture
     candidate = runner.placer.plan(zone, search['held'], search['transit'],
         held=search['shape'], strict=True, fixed_xy=True)
     assert not candidate.feasible
+
+
+@pytest.mark.parametrize('collision', [False, True])
+def test_stack_exit_planner_changes_unreachable_retreat_and_still_checks_open_tool_sweep(collision):
+    from types import SimpleNamespace
+    runner, target, grasp, place, support, zone, polygon = stacked_scene()
+    runner.free_tilt = 40.
+    original = place.T_retreat.copy()
+    calls = []
+    runner.arm = SimpleNamespace(get_joints=lambda: SimpleNamespace(value=np.zeros(6)),
+        _ik_tcp=lambda *a: (np.zeros(6), 0., 0.),
+        check_reachable=lambda *a, **k: (True, ''),
+        _check_linear_path=lambda a,b,*rest: (not np.array_equal(b,original),'singular exit'))
+    def geometry(*args):
+        calls.append(place.T_retreat.copy())
+        return not collision, 'measured object blocks exit' if collision else ''
+    runner._release_retreat_clear = geometry
+    ok, why = runner._plan_release_exit(target,grasp,place,[support],polygon,lambda:False)
+    assert ok is (not collision) and calls
+    if collision:
+        np.testing.assert_array_equal(place.T_retreat,original)
+        assert 'blocks' in why
+    else:
+        assert not why and not np.array_equal(place.T_retreat,original)

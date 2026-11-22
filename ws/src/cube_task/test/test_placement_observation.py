@@ -121,6 +121,24 @@ def test_inspection_without_reachability_check_refuses_to_offer_unchecked_motion
     assert poses == []
 
 
+def test_tapered_contact_inspects_by_translation_and_rejects_large_bending_routes():
+    target, grasp, _frame, _camera = inputs()
+    target.extra['grasp'] = {'neck': True}
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                         _check_linear_path=lambda *a: (True, ''))
+    T_fc = make_T(np.diag([1., -1., -1.]), [0., 0., .05])
+    poses, _ = safe_inspection_poses(arm, grasp, T_fc, np.eye(4), [.3, 0.], .11)
+    assert poses
+    assert all(np.arccos(np.clip(grasp.T_grasp[:3, 2] @ pose[:3, 2], -1, 1))
+               <= np.deg2rad(15.) for pose in poses)
+    np.testing.assert_allclose(poses[0][:3, :3], grasp.T_grasp[:3, :3])
+    from cube_task.robot.kinematics import tilt_outward
+    start = top_down_T(.3, 0., .3, 0.)
+    end = tilt_outward(start, np.deg2rad(30.))
+    route, why = safe_inspection_route(arm, grasp, start, end, [], .05, bend_reference=start)
+    assert not route and 'tapered contact' in why
+
+
 def test_inspection_checks_native_path_and_can_retract_without_an_unreachable_lift():
     _target, grasp, _frame, _camera = inputs()
     current = top_down_T(.4, 0., .15, 0.)
@@ -225,3 +243,66 @@ def test_releasing_and_regrasping_same_anchor_allows_old_views_again():
     forget_inspection(session)
     assert inspection_history(session, grasp) == []
     assert session._skill_coverage_revision is None and not session._skill_observation_coverage
+
+
+@pytest.mark.parametrize('obstacle', [False, True])
+def test_joint_fallback_checks_actual_fk_sweep_after_cartesian_path_refusal(obstacle):
+    target, grasp, _frame, _camera = inputs()
+    start, end = top_down_T(.3, 0., .2, 0.), top_down_T(.4, 0., .2, 0.)
+    q0, q1 = np.array([.3, 0., 0., 0., 0., 0.]), np.array([.4, 0., 0., 0., 0., 0.])
+    def fk(q):
+        return top_down_T(q[0], .1*np.sin(np.pi*(q[0]-.3)/.1), .2, 0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+        _check_linear_path=lambda *a: (False, 'Cartesian wrist singularity'),
+        get_joints=lambda: SimpleNamespace(value=q0),
+        _ik_tcp=lambda *a: (q1, 0., 0.), _kin=SimpleNamespace(fk=fk),
+        _T_ft=np.eye(4), _guard=SimpleNamespace(check_tcp=lambda *a, **k: (True, '')))
+    neighbors = [Detection('green', 1., center_base=np.array([.35, .1, .3]),
+        top_z=.3, height=.3, length=.03, width=.03, yaw=0.)] if obstacle else []
+    route, why = safe_inspection_route(arm, grasp, start, end, neighbors, .05,
+                                     allow_joint_route=True)
+    if obstacle:
+        assert not route and 'joint sweep' in why
+    else:
+        assert route and not why
+        np.testing.assert_array_equal(route.start_joints, q0)
+        np.testing.assert_array_equal(route.end_joints, q1)
+        np.testing.assert_array_equal(route[-1], end)
+
+
+def test_remeasured_low_release_can_only_depart_support_by_a_straight_raise():
+    _target, grasp, _frame, _camera = inputs()
+    start, end = top_down_T(.3, 0., .02, 0.), top_down_T(.4, 0., .2, 0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                          _check_linear_path=lambda *a: (True, ''))
+    route, why = safe_inspection_route(arm, grasp, start, end, [], .05,
+                                     allow_table_departure=True)
+    assert route and not why and len(route) == 2
+    np.testing.assert_allclose(route[0][:2, 3], start[:2, 3])
+    np.testing.assert_allclose(route[0][:3, :3], start[:3, :3])
+    assert route[0][2, 3] >= start[2, 3] + .015
+
+
+def test_low_departure_does_not_authorize_an_object_already_below_the_support():
+    _target, grasp, _frame, _camera = inputs()
+    start, end = top_down_T(.3, 0., .015, 0.), top_down_T(.4, 0., .2, 0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                          _check_linear_path=lambda *a: (True, ''))
+    route, why = safe_inspection_route(arm, grasp, start, end, [], .05,
+                                     allow_table_departure=True)
+    assert not route and 'table' in why
+
+
+@pytest.mark.parametrize('resting_pose,clear', [('upright', True), ('uncertain', False)])
+def test_round_carried_body_avoids_box_corners_without_shrinking_unknown_shapes(resting_pose, clear):
+    target, grasp, _frame, _camera = inputs()
+    target.label = 'pear'
+    target.extra['resting_pose'] = resting_pose
+    start, end = top_down_T(.3, 0., .15, 0.), top_down_T(.25, 0., .15, 0.)
+    obstacle = Detection('green', 1., center_base=np.array([.333, .033, .19]),
+        top_z=.19, height=.1, length=.004, width=.004, yaw=0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                          _check_linear_path=lambda *a: (True, ''))
+    route, why = safe_inspection_route(arm, grasp, start, end, [obstacle], .05)
+    assert bool(route) is clear
+    assert not why if clear else 'overlaps' in why

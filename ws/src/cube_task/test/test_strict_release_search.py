@@ -17,6 +17,28 @@ def setup_search(yaw=0.):
     return planner, zone, shape
 
 
+def test_strict_shared_region_respects_spread_policy_and_keeps_room_for_zone_mate():
+    planner, zone, shape = setup_search()
+    result = planner.plan(zone, .015, .18, held=shape, strict=True, center_first=False)
+    assert result.feasible
+    assert np.linalg.norm(np.asarray(planner.last_info['xy'])-zone.center[:2]) > .03
+    exact = planner.plan(zone, .015, .18, held=shape, strict=True,
+                         center_first=False, fixed_xy=True)
+    assert exact.feasible
+    assert planner.last_info['xy'] == pytest.approx(zone.center[:2])
+
+
+def test_tapered_release_prioritizes_balanced_landing_contacts_before_preserving_source_yaw():
+    planner,zone,shape=setup_search()
+    zone.center=np.array([.4,0.,0.])
+    shape.update(grasp_closing=0.,balanced_contact=True)
+    assert planner.plan(zone,.015,.18,held=shape,strict=True).feasible
+    assert abs(math.cos(planner.last_info['closing_angle']))<1e-8
+    shape['balanced_contact']=False
+    assert planner.plan(zone,.015,.18,held=shape,strict=True).feasible
+    assert abs(math.sin(planner.last_info['closing_angle']))<1e-8
+
+
 @pytest.mark.parametrize('yaw', [0., math.pi / 5])
 def test_bounded_search_reaches_distant_open_support_before_dense_center_refinement(yaw):
     planner, zone, shape = setup_search(yaw)

@@ -206,6 +206,13 @@ def test_failed_auto_free_move_chooses_another_point_until_scene_intervention(mo
         runner=SimpleNamespace(has_held_recovery=False, nominal={}), execute=fail_move)
     executor = SkillExecutor(session)
     executor._fresh_target = lambda *args: (target, {'object_id': 'measured-red'})
+    def failed_late_place(self, action, goals, protected, cancel):
+        candidate = self._candidates(target, action['destination'], [target])[0]
+        attempts.append(copy.deepcopy(candidate))
+        self._remember_failed_free(target.label, candidate)
+        return {'ok': False, 'holding': False, 'error': 'placement_not_observed'}
+    monkeypatch.setattr(SkillExecutor, '_pick', lambda *args: {'ok': True, 'holding': True})
+    monkeypatch.setattr(SkillExecutor, '_place', failed_late_place)
     monkeypatch.setattr('cube_task.assistant.obstacle_recovery._checked_placement',
                         lambda *args, **kwargs: {'xy': [0., 0.]})
     step = {'id': 'm', 'skill': 'move', 'label': 'red', 'destination': {'type': 'auto_free'}}

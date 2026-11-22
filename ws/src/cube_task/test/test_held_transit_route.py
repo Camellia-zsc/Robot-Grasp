@@ -125,3 +125,78 @@ def test_rejected_route_still_reports_loss_or_missing_feedback_during_planning(w
     else:
         assert not result.detail['holding'] and not result.detail['fault']
         assert result.error == 'dropped_in_transit'
+
+
+@pytest.mark.parametrize('stale', [False, True])
+def test_checked_joint_transfer_executes_exact_solution_and_refuses_changed_start(stale):
+    from cube_task.assistant.placement_observation import JointTransitRoute
+    _clock, world, arm, skill, grasp, place, _waypoint, width = held_scene()
+    start, end = np.zeros(6), np.ones(6)*.1
+    route = JointTransitRoute(place.T_pre, start+(.01 if stale else 0.), end)
+    commands = []
+    def move_joints(q):
+        commands.append(np.array(q))
+        return arm.move_tcp(place.T_pre, linear=False)
+    arm.move_joints = move_joints
+    skill.before_held_transit = lambda *args: route
+    result = skill.place_held(grasp, place, width)
+    if stale:
+        assert not result.ok and result.detail['holding'] and not commands
+        assert not arm.motions()
+    else:
+        assert result.ok and len(commands) == 1
+        np.testing.assert_array_equal(commands[0], end)
+        assert arm.motions()[0][2] is False
+
+
+@pytest.mark.parametrize('available', [True, False])
+def test_return_from_camera_inspection_cannot_bypass_checked_held_transit(available):
+    from cube_task.core.types import PickResult
+    from cube_task.task.skills import _StepFailed
+    _clock, _world, arm, skill, grasp, place, waypoint, width = held_scene()
+    skill.before_release = lambda *args: place
+    checked = []
+    def entry(*args):
+        checked.append(True)
+        return [waypoint, place.T_pre] if available else None
+    skill.before_held_transit = entry
+    result = PickResult(False, grasp_width=width, detail={'holding': True, 'fault': False, 'steps': []})
+    if available:
+        skill._inspect_release(result, grasp, place)
+        np.testing.assert_allclose(arm.motions()[0][1], waypoint)
+        assert arm.motions()[0][2] is True
+    else:
+        with pytest.raises(_StepFailed, match='placement_changed'):
+            skill._inspect_release(result, grasp, place)
+        assert not arm.motions()
+    assert checked == [True]
+
+
+@pytest.mark.parametrize('settles', [True, False])
+def test_measured_anchor_shift_gets_one_checked_local_replan_before_opening(settles):
+    from cube_task.core.types import PickResult
+    _clock, _world, arm, skill, grasp, place, _waypoint, width = held_scene()
+    arm.tcp = place.T_release.copy()
+    checks, replans = [], []
+    def before_open(g, p, result):
+        checks.append(True)
+        if len(checks) == 1 or not settles:
+            result.detail['held_anchor_replan_required'] = True
+            return False, 'newly measured grip translation'
+        return True, ''
+    def replan(*args):
+        replans.append(True)
+        return place
+    skill.before_open, skill.before_release = before_open, replan
+    skill.before_held_transit = lambda *args: [place.T_pre]
+    result = PickResult(False, grasp_width=width,
+                        detail={'holding': True, 'fault': False, 'steps': []})
+    skill._release_and_retreat(result, grasp, place)
+    assert len(replans) == 1 and len(checks) == 2
+    np.testing.assert_allclose(arm.motions()[0][1], place.T_pre)
+    np.testing.assert_allclose(arm.motions()[1][1], place.T_release)
+    if settles:
+        assert arm.gripper_cmds() and not result.detail['holding']
+    else:
+        assert result.error == 'held_anchor_unconfirmed' and result.detail['holding']
+        assert not arm.gripper_cmds()

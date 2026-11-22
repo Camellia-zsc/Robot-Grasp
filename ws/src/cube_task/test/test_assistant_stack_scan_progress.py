@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from cube_task.assistant.simulation import SimulationSession
-from cube_task.assistant.skill_execution import SkillExecutor
+from cube_task.assistant.skill_execution import SkillExecutor, _PlanChanged
 from test_assistant_targeted_scan import block, scan_session
 
 
@@ -69,7 +69,7 @@ def test_change_while_seeking_support_invalidates_the_retained_upper_measurement
                 session._interventions.append({'action': 'move'})
         return result
     session.runner._observe = capture
-    with pytest.raises(ValueError, match='新相机|同时完整确认'):
+    with pytest.raises(_PlanChanged if change == 'revision' else ValueError, match='新相机|同时完整确认'):
         SkillExecutor(session)._fresh_target('pear', 'recover_queued_target', support_label='yellow')
     assert seen == [0, 2]
 

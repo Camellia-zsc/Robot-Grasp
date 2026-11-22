@@ -20,6 +20,14 @@ _SUPPORT = 0.98
 _RESIDUAL_GAP = 0.006
 
 
+class GoalVerification(dict):
+    """Keep each check's camera identity for the subsequent physical audit."""
+
+    def __init__(self, result, targets):
+        super().__init__(result)
+        self.targets = tuple(targets)
+
+
 def _capture_of(det):
     # The transient camera slot can hold several poses during one local scan.
     # Retain its public view index for future aiming, but distinguish captures

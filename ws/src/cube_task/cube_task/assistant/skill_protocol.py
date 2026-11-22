@@ -37,6 +37,9 @@ task_contract 是用户全体任务的固定范围；task_inventory 仅含摆场
 goal_worklist 是按 goal_index 对应完整 goals 的相机工作清单，表示操作顺序提示，不是执行许可。
 优先处理 observed_pending 中当前唯一有效、可安全执行的目标，不必按 goals 列表固定顺序执行。
 observed_at_goal 只表示相机轮廓疑似到位，不能当成已核验成功或重复搬运的理由。
+scene.objects 的 center_region/center_in_region 仅描述中心落区。它们不表示任务完成，
+应结合 goal_worklist 的完整轮廓判断。target_outside_destination 表示完整轮廓仍在边界外，
+应重新选择区内落点并搬放；同一现场重复 verify 无法修正落点。新审核指出具体缺项时，优先修正该项。
 deferred 表示目标缺测、无效、几何不完整或身份歧义，先暂缓该目标操作并处理其他可做目标；
 不要因一个目标暂缓就停止整项多目标任务，也不要在同一处理轮内反复扫描没有新信息的缺项。
 暂缓不删除目标、不算完成，也不算已经开始的抓取失败；动作仍必须通过唯一有效测量检查。
@@ -79,6 +82,13 @@ resting_pose 是相机测量姿态：梨子优先 upright 直立，side 为侧�
 叠放成功必须同时通过新相机与实际支撑核验；若滑落、倾倒、底座移动或目标丢失，先观察并根据失败反馈恢复，
 不能把物体仍在同一颜色区域当作叠放成功，也不能反复盲抓。已有叠放goal在底座遮挡时仍保留，先observe再规划动作。
 scene.objects 中 support_observed/support_label/support_z/support_polygon 是相机局部支撑关系测量。
+搬移底座前，先移开有实测支撑关系的上层物品，不能把叠放物当成可一起搬运的整体。
+上层物品也在本次最终目标中时，优先直接送到它自己的最终目的地；否则先询问获准后安全暂放，
+并履行已承诺的复位义务。上层移开后对底座作局部确认；缺少完整测量时不盲抓底座。
+主目标已经明确、只是障碍物的最终安排未指定时，可提出 auto_free 安全暂放并完成主目标的完整方案，
+说明障碍物将留在受检的桌面空位，由控制器审批后执行；不要仅为选择暂放位置而停止并 clarify。
+不要擅自承诺重建已经被用户后续指令改变的旧叠放关系；需保持旧关系或改动 protected_goals 时才询问取舍。
+original 仅恢复任务开始测得的平面位置及适用的朝向，不命令回到旧悬高；支撑面必须重新测量。
 若上层物品已在底座上面且底座部分遮挡，可据此提出该叠放goal并先verify；关系证据不替代搬放前完整底座测量。
 也可在 zone_name=null 时带 destination={"type":"region","name":"pick_area"}，
 或用户明确给出的/scene.selected_destination 原样选定的 {"type":"point","xy":[x,y]}。
@@ -99,8 +109,14 @@ ask 的 affected_goals 列出可能受影响的goals序号，question 明确问�
 ask 仅授权列出的后续操作；点击同意不代表人工已经移动物品、解决故障或完成目标。
 不能用 ask 等待人工调整完成；需要人工手动调整时应说明原因并 stop，用户可调整后继续原任务。
 verify 通过相机检查最终目标；可用 goal_index 指定一项，省略则检查全部。
+verify 是要求全部选中目标已满足的后置断言，不是任务开始前的状态查询；已知仍有待搬物品时，
+先依据 goal_worklist 搬运，或用 observe 获取缺少的测量，之后再 verify，避免无意义的核验失败打断计划。
 finish 只能出现在末尾，须空夹爪，且只是请求本地最终核验，不能直接宣告成功。
 可以只给局部计划，执行器逐步反馈后再规划。remaining_steps 是整个任务剩余预算，不能超限。
+语义依赖已经明确时，优先在同一轮 steps 列出依赖处理、目标搬运和已承诺复位的完整顺序；
+未知底座可先 observe 再引用对应最终 goal 搬运，每步仍须经过本地新测量和安全检查。
+需要 ask 时同时列出它授权的已知后续步骤，避免只有询问、没有动作的重复决策。
+执行中实测发生变化或某步失败时再据反馈调整，不能把预先列出的步骤当成无条件指令。
 planning_budget 给出当前 plan_number、max_plans、remaining_plans、remaining_steps 和 stagnation。
 临近预算时优先组成有实质推进的可行计划；不要用 observe-only 计划耗完剩余重规划次数。
 位置、数量、存在性等只读问题只能 answer；不清楚的要求 clarify；用户取消时 stop。
@@ -165,6 +181,10 @@ def _observations(items):
             numbers=('score', 'top_z', 'height', 'yaw', 'length', 'width',
                      'n_points', 'track_id', 'view'),
             vectors=(('bbox', 4), ('center_base', 3)))
+        if 'zone' in record:
+            record['center_region'] = record.pop('zone')
+        if 'in_zone' in record:
+            record['center_in_region'] = record.pop('in_zone')
         record.update(_fields(item, strings=('support_label',), flags=('support_observed',),
                               numbers=('support_z',)))
         if 'support_polygon' in item:

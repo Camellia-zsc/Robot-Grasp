@@ -450,3 +450,43 @@ def test_multi_goal_verification_grouped_by_destination_finishes_without_replann
     assert len(client.contexts) == 1
     assert [s['skill'] for s in session.calls] == ['verify']
     assert [item['goal'] for item in state['last_result']['items']] == goals
+
+
+@pytest.mark.parametrize('disturb', [False, True])
+def test_monitored_batch_retains_unmoved_proofs_but_rechecks_physical_containment(create, disturb):
+    goals = [dict(label='apple', zone_name='zone_red'), dict(label='banana', zone_name='zone_green')]
+    def compose(c, n):
+        if n == 1:
+            return [step(1, 'move', 'apple', dict(type='goal', index=0)),
+                    step(2, 'move', 'banana', dict(type='goal', index=1)), step(3, 'finish')]
+        return [step(4, 'move', 'apple', dict(type='goal', index=0)), step(5, 'finish')]
+    ctl, session, client = create(compose, goals)
+    session._verify_zone = lambda obj, name: next(o for o in session._scene['objects']
+        if o['label'] == obj.label).get('zone') == name
+    session._verify_destination = lambda *args: False
+    def displace(action, result):
+        if disturb and action.get('label') == 'banana' and action['skill'] == 'move':
+            next(o for o in session._scene['objects'] if o['label'] == 'apple')['zone'] = None
+    session.result_hook = displace
+    run(ctl)
+    assert ctl.snapshot()['status'] == 'complete'
+    assert len(client.contexts) == (2 if disturb else 1)
+    checks = [c for c in session.calls if c['skill'] == 'verify']
+    assert bool(checks) is disturb
+
+
+def test_scene_change_during_missing_goal_check_cannot_complete_from_partial_new_evidence(create):
+    goals=[dict(label='apple',zone_name='zone_red'),dict(label='banana',zone_name='zone_green')]
+    ctl,session,_client=create(lambda c,n:[],goals)
+    session._verify_zone=lambda *args:True
+    session._verify_destination=lambda *args:True
+    engine=SkillOrchestrator(ctl)
+    prior=engine._proof(dict(ok=True,camera_verified=True,truth=dict(success=True),verified_revision=0,
+        items=[dict(goal=goals[0],ok=True,camera_verified=True,truth=dict(success=True))]),goals[:1])
+    def changed(step,missing,**kwargs):
+        assert missing==goals[1:]
+        session._environment_revision+=1
+        return dict(ok=True,camera_verified=True,truth=dict(success=True),verified_revision=1,
+            items=[dict(goal=goals[1],ok=True,camera_verified=True,truth=dict(success=True))])
+    result=engine._verify_selected(SimpleNamespace(execute=changed),goals,prior)
+    assert not result['ok'] and result['error']=='scene_changed'

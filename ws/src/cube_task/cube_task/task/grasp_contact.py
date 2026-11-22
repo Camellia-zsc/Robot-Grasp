@@ -9,8 +9,8 @@ import numpy as np
 from .reach import accepts_kwarg, reach_adjust
 
 
-def supported_grasp(planner, arm, detection, baseline):
-    """Reduce the two fingers' height difference on a supported upper object.
+def supported_grasp(planner, arm, detection, baseline, *, free_tilt=None):
+    """Reduce the two fingers' height difference on a measured profile grip.
 
     Reach correction may tilt a formerly vertical profile grasp. Closing along
     that lean puts one pad lower on a tapered body and can eject it on lifting.
@@ -21,23 +21,38 @@ def supported_grasp(planner, arm, detection, baseline):
     section keeps the original behavior.
     """
     extra = detection.extra or {}
-    if (not detection.valid or not baseline.feasible or extra.get('support_observed') is not True
-            or not extra.get('support_label') or extra.get('support_z') is None
+    from ..perception.grasp import measured_tapered_contact
+    supported = (extra.get('support_observed') is True and extra.get('support_label')
+                 and extra.get('support_z') is not None)
+    tapered = measured_tapered_contact(detection)
+    if (not detection.valid or not baseline.feasible or not (supported or tapered)
             or (extra.get('grasp') or {}).get('mode') != 'profile'
             or not accepts_kwarg(planner.plan, 'closing_angle')):
         return baseline
     try:
-        if not math.isfinite(float(extra['support_z'])):
+        from ..perception.grasp import detection_table_z
+        floor = extra['support_z'] if supported else detection_table_z(detection)
+        if floor is None or not math.isfinite(float(floor)):
             return baseline
         width = float(baseline.expected_width)
     except (TypeError, ValueError):
         return baseline
-    original, tilt, _reason = reach_adjust(arm, baseline.T_grasp)
-    if original is None or tilt < .5:
-        return baseline
     if not math.isfinite(width) or width <= 0.:
         return baseline
-    first_gap = abs(float(original[2, 1])) * width
+    def gap(plan):
+        pose, _tilt, _reason = reach_adjust(arm, plan.T_grasp)
+        if pose is None:
+            return None
+        values = [abs(float(pose[2, 1])) * float(plan.expected_width)]
+        # A vertical table grasp can require a leaned lift. Check it before
+        # closing: the first held feedback arrives after this potential slip.
+        lifted, _tilt, _reason = reach_adjust(arm, plan.T_lift, max_tilt_deg=free_tilt)
+        if lifted is not None:
+            values.append(abs(float(lifted[2, 1])) * float(plan.expected_width))
+        return max(values)
+    first_gap = gap(baseline)
+    if first_gap is None:
+        return baseline
     if first_gap < .002:
         return baseline
     best, best_gap = baseline, first_gap
@@ -69,12 +84,11 @@ def supported_grasp(planner, arm, detection, baseline):
                 # An explicit alternate axis must retain this check even when
                 # the ordinary planner's adaptive-neighbor option is disabled.
                 continue
-        pose, _candidate_tilt, _reason = reach_adjust(arm, candidate.T_grasp)
-        if pose is None:
+        candidate_gap = gap(candidate)
+        if candidate_gap is None:
             continue
-        gap = abs(float(pose[2, 1])) * float(candidate.expected_width)
-        if gap + .002 < best_gap:
-            best, best_gap = candidate, gap
+        if candidate_gap + .002 < best_gap:
+            best, best_gap = candidate, candidate_gap
     if best is baseline:
         return baseline
     info = copy.deepcopy(best.target.extra['grasp'])

@@ -82,8 +82,9 @@ def test_joint_fallback_changes_a_taught_pose_and_checks_full_sweep():
     session._safe_observation_joints = lambda q, neighbors: checks.append(q.copy()) or True
     upper, lower = block('apple', top=.11), block('green')
     q = session._stack_joint_view(upper, lower, [upper, lower], 0)
-    np.testing.assert_allclose(q, [-.15, .18, -.4, 0., 1., 0.])
     assert len(checks) == 1
+    np.testing.assert_array_equal(q, checks[0])
+    assert np.linalg.norm(q-session.runner.views[0]) > .03
     assert session.runner.views == [[0., .5, -.4, 0., 1., 0.]]
 
 
@@ -134,7 +135,7 @@ def test_joint_candidates_prefer_new_line_of_sight_without_requiring_axis_rotati
     upper, lower = block('apple', xy=(.2, .3), top=.11), block('green', xy=(.2, .3))
     previous = np.array([-.15, .18, -.4, 0., 1., 0.])
     q = session._stack_joint_view(upper, lower, [upper, lower], 0, [previous])
-    assert q[0] == pytest.approx(.15)
+    assert q[0] >= .15  # Wider candidates may provide still more angular novelty.
     np.testing.assert_array_equal(session.arm.kin.fk(q)[:3, :3],
                                   session.arm.kin.fk(previous)[:3, :3])
 

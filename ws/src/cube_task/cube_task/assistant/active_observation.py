@@ -125,7 +125,7 @@ def inspect_held(session, xy, polygon, stationary, check_current):
                 session.arm, grasp, current, pose, neighbors, width, table_z=table,
                 nominal=session.runner.nominal.get(target.label), neighbor_nominal=session.runner.nominal,
                 free_tilt_deg=session.runner.free_tilt, cancelled=budget.cancelled,
-                opening_uncertainty=_INSPECTION_OPENING_UNCERTAINTY)
+                opening_uncertainty=_INSPECTION_OPENING_UNCERTAINTY, allow_joint_route=True)
             if not route:
                 continue
             for waypoint in route:
@@ -149,7 +149,8 @@ def inspect_held(session, xy, polygon, stationary, check_current):
                         message='夹持仍有效，但已超出本次路径的检查范围，需重新规划观察路径')
                 move_inspection = getattr(session, '_move_inspection_waypoint', None)
                 if move_inspection is not None:
-                    if not move_inspection(result, waypoint):
+                    if not move_inspection(result, waypoint, **(
+                            {'joint_route': route} if hasattr(route, 'end_joints') else {})):
                         break
                 else:
                     session.runner.skill._move(result, 'inspect_place', waypoint, True)

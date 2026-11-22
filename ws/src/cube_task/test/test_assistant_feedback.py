@@ -7,6 +7,7 @@ import pytest
 import numpy as np
 
 from cube_task.assistant.simulation import SimulationSession
+from cube_task.assistant.catalog import make_catalog_object
 from cube_task.core.types import Detection, PickResult, Zone
 
 
@@ -14,6 +15,8 @@ from cube_task.core.types import Detection, PickResult, Zone
 def session():
     session = SimulationSession.__new__(SimulationSession)
     session.cancel_event = threading.Event()
+    session._physics = None
+    session._last_fresh = []
     session._scene = {'scene_version': 2, 'objects': []}
     session._feedback = {'grasp_plan': {}, 'checks': []}
     zone = Zone('zone_red', np.array([.17, -.35, 0]), (.2, .2), label='red')
@@ -36,7 +39,7 @@ def test_placement_feedback_passes_when_correctly_placed_but_retreat_failed(sess
     summary = session._finish_attempt(
         motion_result, '', 'v1-object-1', 'zone_red',
         Detection('apple', 1., center_base=np.array([.17, -.35, .06]), height=.06),
-        SimpleNamespace(name='catalog-apple-1'))
+        make_catalog_object('apple', 'catalog-apple-1', [.17, -.35]))
 
     assert summary['truth']['success'] is True
     assert summary['controller_ok'] is False
@@ -52,7 +55,7 @@ def test_placement_feedback_fails_when_motion_finished_outside_target_zone(sessi
     summary = session._finish_attempt(
         motion_result, '', 'v1-object-1', 'zone_red',
         Detection('apple', 1., center_base=np.array([.17, -.35, .06]), height=.06),
-        SimpleNamespace(name='catalog-apple-1'))
+        make_catalog_object('apple', 'catalog-apple-1', [.4, .1]))
 
     assert summary['truth']['success'] is False
     assert summary['truth']['actual_zone'] is None

@@ -418,6 +418,12 @@ def annotate_grasp_neighbors(det: Detection, neighbors: Sequence[Detection]) -> 
         det.extra.pop('_neighbor_xy', None)
 
 
+def measured_tapered_contact(target):
+    """A known solid box does not become tapered from depth-profile noise."""
+    profile = target.extra.get('grasp') or {}
+    return bool(profile.get('neck') and target.extra.get('catalog_shape') not in ('box','cube'))
+
+
 class GraspPlanner:
     """
     Plan a vertical top-down grasp for one detection.
@@ -1415,7 +1421,8 @@ class PlacePlanner:
             if strict:
                 candidate = self._strict_release(zone, held, occupied, avoid, lower,
                                                  fixed_xy, candidate_filter, pose_filter, avoid_poses,
-                                                 cancelled, preferred_xy=preferred_xy)
+                                                 cancelled, preferred_xy=preferred_xy,
+                                                 center_first=center_first)
                 if candidate is None:
                     return PlacePlan(zone.name, eye, eye.copy(), eye.copy(), self.open_width,
                                      False, 'planning_cancelled' if cancelled and cancelled()
@@ -1454,7 +1461,7 @@ class PlacePlanner:
 
     def _strict_release(self, zone, held, occupied, avoid, lower, fixed_xy,
                         candidate_filter, pose_filter, avoid_poses, cancelled=None,
-                        preferred_xy=()):
+                        preferred_xy=(), center_first=True):
         """Search only fully clear candidates; an exact point never drifts."""
         L, W = sorted((float(held['length']), float(held['width'])), reverse=True)
         grip = float(held.get('grip_width', W) or W)
@@ -1472,6 +1479,11 @@ class PlacePlanner:
                 point = np.asarray(value, float)
                 if point.shape == (2,) and np.all(np.isfinite(point)):
                     candidates.append(tuple(float(v) for v in point))
+            # Honor the caller's shared-zone policy in strict mode too. A
+            # first fruit at the centre can consume every safely usable slot
+            # for its larger zone mate even while most of the card looks free.
+            if self.spread and not center_first:
+                candidates.extend(self._slots(zone, L))
         candidates.append(center)
         if not fixed_xy:
             c, s = math.cos(zone.yaw), math.sin(zone.yaw)
@@ -1586,7 +1598,15 @@ class PlacePlanner:
                         complete.append((None if axis is None else axis + turn, full))
                 source_closing = held.get('grasp_closing')
                 if source_closing is not None and _finite(source_closing):
-                    complete.sort(key=lambda value: abs(wrap_pi(value[1] - float(source_closing))))
+                    def contact_order(value):
+                        turn = abs(wrap_pi(value[1]-float(source_closing)))
+                        # Outward wrist lean leaves a tangential closing axis
+                        # horizontal. Preserving the source yaw can instead
+                        # put tapered contacts at unequal heights at landing.
+                        gap = (round(abs(math.cos(value[1]-math.atan2(y,x))),6)
+                               if held.get('balanced_contact') else 0.)
+                        return gap,turn
+                    complete.sort(key=contact_order)
                 angles = complete
             for axis, closing in angles:
                 if cancelled is not None and cancelled():

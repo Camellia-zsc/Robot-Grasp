@@ -51,15 +51,10 @@ def spherical_model(target):
 
 def seating_requires_feedback(grasp, result, width):
     """A large measured seating change cannot establish an unchanged grip."""
-    extra = grasp.target.extra
-    try:
-        supported_source = (extra.get('support_observed') is True
-                            and bool(extra.get('support_label'))
-                            and math.isfinite(float(extra.get('support_z'))))
-    except (TypeError, ValueError):
-        supported_source = False
-    if (not (extra.get('_stack_support') or supported_source)
-            or spherical_model(grasp.target) is None):
+    # Seating can shift a curved body in a table grasp as well as a stack
+    # grasp. Bind every measurable spherical source to its actual grip before
+    # carrying it with the old rigid transform.
+    if spherical_model(grasp.target) is None:
         return False
     closes = [step.get('width') for step in result.detail.get('steps', [])
               if step.get('stage') == 'close' and step.get('ok')]
@@ -83,7 +78,24 @@ def source_anchor(grasp):
     points = grasp.target.extra.get('_placement_points_base')
     if points is None:
         return dict(ok=False, error='fused_source_cloud_unavailable')
-    return fit_spherical_anchor(points, prior['radius'], prior['prior_center'])
+    fitted = fit_spherical_anchor(points, prior['radius'], prior['prior_center'])
+    if fitted.get('ok'):
+        return fitted
+    # The spherical section is only part of a compound fruit. At a raised
+    # support the visible neck can outnumber the bulb. Select a fixed band
+    # around the class prior's equator, without selecting by fitted residuals
+    # or relaxing any fit/coverage/ambiguity gate.
+    try:
+        data = np.asarray(points, float)
+        radius, center = prior['radius'], prior['prior_center']
+        band = data[(np.abs(data[:, 2]-center[2]) <= .55*radius)
+                    & (np.linalg.norm(data[:, :2]-center[:2], axis=1) <= radius+.012)]
+        selected = fit_spherical_anchor(band, radius, center)
+        if selected.get('ok'):
+            return dict(selected, source_section='equatorial_body_band')
+    except (ValueError, TypeError, IndexError):
+        pass
+    return fitted
 
 
 def held_anchor(detections, grasp, source, tcp):

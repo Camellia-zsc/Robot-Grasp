@@ -295,6 +295,67 @@ def test_observation_route_keeps_tool_clear_of_table_in_empty_space():
     assert not session._safe_observation_joints([.3, 0, 0, 0, 0, 0], [block('red', xy=(.5, .5))])
 
 
+def test_observation_route_does_not_fill_the_empty_space_between_open_fingers():
+    session,_ = route_session(lambda x:.14)
+    obstacle = block('green',top=.16,height=.16)
+    obstacle.length = obstacle.width = .015
+    assert session._safe_observation_joints([.3,0,0,0,0,0],[obstacle])
+    obstacle.center_base[1] += .035  # The same object now enters a real finger.
+    assert not session._safe_observation_joints([.3,0,0,0,0,0],[obstacle])
+
+
+def test_observation_route_preserves_round_body_without_rotated_box_corner_obstacles():
+    session,_ = route_session(lambda x:.14)
+    obstacle = block('pear',xy=(.2,.39),top=.16,height=.16)
+    obstacle.length=obstacle.width=.085
+    obstacle.yaw=np.pi/4
+    obstacle.extra['resting_pose']='upright'
+    assert session._safe_observation_joints([.3,0,0,0,0,0],[obstacle])
+    obstacle.center_base[1]-=.02
+    assert not session._safe_observation_joints([.3,0,0,0,0,0],[obstacle])
+
+
+@pytest.mark.parametrize('case',['clear','blocked_second_leg','changed'])
+def test_empty_camera_lifts_via_gateway_only_when_both_joint_sweeps_are_checked(case):
+    session,_ = route_session(lambda x:.14)
+    session._environment_revision = 1
+    session._emit = lambda *a: None
+    session.arm.get_tcp_pose = lambda:SimpleNamespace(value=np.diag([1.,-1.,-1.,1.]))
+    gateway = np.array([.5,0.,0.,0.,0.,0.])
+    session.arm._ik_tcp = lambda *a:(gateway,0.,0.)
+    checked,moved = [],[]
+    def safe(q,ds,*,start_joints=None):
+        checked.append((np.asarray(q).copy(),start_joints))
+        return bool(q[0]==.5 or (start_joints is not None and case!='blocked_second_leg'))
+    def move_joints(q):
+        moved.append(q.copy())
+        if case=='changed':session._environment_revision+=1
+        return SimpleNamespace(ok=True)
+    session._safe_observation_joints = safe
+    session.arm.move_joints = move_joints
+    result = session._prepare_observation_motion(np.array([1.,0.,0.,0.,0.,0.]),[])
+    assert result is (case=='clear')
+    assert len(moved)==(0 if case=='blocked_second_leg' else 1)
+    assert any(start is not None for q,start in checked)
+
+
+def test_empty_camera_can_use_a_checked_taught_gateway_when_fixed_attitude_ik_fails():
+    from cube_task.core.transforms import top_down_T
+    session, _ = route_session(lambda x: .3)
+    session._environment_revision = 1
+    session._emit = lambda *a: None
+    session.arm.get_tcp_pose = lambda: SimpleNamespace(value=top_down_T(.2, 0., .1, 0.))
+    gateway = np.array([.5, 0., 0., 0., 0., 0.])
+    session.runner.views = [gateway]
+    session.arm._ik_tcp = lambda *a: (None, 1., 1.)
+    session._safe_observation_joints = lambda q, ds, start_joints=None: bool(
+        np.allclose(q, gateway) or start_joints is not None)
+    moves = []
+    session.arm.move_joints = lambda q: moves.append(q) or SimpleNamespace(ok=True)
+    assert session._prepare_observation_motion(np.ones(6), [])
+    np.testing.assert_array_equal(moves, [gateway])
+
+
 def test_observation_route_never_shrinks_known_object_to_a_short_camera_measurement():
     session, _ = route_session(lambda x: .10)
     obstacle = block('pear', xy=(.2, .375), top=.16)
@@ -302,6 +363,60 @@ def test_observation_route_never_shrinks_known_object_to_a_short_camera_measurem
     assert session._safe_observation_joints([.3, 0, 0, 0, 0, 0], [obstacle])
     session.runner.nominal = {'pear': (.085, .055)}
     assert not session._safe_observation_joints([.3, 0, 0, 0, 0, 0], [obstacle])
+
+
+def test_physical_final_audit_skips_a_taught_view_whose_joint_sweep_hits_the_stack():
+    pear,green = block('pear',top=.16,height=.11),block('green')
+    session,seen = scan_session([[pear,green],[pear,green],[]])
+    session._physics = object()
+    session.runner.views = [[float(i)]*6 for i in range(3)]
+    checked = []
+    session._safe_observation_joints = lambda q, ds: checked.append(q[0]) or q[0] != 0.
+    session.observe(target=dict(xy=[.2,.3],verify_goals=[STACK_GOAL]),purpose='verify_place')
+    assert checked == [0.,1.] and seen == [1]
+
+
+def test_just_released_geometry_blocks_camera_sweep_before_a_fresh_image_exists():
+    session,_ = route_session(lambda x:.12)
+    session.runner.nominal = {}
+    source = block('red',xy=(.5,.5))
+    destination = np.eye(4)
+    destination[:3,3] = [-.3,-.2,.11]
+    assert session._safe_observation_joints([.3,0,0,0,0,0],[source])
+    session._remember_released_obstacle(source,PickResult(True,detail={'released_transform':destination}))
+    assert not session._safe_observation_joints([.3,0,0,0,0,0],[source])
+    assert not session._released_observation_obstacle.valid
+    assert '_released_observation_obstacle' not in session.__dict__.get('_scene',{})
+
+
+def test_cropped_region_verification_can_use_checked_joint_views_without_inventing_a_support():
+    session,_ = scan_session([])
+    session.arm.kin = object()
+    session.runner.nominal = {'pear':(.085,.085)}
+    session._source_observation_views = lambda hint: []
+    session._stack_verification_view = lambda *a: None
+    captured = []
+    session._stack_joint_view = lambda *args: captured.append(args) or np.ones(6)
+    session._remember_stack_view = lambda q,stacked: 6 if not stacked else 7
+    cropped = block('pear',xy=(.17,.3),top=.11,height=.11)
+    cropped.valid = False
+    view = session._verification_view([dict(label='pear',zone_name='zone_green')],[cropped],1)
+    assert view==6 and captured[0][0].width==.085
+    assert captured[0][1].label=='_table_aim' and not captured[0][1].valid
+    assert session._scene['objects']==[]
+
+
+def test_verification_keeps_earlier_release_aim_when_later_objects_were_moved():
+    session, _ = scan_session([])
+    session._stack_verification_view = lambda *a: None
+    green = block('green', xy=(.33, -.12))
+    green.valid = False
+    session._released_observation_hints = {'green': green}
+    session._released_observation_obstacle = block('apple', xy=(.27, .04))
+    session._source_observation_views = lambda hint: [1] if hint['label'] == 'green' else []
+    session.runner.views = [np.zeros(6), np.ones(6)]
+    assert session._verification_view([dict(label='green', destination={'type':'region','name':'pick_area'})], [], 1) == 1
+    assert not session._scene['objects']
 
 
 @pytest.mark.parametrize('changed', [False, True])

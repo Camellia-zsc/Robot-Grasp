@@ -122,9 +122,14 @@ def test_http_resume_rejects_new_goal_even_with_a_recoverable_held_object(pendin
     session.runner = SimpleNamespace(has_held_recovery=True)
     session.cancel_event = threading.Event()
     session._recovery_goal = {'label': 'apple', 'zone_name': 'zone_red'}
+    snapshot = session.snapshot
+    session.snapshot = lambda: dict(snapshot(), held_object='held-apple')
     status, result = post('/api/recovery-approval', dict(answer, approved=False))
     assert status == 202 and result['ok']
     assert ctl.wait_idle(3)
+    # This boundary concerns changing a healthy held task, not overriding the
+    # controller-fault stop supplied by RecoveringBatch's default failure.
+    ctl._last_result['fault'] = False
     assert ctl.snapshot()['can_resume_recovery']
 
     status, result = post('/api/resume-recovery', {'instruction': '改抓梨放到绿区'})

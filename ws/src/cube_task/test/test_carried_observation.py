@@ -160,3 +160,59 @@ def test_frame_bound_raw_detections_survive_environment_filtering():
     assert result == environment
     assert result.anchor_detections is raw
     assert copy.deepcopy(result).anchor_detections == raw
+
+
+def test_measured_spherical_core_masks_newly_exposed_back_without_filling_box_corners(capture):
+    frame, camera, grasp, tcp = capture
+    target = grasp.target
+    target.label, target.top_z, target.height = 'pear', .5625, .1125
+    target.length = target.width = .085
+    target.extra['resting_pose'] = 'upright'
+    rng = np.random.default_rng(31)
+    normals = rng.normal(size=(3000, 3))
+    normals /= np.linalg.norm(normals, axis=1)[:, None]
+    normals = normals[normals[:, 2] > .15]
+    target.extra['_placement_points_base'] = np.array([0., 0., .4925])+normals*.0425
+    # Only the upper hemisphere was seen at the source. The lower pole is now
+    # exposed; an external surface in the fruit's empty box corner is preserved.
+    frame.depth[40, 40] = .95
+    frame.depth[48, 48] = .975
+    result = mask_carried_depth(frame, camera, grasp, tcp, .08)
+    assert result.depth[40, 40] == 0.
+    assert result.depth[48, 48] == frame.depth[48, 48]
+
+
+def test_fitted_self_core_is_not_clipped_by_biased_silhouette_box(capture):
+    frame, camera, grasp, tcp = capture
+    target=grasp.target
+    target.label,target.top_z,target.height='pear',.5625,.1125
+    target.length=target.width=.085
+    target.extra['resting_pose']='upright'
+    rng=np.random.default_rng(35)
+    directions=rng.normal(size=(2000,3));directions/=np.linalg.norm(directions,axis=1)[:,None]
+    # The silhouette median is at x=0, while the sphere fit resolves x=10mm.
+    target.extra['_placement_points_base']=np.array([.01,0.,.4925])+directions*.0425
+    # x=49mm is outside the old box+4mm but is the measured body's right side.
+    frame.depth[40,50]=.98
+    assert abs((.98/200*10)-target.center_base[0]) > .085/2+.004
+    result=mask_carried_depth(frame,camera,grasp,tcp,.08)
+    assert result.depth[40,50] == 0.
+
+
+def test_validated_body_prior_masks_unseen_neck_but_preserves_empty_compound_corner(capture):
+    frame,camera,grasp,tcp=capture
+    target=grasp.target
+    target.label,target.top_z,target.height='pear',.5625,.1125
+    target.length=target.width=.085
+    target.extra['resting_pose']='upright'
+    rng=np.random.default_rng(39)
+    normals=rng.normal(size=(2000,3));normals/=np.linalg.norm(normals,axis=1)[:,None]
+    target.extra['_placement_points_base']=np.array([0.,0.,.4925])+normals*.0425
+    frame.depth[40,45]=1.04 # neck surface beyond the measured bulb
+    frame.depth[40,48]=1.04 # empty corner inside the whole fruit bounding box
+    result=mask_carried_depth(frame,camera,grasp,tcp,.08)
+    assert result.depth[40,45]==0.
+    assert result.depth[40,48]==frame.depth[40,48]
+    target.extra.pop('_placement_points_base')
+    unproven=mask_carried_depth(frame,camera,grasp,tcp,.08)
+    assert unproven.depth[40,45]==frame.depth[40,45]

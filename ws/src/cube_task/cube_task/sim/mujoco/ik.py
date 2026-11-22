@@ -230,7 +230,7 @@ class MujocoIK:
         return seeds
 
     def _solve(self, Tt_world: np.ndarray, q0: np.ndarray, max_iter: int, tol_pos: float,
-               tol_rot: float) -> Tuple[np.ndarray, float, float, bool]:
+               tol_rot: float, cancelled=None) -> Tuple[np.ndarray, float, float, bool]:
         lo, hi = self._lim[:, 0], self._lim[:, 1]
         w = np.array([1.0, 1.0, 1.0, _ROT_WEIGHT, _ROT_WEIGHT, _ROT_WEIGHT])
         q = np.clip(q0, lo, hi)
@@ -241,6 +241,8 @@ class MujocoIK:
         stall = 0
         J = None
         for _ in range(max_iter):
+            if cancelled is not None and cancelled():
+                return q, ep, eo, False
             if ep < tol_pos and eo < tol_rot:
                 return q, ep, eo, True
             if J is None:
@@ -275,7 +277,7 @@ class MujocoIK:
               max_iter: int = 80, tol_pos: float = 1e-4, tol_rot: float = 1e-3,
               n_random: int = 4, seeds: Optional[Sequence[Sequence[float]]] = None,
               standard: bool = True, accept_pos: Optional[float] = None,
-              accept_rot: Optional[float] = None
+              accept_rot: Optional[float] = None, cancelled=None
               ) -> Tuple[Optional[np.ndarray], float, float]:
         """
         Solve joint angles for a tool pose in the base frame, inside the limits.
@@ -306,7 +308,9 @@ class MujocoIK:
                 cand.append(rng.uniform(self._lim[:, 0], self._lim[:, 1]))
         best = (math.inf, None, math.inf, math.inf)
         for s in cand:
-            q, ep, eo, ok = self._solve(Tt, s, max_iter, tol_pos, tol_rot)
+            if cancelled is not None and cancelled():
+                return None, best[2], best[3]
+            q, ep, eo, ok = self._solve(Tt, s, max_iter, tol_pos, tol_rot, cancelled=cancelled)
             if ok:
                 return q, ep, eo
             c = ep * ep + (_ROT_WEIGHT * eo) ** 2

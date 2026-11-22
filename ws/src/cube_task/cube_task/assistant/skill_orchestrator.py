@@ -140,6 +140,12 @@ class SkillOrchestrator:
         for goal, item in zip(contracts, items):
             destination = goal.get('destination') or {}
             if destination.get('type') != 'on_object':
+                check = (getattr(self.session, '_verify_destination', None) if destination else
+                         getattr(self.session, '_verify_zone', None))
+                if callable(check):
+                    objects = [o for o in self.session.world.objects if o.label == goal['label']]
+                    if len(objects) != 1 or not check(objects[0], destination or goal['zone_name']):
+                        return None
                 continue
             support = self._stack_support(goal)
             if support.get('success') is not True:
@@ -150,6 +156,58 @@ class SkillOrchestrator:
         if len(items) == 1 and 'support' in items[0]['truth']:
             result['truth']['support'] = copy.deepcopy(items[0]['truth']['support'])
         return result
+
+    def _retain_unmoved_proofs(self, proof, label):
+        """Only monitored physical sessions can keep unrelated camera proofs."""
+        if (getattr(self.session, '_physics', None) is None or not proof
+                or not callable(getattr(self.session, '_verify_zone', None))
+                or not callable(getattr(self.session, '_verify_destination', None))
+                or not self._reusable(proof.get('result'))):
+            return None
+        goals = [g for g in proof['goals'] if g['label'] != label
+                 and (g.get('destination') or {}).get('label') != label]
+        if not goals:
+            return None
+        items = [copy.deepcopy(proof['result']['items'][proof['goals'].index(g)]) for g in goals]
+        return dict(goals=goals, result=dict(copy.deepcopy(proof['result']), items=items))
+
+    def _combine_proofs(self, prior, added):
+        if not added:
+            return prior
+        if not prior or not self._reusable(prior.get('result')):
+            return added
+        goals = [g for g in prior['goals'] if g not in added['goals']] + added['goals']
+        items = [prior['result']['items'][prior['goals'].index(g)]
+                 for g in goals if g not in added['goals']] + added['result']['items']
+        return self._proof(dict(added['result'], items=items), goals)
+
+    def _verify_selected(self, executor, goals, cached):
+        """Refresh missing camera evidence; recheck every cached physical goal."""
+        monitored = (getattr(self.session, '_physics', None) is not None
+                     and callable(getattr(self.session, '_verify_zone', None))
+                     and callable(getattr(self.session, '_verify_destination', None)))
+        if not monitored:
+            reused = self._cached_verification(cached, goals)
+            return reused if reused is not None else executor.execute(
+                dict(id='final-check', skill='verify'), goals, cancel_event=self.ctl._cancel)
+        reused, missing = [], []
+        revision = self._revision()
+        for goal in goals:
+            result = self._cached_verification(cached, [goal])
+            (reused if result is not None else missing).append(result if result is not None else goal)
+        if not missing:
+            return self._cached_verification(cached, goals)
+        result = executor.execute(dict(id='final-check', skill='verify'), missing, cancel_event=self.ctl._cancel)
+        if not reused:
+            return result
+        if revision != self._revision() or not self._verification_current(result):
+            return dict(result, ok=False, error='scene_changed',
+                        message='补充核验期间现场变化，先前目标的证据已失效，不能以部分目标结束')
+        items = [item for proof in reused for item in proof['items']] + list(result.get('items', ()))
+        ok = len(items) == len(goals) and all(i.get('ok') is True for i in items)
+        return dict(result, items=items, ok=ok, camera_verified=all(
+            i.get('camera_verified') is True for i in items),
+            truth=dict(success=ok), reused_goals=len(reused))
 
     def _paired_place(self, steps, index, goals):
         """Only an explicit final-place postcondition can make a pick redundant."""
@@ -519,7 +577,7 @@ class SkillOrchestrator:
         result = (self._cached_verification(cached, goals)
                   if not memory['protected_goals'] and not memory['restorations'] else None)
         if result is None:
-            result = executor.execute(dict(id='final-check', skill='verify'), goals, cancel_event=self.ctl._cancel)
+            result = self._verify_selected(executor, goals, cached)
         if not self._verification_current(result):
             return dict(result, ok=False, error='scene_changed', message='最终核验期间现场变化，结果已过期')
         if contract is not None and result.get('ok') and self._proof(result, goals) is None:
@@ -531,12 +589,10 @@ class SkillOrchestrator:
                         if o.get('valid') and o.get('label') == label]
             # A square's observed principal axis is only defined modulo 90°.
             # Retain the full-pose requirement for asymmetric footprints.
-            from .catalog import catalog_entries
-            entry = next((e for e in catalog_entries() if e['label'] == label), {})
-            dims = entry.get('dimensions', [])
-            square = (entry.get('shape') in ('box', 'cube') and len(dims) >= 2
-                      and abs(dims[0]-dims[1]) < .001)
-            period = math.pi/2 if square else math.pi
+            from .catalog import restoration_yaw_period
+            period = restoration_yaw_period(label,original.get('resting_pose'))
+            if period is None:
+                continue
             if (len(measured) != 1 or measured[0].get('yaw') is None or original.get('yaw') is None
                     or abs(math.remainder(measured[0]['yaw']-original['yaw'], period)) > math.radians(10)):
                 result = dict(result, ok=False, error='restoration_yaw_unconfirmed', message='原位复位朝向未通过相机核验')
@@ -755,7 +811,10 @@ class SkillOrchestrator:
                 self._publish(goals=memory['goals'], steps=steps, current_index=None,
                               max_plans=plan_limit(memory['goals'], memory['initial_steps']))
                 ctl._event('skill_plan', dict(message=plan['message'], steps=steps, plan_number=number))
-                if self._risk(steps, memory['goals']):
+                # An explicit ask approves its complete following segment.
+                # Only risk BEFORE that gate needs a blanket approval now.
+                first_ask = next((i for i, s in enumerate(steps) if s['skill'] == 'ask'), len(steps))
+                if self._risk(steps[:first_ask], memory['goals']):
                     question = ('此方案会暂放目标或移动其他物品。列出原位复位步骤的物品会要求复位；'
                                 '其余调整可能保留改变。是否同意以下完整操作？')
                     if not self._approve(steps, question):
@@ -808,11 +867,12 @@ class SkillOrchestrator:
                         elif index in skipped_pairs and result is None:
                             result = dict(ok=False, error='completion_changed',
                                 message='已完成状态不再成立，未执行空爪放置，等待重新规划')
-                    # Every actual manipulation invalidates all earlier proofs,
-                    # even when no human edit (and hence no revision) occurred.
+                    # The moved body and stacks depending on it lose evidence.
+                    # Unexpected motion of any other body invalidates the scene
+                    # revision; reuse still rechecks physical contact/containment.
                     prior_verified = verified
                     if physical and not (result and result.get('skipped') is True):
-                        verified = None
+                        verified = self._retain_unmoved_proofs(verified, step.get('label'))
                     if step['skill'] == 'ask':
                         accepted = self._approve(steps[index:], step['question'])
                         result = dict(ok=accepted, changed=False,
@@ -822,7 +882,9 @@ class SkillOrchestrator:
                     elif step['skill'] == 'finish':
                         result = (copy.deepcopy(memory['_audit_result']) if self._audit_current(memory)
                                   else self._verify_all(executor, memory, verified))
-                        self._end_audit(executor, memory, result, result=result, expected_revision=revision)
+                        reviewed, _new = self._end_audit(executor, memory, result, result=result, expected_revision=revision)
+                        if reviewed is not None:
+                            result = reviewed
                         finished = bool(result.get('ok'))
                         finish_failed = not finished
                     elif step['skill'] == 'verify':
@@ -867,13 +929,14 @@ class SkillOrchestrator:
                         proof = self._action_proof(proof_step, result, memory['goals'])
                         if self._proof_updates_audit(memory, proof):
                             self._invalidate_audit(memory)
-                        if proof is not None and not memory['protected_goals'] and not memory['restorations']:
-                            verified = proof
+                        if proof is not None:
+                            verified = self._combine_proofs(verified, proof)
                     elif step['skill'] == 'verify':
                         if self._verification_updates_audit(memory, result, selected):
                             self._invalidate_audit(memory)
-                        if not memory['protected_goals'] and not memory['restorations']:
-                            verified = self._proof(result, selected)
+                        proof = self._proof(result, selected)
+                        if proof is not None:
+                            verified = self._combine_proofs(verified,proof)
                     if not result.get('ok'):
                         failure = result
                         if step['skill'] == 'ask' or result.get('aborted') or result.get('fault'):
@@ -894,7 +957,9 @@ class SkillOrchestrator:
                             and (not ready or full_proof is not None)):
                         result = (copy.deepcopy(memory['_audit_result']) if self._audit_current(memory)
                                   else self._verify_all(executor, memory, verified))
-                        self._end_audit(executor, memory, result, result=result, expected_revision=revision)
+                        reviewed, _new = self._end_audit(executor, memory, result, result=result, expected_revision=revision)
+                        if reviewed is not None:
+                            result = reviewed
                         if result.get('ok'):
                             return self._finish(True, '全部原始目标已通过核验', memory, result)
                         failure = result

@@ -184,13 +184,60 @@ def test_region_can_advance_after_a_blocked_first_candidate_without_restarting(m
     executor._resolve = lambda *a: (dict(type='named_region', name=zone.name), None)
     executor._options = lambda *a: dict(placement_zone=zone,
                                        placement_polygon=zone.corners_xy(), exact_xy=False)
-    centers = []
+    poses = []
     def final_check(_det, _gp, pp, *_args, **_kwargs):
-        centers.append(pp.T_release[:2, 3].copy())
-        return (False, 'first candidate blocked') if len(centers) == 1 else (True, '')
+        poses.append(pp.T_release.copy())
+        return (False, 'first candidate blocked') if len(poses) == 1 else (True, '')
     runner._adjust_strict_release = final_check
     result = executor._place(action, [], [], None)
-    assert result['ok'] and len(centers) == 2
-    assert not np.array_equal(centers[0], centers[1])
+    assert result['ok'] and len(poses) == 2
+    # A second wrist direction at the same centre is also a distinct candidate.
+    assert not np.array_equal(poses[0], poses[1])
     runner.execute_held_transfer.assert_called_once()
     assert not session.cancel_event.is_set()
+
+
+def test_physics_planning_budget_counts_worker_cpu_but_keeps_stop_and_wall_limit(monkeypatch):
+    from cube_task.assistant.simulation import _PlacementBudget, _PlacementInterrupted
+    cpu, wall = [0.], [0.]
+    monkeypatch.setattr('cube_task.assistant.simulation.time.monotonic',lambda:wall[0])
+    arm = SimpleNamespace(planning_time=lambda:cpu[0])
+    stop = threading.Event()
+    budget = _PlacementBudget(arm,stop,seconds=15.)
+    def waited():
+        wall[0] += 20.
+        cpu[0] += 1.
+        return 'planned'
+    assert budget.run(waited) == 'planned' and budget.remaining == 14.
+    def excessive():
+        cpu[0] += 15.
+    with pytest.raises(_PlacementInterrupted):budget.run(excessive)
+    budget = _PlacementBudget(arm,stop,seconds=15.)
+    def no_cpu_progress():wall[0] += 91.
+    with pytest.raises(_PlacementInterrupted):budget.run(no_cpu_progress)
+    budget = _PlacementBudget(arm,stop,seconds=15.)
+    stop.set()
+    with pytest.raises(_PlacementInterrupted):budget.run(lambda:None)
+
+
+@pytest.mark.parametrize('confirmed',[True,False])
+def test_held_place_calibrates_actual_grip_before_selecting_landing(monkeypatch,confirmed):
+    executor,session,action,now,events,calls=held_search(monkeypatch,candidate_seconds=1.,succeed=True)
+    context=session.runner._held_recovery_context
+    order=[]
+    session.runner._held_transfer_feedback=lambda target:(context,.05,'')
+    def calibrate(grasp,result,width,first):
+        order.append('measure')
+        if confirmed:grasp.T_grasp[2,3]+=.006
+        return confirmed,'source unconfirmed' if not confirmed else '',None
+    session._calibrate_carried_anchor=calibrate
+    original=session.runner.plan_held_transfer
+    def plan(*args,**kwargs):
+        order.append('plan')
+        assert context['grasp'].T_grasp[2,3]==pytest.approx(.006)
+        return original(*args,**kwargs)
+    session.runner.plan_held_transfer=plan
+    result=executor._place(action,[],[],None)
+    assert order==(['measure','plan'] if confirmed else ['measure'])
+    assert result['ok'] is confirmed
+    if not confirmed:session.runner.execute_held_transfer.assert_not_called()

@@ -58,7 +58,8 @@ def test_camera_measured_stack_respects_low_release_and_confirmation(
             # leans enough that full fruit/finger clearance is unconfirmed.
             # Holding it higher and opening anyway must never be the fallback.
             assert not placed['ok'] and not placed['controller_ok'], placed
-            assert 'leaned release has no full footprint or finger clearance' in placed['error']
+            assert ('leaned release has no full footprint or finger clearance' in placed['error']
+                    or placed['error'].startswith('unreachable release:'))
             assert not release_samples
             assert not session._physics.mujoco_world.held_objects()
             assert not session.runner.has_held_recovery

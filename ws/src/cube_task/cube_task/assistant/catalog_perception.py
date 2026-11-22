@@ -311,6 +311,7 @@ class SandboxPerception(Perception):
     def __init__(self, cfg, classifier=None, detector=None):
         seeded = _ColorSeededKnn(cfg, classifier) if classifier is not None else None
         super().__init__(cfg, classifier=seeded, detector=detector)
+        self._catalog_shapes = {entry['label']:entry['shape'] for entry in catalog_entries()}
 
     def _merged_blocks(self, frame, seg, dets, clf, res):
         # Only use the shared color-boundary splitter. The fixed library also
@@ -323,6 +324,7 @@ class SandboxPerception(Perception):
         changed = refine_supported_objects(frame, T_base_camera, zones, result, self, completeness)
         centered = False
         for det in result.detections:
+            det.extra['catalog_shape'] = self._catalog_shapes.get(det.label)
             det.extra['catalog_complete'] = bool(det.valid and completeness(det))
             if det.label == 'pear':
                 det.extra['resting_pose'] = pear_pose(det)

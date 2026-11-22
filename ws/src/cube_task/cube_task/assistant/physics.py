@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import threading
+import time
 from pathlib import Path
 
 import numpy as np
@@ -25,8 +26,8 @@ from ..sim.sim_camera import SimCamera
 class PhysicsKinematics:
     """Flange FK/IK in the actual MJCF; snapshot frames use those same bodies."""
 
-    def __init__(self, world):
-        self._solver = MujocoIK(world.model, body=world.meta['flange_body'])
+    def __init__(self, world, limits=None):
+        self._solver = MujocoIK(world.model, body=world.meta['flange_body'], limits=limits)
         self._mj = world._mj
         self._lock = threading.RLock()
         self._bodies = [self._mj.mj_name2id(world.model, self._mj.mjtObj.mjOBJ_BODY, name)
@@ -55,8 +56,7 @@ class PhysicsKinematics:
 
     def ik(self, target, **kwargs):
         with self._lock:
-            # SafeArm's SDK compatibility hint is irrelevant to this MJCF solve.
-            kwargs.pop('cancelled', None)
+            # Forward the computation deadline into the iterative solver too.
             return self._solver.solve(target, **kwargs)
 
 
@@ -157,7 +157,9 @@ class DashboardPhysics:
         # context or second dynamics engine is created by its preview thread.
         self.cfg.set('camera.backend', 'sim')
         inner = MujocoArm(self.cfg, self.clock, mw.sim)
-        kin = PhysicsKinematics(mw)
+        # The driver intersects the MJCF ranges with the controller's joint
+        # limits. Planning must use that same intersection before moving.
+        kin = PhysicsKinematics(mw, limits=inner.ik.limits)
         ft = flange_to_tcp_from_cfg(self.cfg)
         if previous_arm is None:
             self.arm = SafeArm(inner, SafetyGuard(self.cfg), kin=kin, T_flange_tcp=ft,
@@ -170,6 +172,9 @@ class DashboardPhysics:
             previous_arm._T_ft, previous_arm._T_tf = ft, inv_T(ft)
             self.arm = previous_arm
         self.arm.set_table_z(mw.table_z)
+        # Planning budgets charge this worker's computation, not time spent
+        # waiting behind the live viewer or another validation process.
+        self.arm.planning_time = time.thread_time
         if abort is not None:
             self.arm.set_abort_event(abort)
         if q is not None:

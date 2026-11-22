@@ -4,6 +4,7 @@ import copy
 import pytest
 
 from cube_task.assistant.simulation import SimulationSession
+from cube_task.assistant.skill_execution import SkillExecutor
 
 
 def edit(session, action, **fields):
@@ -73,7 +74,10 @@ def test_mixed_fruit_layout_is_detected_and_banana_can_be_sorted(tmp_path):
         scene = session.observe()
         visible = {o['label']: o for o in scene['objects'] if o['valid']}
         assert {'banana', 'pear', 'apple'} <= visible.keys(), scene['objects']
-        result = session.execute(dict(scene_version=scene['scene_version'], action='pick',
-                                      object_id=visible['banana']['object_id'],
-                                      zone_name='zone_yellow'))
+        # The web flow confirms the contact section from a local source view;
+        # a broad scene detection alone is not a grasp-contact measurement.
+        result = SkillExecutor(session, originals=scene['objects']).execute(
+            dict(id='banana', skill='move', label='banana',
+                 destination=dict(type='goal', index=0)),
+            [dict(label='banana', zone_name='zone_yellow')])
         assert result['ok'], result

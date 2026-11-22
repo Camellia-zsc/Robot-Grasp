@@ -107,8 +107,9 @@ def test_pick_moves_red_truth_and_expires_observation_ids(session):
     assert _red(session.scene)['in_zone']
     assert _red(session.scene)['zone'] == 'zone_red'
     assert result['scene'] == session.scene
-    assert [step['view'] for step in scan_progress] == list(range(6))
-    assert all(step['total'] == 6 and step['label'] and step['message']
+    # Source and destination are checked locally; unrelated views are unnecessary.
+    assert 0 < len(scan_progress) < 6
+    assert all(1 <= step['total'] <= 6 and step['label'] and step['message']
                for step in scan_progress)
     calls = session.arm.inner.n_calls
     assert session.execute(_decision(scene))['error'] == 'stale_scene'
@@ -127,7 +128,8 @@ def test_red_can_be_observed_and_picked_again_from_yellow_then_green(session):
         assert result['ok'], result
         assert result['truth']['actual_zone'] == zone_name
         assert result['truth']['success']
-        assert len([o for o in session.scene['objects'] if o['valid']]) == 3
+        assert len([o for o in session.scene['objects'] if o['valid'] and o['label'] == 'red']) == 1
+        assert len(session.world.objects) == 3
     assert _red(session.scene)['zone'] == 'zone_green'
     assert 'zone_yellow' not in session.runner._placed
 
@@ -213,7 +215,9 @@ def test_stop_is_nonblocking_and_preserves_held_cube_while_worker_runs(session):
     assert after['status'] == 'stopped'
     np.testing.assert_allclose(after['joints'], before['joints'], atol=0)
     assert after['objects'] == before['objects']
-    assert session.scene['objects'] == []
+    # The frozen observation remains visible but cannot authorize a new grasp.
+    assert session.scene['objects']
+    assert not session._reusable_target(_red(session.scene))
 
 
 def test_external_cancel_is_shared_with_safe_arm_and_cannot_issue_commands(session):

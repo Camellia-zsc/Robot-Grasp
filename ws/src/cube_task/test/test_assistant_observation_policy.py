@@ -124,3 +124,13 @@ def test_missing_geometry_cannot_claim_camera_coverage():
     target.width = None
     assert not measurement_visible(target, frame(), camera())
     assert not measurement_visible(SimpleNamespace(center_base=None), frame(), camera())
+
+
+@pytest.mark.parametrize('visible,complete,forgotten', [(False,False,False), (True,False,False),
+                                                       (False,True,False), (False,False,True)])
+def test_monitored_scene_crop_keeps_complete_source_only_when_it_cannot_disprove_it(visible,complete,forgotten):
+    old, fresh = det(), det(valid=complete)
+    kept = merge_local_detections([old], [fresh], lambda d: visible,
+                                 preserve_incomplete=True, forget=[old] if forgotten else [])
+    assert any(item is old for item in kept) is (not visible and not complete and not forgotten)
+    assert any(item is fresh for item in kept)

@@ -73,6 +73,38 @@ def _solid_box_source(target):
                for entry in catalog_entries())
 
 
+def _compound_core_supported(points, target, anchor, pad=.004):
+    """Solid class-prior parts anchored by the source's validated body fit.
+
+    Unseen neck backs need not be close to a formerly visible source surface.
+    Preserve empty corners/concavities by testing individual solids, never the
+    compound bounding box. An uncertain source resting frame has no such prior.
+    """
+    from .catalog import make_catalog_object
+    model = make_catalog_object(target.label, 'self-prior', [0., 0.])
+    if model.shape != 'compound' or target.extra.get('resting_pose') != 'upright':
+        return np.zeros(points.shape[:-1], bool)
+    spheres = [part for part in model.size if part['shape'] == 'sphere']
+    if not spheres:
+        return np.zeros(points.shape[:-1], bool)
+    body = max(spheres, key=lambda part: float(part['size'][0]))
+    c, s = math.cos(float(target.yaw)), math.sin(float(target.yaw))
+    rotation = np.array([[c, -s, 0.], [s, c, 0.], [0., 0., 1.]])
+    origin = np.asarray(anchor['center'])-rotation@np.asarray(body['pos'])
+    local = (points-origin)@rotation
+    supported = np.zeros(points.shape[:-1], bool)
+    for part in model.size:
+        relative = local-np.asarray(part['pos'])
+        size = np.asarray(part['size'])
+        if part['shape'] in ('sphere', 'ellipsoid'):
+            radii = np.repeat(size[0], 3) if part['shape'] == 'sphere' else size
+            supported |= np.sum((relative/(radii+pad))**2, axis=-1) <= 1.
+        elif part['shape'] == 'cylinder':
+            supported |= ((np.linalg.norm(relative[..., :2], axis=-1) <= size[0]+pad)
+                          & (np.abs(relative[..., 2]) <= size[1]/2+pad))
+    return supported
+
+
 def mask_carried_depth(frame, T_base_camera, grasp, T_base_tcp, opening, nominal=None):
     """Mask only actual depth samples inside the proven held/finger volumes.
 
@@ -122,8 +154,19 @@ def mask_carried_depth(frame, T_base_camera, grasp, T_base_tcp, opening, nominal
                   & (original[..., 2] <= float(floor) + size[2] + pad))
         if not _solid_box_source(target):
             positions = np.flatnonzero(masked)
-            supported = _source_surface_supported(original.reshape(-1, 3)[positions], target)
+            samples = original.reshape(-1, 3)[positions]
+            supported = _source_surface_supported(samples, target)
+            # Rotating a curved item exposes its previously unseen back. A
+            # source-cloud-validated spherical core explains that volume too;
+            # filling the entire fruit box would erase genuine outside objects.
+            from .held_anchor import source_anchor
+            anchor = source_anchor(grasp)
             masked.flat[positions[~supported]] = False
+            if anchor.get('ok'):
+                # A silhouette median can be several mm off the fitted centre.
+                # The proven core must not be clipped to that old biased box.
+                masked |= np.linalg.norm(original-np.asarray(anchor['center']), axis=-1) <= anchor['radius']+.002
+                masked |= _compound_core_supported(original, target, anchor)
         for sign in (-1., 1.):
             finger = np.array([0., sign * (opening / 2 + .006), -.025])
             masked |= np.all(np.abs(local - finger) <= np.array([.010, .006, .025]) + pad,

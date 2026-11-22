@@ -35,6 +35,40 @@ def test_ambiguous_partial_instances_do_not_invent_a_source_identity():
     assert SkillExecutor(session)._reference('pear', allow_partial=True) == dict(label='pear')
 
 
+def test_unexplained_misclassified_crop_can_aim_missing_target_search_only():
+    crop = dict(HINT, label='apple')
+    apple = dict(label='apple', valid=True, center_base=[.16, -.35, .06])
+    session = SimpleNamespace(scene={'objects': [crop, apple]},
+                              editor=SimpleNamespace(metadata=lambda: {'one_per_class': True}))
+    executor = SkillExecutor(session)
+    assert executor._reference('red') == {'label': 'red'}
+    hint = executor._reference('red', allow_partial=True)
+    assert hint['valid'] is False and hint['_observation_hint_only']
+    assert hint['center_base'] == crop['center_base']
+    assert session.scene['objects'][0]['label'] == 'apple'
+    session.scene['objects'].append(dict(crop, center_base=[.45, .2, .1]))
+    assert executor._reference('red', allow_partial=True) == {'label': 'red'}
+
+
+def test_moved_upper_retains_camera_aiming_hint_for_previously_hidden_support():
+    upper = dict(label='pear', valid=True, center_base=[.3, -.1, .17],
+                 support_observed=True, support_label='yellow', support_z=.05,
+                 support_polygon=[[.28, -.12], [.31, -.12], [.31, -.09], [.28, -.09]])
+    executor = SkillExecutor(SimpleNamespace(scene={'objects': []}), originals=[upper])
+    hint = executor._reference('yellow', allow_partial=True)
+    assert hint['valid'] is False and hint['_observation_hint_only'] is True
+    np.testing.assert_allclose(hint['center_base'], [.295, -.105, .05])
+    assert executor._reference('yellow') == {'label': 'yellow'}
+
+
+def test_conflicting_support_patches_do_not_invent_a_base_location():
+    upper = dict(label='pear', support_observed=True, support_label='yellow', support_z=.05,
+                 support_polygon=[[.28, -.12], [.31, -.12], [.31, -.09]])
+    other = dict(upper, support_polygon=[[.48, .12], [.51, .12], [.51, .15]])
+    executor = SkillExecutor(SimpleNamespace(scene={'objects': [other]}), originals=[upper])
+    assert executor._reference('yellow', allow_partial=True) == {'label': 'yellow'}
+
+
 def test_source_label_with_location_precedes_its_different_placement_destination():
     executor = fake_executor()
     session = executor.session
@@ -204,3 +238,49 @@ def test_cancelled_source_search_never_creates_executable_views():
     session.cancel_event.set()
     assert session._source_observation_views(HINT) == []
     assert not calls
+
+
+@pytest.mark.parametrize('available', [True, False])
+def test_curved_source_observation_waits_for_body_anchor_before_authorizing_grasp(monkeypatch, available):
+    pear = block('pear', top=.1125, height=.1125)
+    pear.extra['resting_pose'] = 'upright'
+    session, seen = scan_session([[pear], [pear], [pear]])
+    session._placement_cloud = lambda *args: np.ones((100,3))
+    monkeypatch.setattr('cube_task.assistant.obstacle_recovery._grasp',
+        lambda s,d,n:(copy.deepcopy(d),SimpleNamespace(feasible=True,target=copy.deepcopy(d))))
+    fits = []
+    def anchor(grasp):
+        fits.append(True)
+        return dict(ok=available and len(seen)>=3,error='sphere_surface_coverage_unconfirmed')
+    monkeypatch.setattr('cube_task.assistant.held_anchor.source_anchor',anchor)
+    scene = session.observe(target=dict(label='pear',xy=[.2,.3],require_grasp=True),purpose='recover_queued_target')
+    assert seen == [0,1,2] and fits
+    measured = next(o for o in scene['objects'] if o['label']=='pear')
+    assert measured['valid'] is available
+    if not available:assert 'source_anchor_unconfirmed' in measured['reject_reason']
+
+
+def test_auto_free_move_keeps_semantic_choice_until_after_actual_pick(monkeypatch):
+    executor=fake_executor()
+    executor._held=lambda:None
+    executor.session.snapshot=lambda:{}
+    source=block('pear'); obj=dict(object_id='pear-source')
+    original=dict(type='auto_free',away_from=['yellow'])
+    executor._resolve=lambda *a:(copy.deepcopy(original),None)
+    executor._completed_move=lambda *a,**k:None
+    executor._fresh_target=lambda *a,**k:(source,obj)
+    executor._candidates=lambda *a:[dict(type='point',xy=[.2,.1])]
+    executor._check_plan=lambda:None
+    executor._stopped=lambda *a:False
+    executor.session._observed_detections=[]
+    monkeypatch.setattr('cube_task.assistant.obstacle_recovery._checked_placement',lambda *a:object())
+    calls=[]
+    executor._pick=lambda *a:(calls.append('pick') or dict(ok=True,holding=True))
+    def place(step,*args):
+        calls.append('place')
+        assert step['destination']==original
+        return dict(ok=True,holding=False,resolved_destination=dict(type='point',xy=[.3,.1]))
+    executor._place=place
+    result=executor._move(dict(id='m',skill='move',label='pear',destination=original),[],[],None)
+    assert result['ok'] and calls==['pick','place']
+    assert result['resolved_destination']['xy']==[.3,.1]

@@ -365,7 +365,7 @@ class PickPlaceSkill:
             return False
         return bool(h is not None and h.ok)
 
-    def _move(self, r: PickResult, stage: str, T: np.ndarray, linear: bool) -> MotionResult:
+    def _move(self, r: PickResult, stage: str, T: np.ndarray, linear: bool, *, joints=None) -> MotionResult:
         self._check_abort(stage)
         if self.on_stage is not None:
             try:
@@ -373,7 +373,9 @@ class PickPlaceSkill:
             except Exception:  # noqa: B902 - an observer never changes the motion
                 _LOG.exception('on_stage hook failed')
         t = self.clock.now()
-        if self.free_tilt is not None and stage in FREE_STAGES:
+        if joints is not None:
+            m = self.arm.move_joints(joints)
+        elif self.free_tilt is not None and stage in FREE_STAGES:
             m = self.arm.move_tcp(T, linear=linear, max_tilt_deg=self.free_tilt)
         else:
             m = self.arm.move_tcp(T, linear=linear)
@@ -588,6 +590,19 @@ class PickPlaceSkill:
         held_width()
         self._guard('held_transit')
         why = r.detail.get('held_transit_planning_reason', 'no safe held transit route')
+        joint_start = getattr(route, 'start_joints', None)
+        joint_end = getattr(route, 'end_joints', None)
+        if joint_start is not None or joint_end is not None:
+            sample = self.arm.get_joints()
+            try:
+                joint_start, joint_end = np.asarray(joint_start, float), np.asarray(joint_end, float)
+                if (len(route) != 1 or joint_start.shape != (6,) or joint_end.shape != (6,)
+                        or not np.all(np.isfinite(np.r_[joint_start, joint_end]))
+                        or sample is None or self.clock.now()-float(sample.stamp) > self.feedback_max_age
+                        or np.max(np.abs(np.asarray(sample.value)-joint_start)) > .002):
+                    raise ValueError
+            except (TypeError, ValueError):
+                raise _StepFailed('transit', 'placement_changed', 'checked joint route start changed')
         valid = isinstance(route, (list, tuple)) and bool(route)
         if valid:
             try:
@@ -615,7 +630,7 @@ class PickPlaceSkill:
             if abs(width - checked_width) > uncertainty:
                 raise _StepFailed('transit', 'placement_changed',
                                   'held opening is outside the checked transit sweep')
-            self._move(r, 'transit', waypoint, True)
+            self._move(r, 'transit', waypoint, joint_end is None, joints=joint_end)
             if abs(held_width() - checked_width) > uncertainty:
                 raise _StepFailed('transit', 'placement_changed',
                                   'held opening is outside the checked transit sweep')
@@ -652,7 +667,11 @@ class PickPlaceSkill:
 
         if not at_hover():
             self._guard('held_transit')
-            self._move(r, 'transit', updated.T_pre, False)
+            route = updated.__dict__.pop('inspection_entry_route', None)
+            if route is not None or self.before_held_transit is not None:
+                self._checked_held_transit(r, grasp, updated, preplanned_route=route)
+            else:
+                self._move(r, 'transit', updated.T_pre, False)
             self._verify_held(r, 'dropped_in_transit')
             if not at_hover():
                 raise _StepFailed('inspect_place', 'hover_pose_unconfirmed',
@@ -764,13 +783,23 @@ class PickPlaceSkill:
         self._check_abort('open_release')
         callback = getattr(self, 'before_open', None)
         if callback is not None:
-            self._guard('open_release')
-            try:
-                confirmed, reason = callback(g, p, r)
-            except RuntimeError as exc:
-                confirmed, reason = False, str(exc)
-            self._check_abort('open_release')
-            self._guard('open_release')
+            for attempt in range(2):
+                r.detail.pop('held_anchor_replan_required', None)
+                self._guard('open_release')
+                try:
+                    confirmed, reason = callback(g, p, r)
+                except RuntimeError as exc:
+                    confirmed, reason = False, str(exc)
+                self._check_abort('open_release')
+                self._guard('open_release')
+                if confirmed or attempt or not r.detail.get('held_anchor_replan_required'):
+                    break
+                # A verified new translation is useful feedback, not permission
+                # to open at the old pose. Replan once with all normal camera,
+                # support, route and release checks, then measure again.
+                self._inspect_release(r, g, p)
+                self._guard('release')
+                self._move(r, 'release', p.T_release, self.linear_moves)
             if not confirmed:
                 r.ok = False
                 r.stage, r.error = 'release', 'held_anchor_unconfirmed'
@@ -853,6 +882,11 @@ class PickPlaceSkill:
             r.detail['fault'] = True
             return
         r.detail['holding'] = False
+        # Preserve the measured source-to-release mapping for the caller's
+        # subsequent empty-tool observation paths. It is an obstacle bound,
+        # never fresh visual evidence of completion.
+        from ..core.transforms import inv_T
+        r.detail['released_transform'] = after @ inv_T(g.T_grasp)
         if wide:
             r.detail['release_exit_mode'] = 'checked_wide_opening'
         elif clear is not None:

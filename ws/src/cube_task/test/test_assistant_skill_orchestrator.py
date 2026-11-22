@@ -148,6 +148,21 @@ def normal(_context, _number):
     return [step(1, 'move', 'apple', {'type': 'goal', 'index': 0}), step(2, 'verify'), step(3, 'finish')]
 
 
+def test_explicit_question_before_rearrangement_needs_only_one_button_approval(create):
+    def actions(c, n):
+        return [step(1, 'ask', question='允许把香蕉留在安全空位，再归位苹果吗？', affected_goals=[]),
+                step(2, 'move', 'banana', {'type': 'auto_free'}),
+                step(3, 'move', 'apple', {'type': 'goal', 'index': 0}), step(4, 'finish')]
+    ctl, session, _client = create(actions)
+    ctl.submit('把苹果放回红色区域')
+    pending(ctl)
+    assert not session.calls
+    approve(ctl)
+    assert ctl.wait_idle(2), 'A prior explicit ask must not be preceded by a duplicate blanket approval'
+    assert ctl.snapshot()['status'] == 'complete'
+    assert [s['skill'] for s in session.calls[:2]] == ['move', 'move']
+
+
 def test_default_planner_executes_composed_skills_and_verifies_once(create):
     ctl, session, client = create(normal)
     ctl.submit('把苹果放红区')

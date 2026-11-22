@@ -91,11 +91,42 @@ def test_offset_stacked_block_is_observed_in_a_view_with_visible_support(camera_
     assert targets[0].extra['support_label'] == 'red'
 
 
-def test_fully_hidden_support_is_not_confirmed_from_its_previous_expected_position(camera_pipeline):
+def test_covered_top_can_use_a_fresh_planar_side_without_inventing_a_graspable_base(camera_pipeline):
     _cfg, pipeline = camera_pipeline
     result = observe(pipeline, stacked_objects('green'), view=1)
-    assert not any(d.valid and d.extra.get('support_observed') for d in result.detections)
+    upper = next(d for d in result.detections if d.valid and d.label=='green')
+    assert upper.extra['support_surface_kind']=='vertical_face'
+    assert upper.extra['support_label']=='red'
     assert not any(d.valid and d.label == 'red' for d in result.detections)
+
+
+@pytest.mark.parametrize('spurious_peak',[None,.039])
+def test_centered_pear_with_covered_base_top_is_confirmed_from_visible_side_only(camera_pipeline,monkeypatch,spurious_peak):
+    from cube_task.sim.scenarios import look_at
+    from cube_task.perception.geometry import backproject,transform_cloud
+    _cfg,pipeline = camera_pipeline
+    objects = [make_catalog_object('yellow','base',[.25,0]),
+               make_catalog_object('pear','upper',[.25,0],.3,table_z=.05)]
+    intr = CameraIntrinsics.from_dict(layout_intrinsics('A'))
+    pose = look_at([-.03,0.,.18],[.25,0.,.08])
+    color,depth = render_rgbd(SimWorld(objects=objects),intr,pose,gripper=False,
+                              rng=301,noise_std=.0008,dropout=.002)
+    frame = Frame(color,depth,intr,100.,source='sim')
+    if spurious_peak is not None:
+        from cube_task.assistant import stack_perception
+        monkeypatch.setattr(stack_perception,'_observed_levels',lambda points,table:
+                            [(spurious_peak,np.zeros(depth.shape,dtype=bool))])
+    result = pipeline.process(frame,pose,{})
+    upper = next(d for d in result.detections if d.valid and d.label=='pear')
+    assert upper.extra['support_surface_kind']=='vertical_face'
+    assert upper.extra['support_label']=='yellow'
+    assert detection_table_z(upper)==pytest.approx(.05,abs=.003)
+    # Removing every measured base pixel removes the support evidence too.
+    points = transform_cloud(backproject(depth,intr,.15,3.),pose)
+    hidden = (points[...,2]<.052) & (np.linalg.norm(points[...,:2]-[.25,0.],axis=-1)<.04)
+    depth = depth.copy();depth[hidden]=0.
+    result = pipeline.process(Frame(color,depth,intr,101.,source='sim'),pose,{})
+    assert not any(d.extra.get('support_observed') for d in result.detections)
 
 
 def test_single_tall_pear_cannot_supply_its_own_fictional_support_plane(camera_pipeline):

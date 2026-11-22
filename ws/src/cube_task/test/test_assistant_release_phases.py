@@ -31,6 +31,7 @@ def release_session(monkeypatch, capacity=True):
     session._on_stage = lambda *a: None
     session._refresh_placement_occupancy = lambda *a: None
     session._stationary_recovery_observation = lambda **kwargs: []
+    session._plan_carried_entry = lambda *args: ([place.T_pre], '')
     session.cfg = SimpleNamespace(get=lambda key, default=None: default)
     session.camera = SimpleNamespace(_last=SimpleNamespace(), intrinsics=lambda: None)
 
@@ -127,7 +128,8 @@ def test_release_search_rejections_do_not_survive_a_new_camera_measurement(monke
     session.runner.replan_release = replan
     result = PickResult(False, detail={'holding': True})
     assert session._before_release(grasp, place, .05, result) is place
-    assert len(states) == 2 and states[0] is not states[1]
+    # The middle search only aims a new view; all three own fresh exclusions.
+    assert len(states) == 3 and len({id(state) for state in states}) == 3
     assert len(moves) == 1
 
 
@@ -293,3 +295,18 @@ def test_proven_full_destination_is_distinct_from_an_unchecked_observation_path(
     assert not moves
     assert result.detail['placement_checks'] == dict(release_rejection='no_clear_supported_release',
         capacity=False, capacity_reason='no_clear_supported_release', inspection_rejection='')
+
+
+def test_new_checked_view_has_computation_reserved_for_its_first_measurement(monkeypatch):
+    session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
+    def capture(**kwargs):
+        now[0] += 5.
+        return []
+    def route(*args, **kwargs):
+        now[0] += 29.
+        return [np.eye(4)], ''
+    session._stationary_recovery_observation = capture
+    monkeypatch.setattr('cube_task.assistant.placement_observation.safe_inspection_route', route)
+    result = PickResult(False, detail={'holding': True})
+    assert session._before_release(grasp, place, .051, result) is place
+    assert len(moves) == 1 and 45. < now[0] < 70.

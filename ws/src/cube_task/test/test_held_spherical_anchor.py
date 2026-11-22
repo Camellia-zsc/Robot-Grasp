@@ -121,6 +121,16 @@ def test_small_seating_change_avoids_captures_but_missing_original_feedback_cann
     assert not seating_requires_feedback(grasp, result, .0385)
 
 
+def test_tabletop_curved_grasp_also_checks_large_seating_change():
+    grasp = measured_grasp()
+    grasp.target.extra.pop('_stack_support', None)
+    for name in ('support_observed', 'support_label', 'support_z'):
+        grasp.target.extra.pop(name, None)
+    result = PickResult(False, detail={'steps': [{'stage': 'close', 'ok': True, 'width': .0466}]})
+    assert seating_requires_feedback(grasp, result, .0382)
+    assert not seating_requires_feedback(grasp, result, .0459)
+
+
 def anchored_release_session(monkeypatch, *, clouds=True, second_change=False, duplicate_stamp=False,
                              stale_frames=False):
     from types import SimpleNamespace
@@ -283,3 +293,20 @@ def test_carry_without_visible_anchor_never_approves_old_reference(monkeypatch):
     assert route is None
     assert captures and not replans and not moves and result.detail['holding']
     np.testing.assert_array_equal(grasp.T_grasp, original)
+
+
+def test_compound_source_band_fits_bulb_when_visible_neck_dominates_above_support():
+    from cube_task.assistant.spherical_anchor import fit_spherical_anchor
+    grasp = measured_grasp()
+    target = grasp.target
+    target.top_z += .05
+    target.center_base[2] += .05
+    target.extra['table_z'] = .05
+    bulb = sphere_cloud([.4, 0., .0925], .0425, 91)[:600]
+    neck = np.tile(sphere_cloud([.4, 0., .1475], .015, 92), (3, 1))
+    points = np.vstack([bulb, neck])
+    target.extra['_placement_points_base'] = points
+    assert not fit_spherical_anchor(points, .0425, [.4,0.,.0925])['ok']
+    measured = source_anchor(grasp)
+    assert measured['ok'] and measured['source_section'] == 'equatorial_body_band'
+    np.testing.assert_allclose(measured['center'], [.4,0.,.0925], atol=.0001)

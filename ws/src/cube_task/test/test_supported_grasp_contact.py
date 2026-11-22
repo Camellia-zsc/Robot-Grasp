@@ -46,6 +46,24 @@ def test_balanced_axis_replans_profile_and_ik_without_changing_source_or_thresho
     assert info['after_gap_mm'] < .01
 
 
+def test_tapered_tabletop_contact_needs_the_same_balanced_finger_heights():
+    detection, baseline, planner, arm, calls = contact_harness()
+    detection.extra = dict(table_z=0., grasp=dict(mode='profile', neck=True))
+    selected = supported_grasp(planner, arm, detection, baseline)
+    assert selected is not baseline and calls
+    assert selected.target.extra['grasp']['supported_contact']['after_gap_mm'] < .01
+    detection.extra.pop('table_z')
+    detection.height = None
+    assert supported_grasp(planner, arm, detection, baseline) is baseline
+
+
+def test_depth_noise_slope_does_not_turn_a_flat_tabletop_profile_into_a_tapered_grip():
+    detection,baseline,planner,arm,calls = contact_harness()
+    detection.extra = dict(table_z=0.,catalog_shape='box',grasp=dict(mode='profile',neck=True,neck_taper_deg=.3))
+    assert supported_grasp(planner,arm,detection,baseline) is baseline
+    assert not calls
+
+
 @pytest.mark.parametrize('missing', ['support_observed', 'support_label', 'support_z', 'grasp'])
 def test_missing_camera_support_or_profile_keeps_original_grasp(missing):
     detection, baseline, planner, arm, calls = contact_harness()
@@ -65,11 +83,30 @@ def test_unconfirmed_or_already_balanced_grasp_does_not_search(case):
         arm.find_reachable_tilt = lambda T, **kwargs: (T, 0., '')
     elif case == 'already_balanced':
         baseline.T_grasp = top_down_T(.3, 0., .13, math.pi / 2)
+        baseline.T_lift = baseline.T_grasp.copy()
         baseline.closing_angle = math.pi / 2
     else:
         detection.extra['support_z'] = float('nan')
     assert supported_grasp(planner, arm, detection, baseline) is baseline
     assert not calls
+
+
+def test_vertical_contact_checks_the_lift_that_will_lean_after_closing():
+    detection, baseline, planner, arm, calls = contact_harness()
+    detection.extra = dict(table_z=0., grasp=dict(mode='profile', neck=True))
+    baseline.T_lift[2, 3] += .08
+    original = planner.plan
+    def plan(target, *, closing_angle):
+        candidate = original(target, closing_angle=closing_angle)
+        candidate.T_lift[2, 3] += .08
+        return candidate
+    planner.plan = plan
+    arm.find_reachable_tilt = lambda pose, **kw: (
+        (pose, 0., '') if pose[2, 3] < .18 else
+        (tilt_outward(pose, math.radians(20.)), 20., ''))
+    selected = supported_grasp(planner, arm, detection, baseline, free_tilt=40.)
+    assert selected is not baseline and calls
+    assert selected.closing_angle == pytest.approx(math.pi/2)
 
 
 @pytest.mark.parametrize('rejection', ['asymmetric', 'blocked', 'shifted', 'unreachable', 'bad_width'])

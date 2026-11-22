@@ -153,11 +153,14 @@ def held_shape(det: Detection, gp, nominal: Optional[Sequence[float]] = None
     if dims is None:
         return None
     tz = detection_table_z(det)
+    from ..perception.grasp import measured_tapered_contact
     kind = (det.extra.get('grasp') or {}).get('kind', '') if det.extra else ''
     shape = {'length': dims[0], 'width': dims[1], 'elongated': kind == 'elongated',
              'axis_offset': float(det.yaw or 0.) - float(gp.closing_angle),
              'grip_width': float(gp.expected_width),
              'grip_z': 0.0 if tz is None else max(0.0, float(gp.T_grasp[2, 3]) - tz)}
+    if measured_tapered_contact(det):
+        shape['balanced_contact']=True
     desired_yaw = (det.extra or {}).get('_restore_yaw')
     if desired_yaw is not None:
         shape['_required_closing'] = gp.closing_angle + float(desired_yaw) - float(det.yaw or 0)
@@ -894,7 +897,7 @@ class TaskRunner:
         annotate_grasp_neighbors(det, neighbors)
         gp = self.planner.plan(det)
         from .grasp_contact import supported_grasp
-        gp = supported_grasp(self.planner, self.arm, det, gp)
+        gp = supported_grasp(self.planner, self.arm, det, gp, free_tilt=self.free_tilt)
         if not gp.feasible:
             if gp.reason.startswith(REMEASURE_REASONS):
                 # One bad frame can give these: measure again on the next observation.
@@ -1505,6 +1508,33 @@ class TaskRunner:
         state = {} if search_state is None else search_state
         avoided = state.setdefault('avoided', [])
         avoided_poses = state.setdefault('avoided_poses', [])
+        # Do not exhaust a region's entire budget on the many wrist directions
+        # at one unreachable point. Give other points a turn, then revisit
+        # deferred directions if no new point remains geometrically feasible.
+        spatial = not exact_xy and not stacked
+        if spatial:
+            c,s = math.cos(zone.yaw), math.sin(zone.yaw)
+            rotation = np.array([[c,-s],[s,c]])
+            quarter = np.asarray(zone.size)*.25
+            preferred_xy += tuple(tuple(zone.center[:2]+rotation@(quarter*direction))
+                for direction in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,-1),(1,-1),(-1,1)))
+        xy_attempts = state.setdefault('xy_attempts', {})
+        cell_attempts = state.setdefault('cell_attempts', {})
+        state.setdefault('spatial_round', 0)
+        if spatial and max_attempts is None:
+            attempt_limit = max(attempt_limit, 16)
+        def xy_key(x, y):
+            return (round(float(x), 6), round(float(y), 6))
+        def cell_key(x, y):
+            # Fairness must cover areas as well as exact points: spending all
+            # attempts on adjacent 5 mm cells still misses a clear far edge.
+            return tuple(np.floor((np.asarray([x, y])-zone.center[:2])/.025+.5).astype(int))
+        def candidate_allowed(x, y):
+            if release_workspace_reason(self.arm, (x, y)):
+                return False
+            return (not spatial or xy_attempts.get(xy_key(x, y), 0)
+                    < 2*(state['spatial_round']+1)
+                    and cell_attempts.get(cell_key(x, y), 0) < 2*(state['spatial_round']+1))
         preferred_xy = tuple(state.get('preferred_xy', preferred_xy))
         why = 'no clear reachable position in the requested destination'
         for attempt in range(attempt_limit):
@@ -1517,16 +1547,20 @@ class TaskRunner:
                 zone, held, transit, footprint=self._footprint(det), occupied=occupied,
                 held=shape, avoid=avoided, strict=True, fixed_xy=bool(exact_xy),
                 avoid_poses=avoided_poses, pose_filter=measured_allowed,
-                candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
+                candidate_filter=candidate_allowed,
                 center_first=self._center_first(zone.name),
                 lower=self.release_lower.get(det.label, 0.0), cancelled=interrupted,
                 preferred_xy=preferred_xy)
             if interrupted():
                 return None, interruption_reason()
             if not candidate.feasible:
+                if spatial and xy_attempts and state['spatial_round'] < 4:
+                    state['spatial_round'] += 1
+                    continue
                 return None, candidate.reason or why
             info = dict(self.placer.last_info)
             xy = tuple(info['xy'])
+            attempted_cell = cell_key(*candidate.T_release[:2, 3])
             ok, why, _tilts = adjust_plan_poses(
                 self.arm, planning_grasp, candidate,
                 self._floors(det, planning_grasp, candidate, held), self.free_tilt,
@@ -1537,6 +1571,10 @@ class TaskRunner:
                 ok, why = self._adjust_strict_release(
                     det, planning_grasp, candidate, neighbors, polygon, xy, held,
                     held_only=True, completion_zone=search['completion_zone'])
+            if ok and shape.get('balanced_contact') and any(
+                    abs(float(pose[2, 1])) * width > .002
+                    for pose in (candidate.T_pre, candidate.T_release)):
+                ok, why = False, 'measured tapered landing contact height difference exceeds 2 mm'
             if interrupted():
                 return None, interruption_reason()
             if ok and observation_filter is not None:
@@ -1549,7 +1587,7 @@ class TaskRunner:
                 ok, why = False, 'release planning would change the held grasp transform'
             if (ok and stacked and shape.get('requested_release_opening') is not None
                     and observation_filter is not None):
-                ok, why = self._release_retreat_clear(
+                ok, why = self._plan_release_exit(
                     det, planning_grasp, candidate, neighbors, polygon, interrupted)
                 if interrupted():
                     return None, interruption_reason()
@@ -1583,6 +1621,9 @@ class TaskRunner:
             # measured point can still work, including in an ordinary region.
             # Keep broad XY exclusions for caller-proven XY-only conflicts.
             avoided_poses.append((*xy, info['closing_angle']))
+            key = xy_key(*xy)
+            xy_attempts[key] = xy_attempts.get(key, 0)+1
+            cell_attempts[attempted_cell] = cell_attempts.get(attempted_cell, 0)+1
             # This point has already passed measured XY support/occupancy.
             # Try its remaining directions before rescanning the region grid;
             # the same-measurement continuation retains this bounded ordering.
@@ -1713,7 +1754,7 @@ class TaskRunner:
         annotate_grasp_neighbors(target, others)
         gp = self.planner.plan(target)
         from .grasp_contact import supported_grasp
-        gp = supported_grasp(self.planner, self.arm, target, gp)
+        gp = supported_grasp(self.planner, self.arm, target, gp, free_tilt=self.free_tilt)
         if not gp.feasible:
             return None, 'grasp infeasible: %s' % gp.reason
         held = held_offset_of(gp)
@@ -1934,6 +1975,38 @@ class TaskRunner:
                     return False
             return True
         return allowed
+
+    def _plan_release_exit(self, det, gp, pp, neighbors, polygon, cancelled):
+        """Select a reachable, collision-checked open-tool exit before release."""
+        native = getattr(self.arm, '_check_linear_path', None)
+        solve = getattr(self.arm, '_ik_tcp', None)
+        if not callable(native) or not callable(solve):
+            return self._release_retreat_clear(det, gp, pp, neighbors, polygon, cancelled)
+        from ..robot.kinematics import tilt_outward
+        from ..core.transforms import top_down_T
+        joints = self.arm.get_joints()
+        seed, _ep, _eo = solve(pp.T_release, None if joints is None else joints.value)
+        if seed is None:
+            return False, 'release exit has no reachable start'
+        original = pp.T_retreat.copy()
+        base = top_down_T(*original[:3, 3], gp.closing_angle)
+        candidates = [original] + [tilt_outward(base, math.radians(angle))
+                                   for angle in (25., 30., 35., 40.) if angle <= self.free_tilt]
+        why = 'no reachable collision-free release exit'
+        for retreat in candidates:
+            if cancelled():
+                break
+            ok, why = self.arm.check_reachable(retreat, q_seed=seed, max_tilt_deg=self.free_tilt)
+            if ok:
+                ok, why = native(pp.T_release, retreat, seed, self.free_tilt)
+            if not ok:
+                continue
+            pp.T_retreat = retreat.copy()
+            ok, why = self._release_retreat_clear(det, gp, pp, neighbors, polygon, cancelled)
+            if ok and not cancelled():
+                return True, ''
+        pp.T_retreat = original
+        return False, why
 
     def _release_retreat_clear(self, det, gp, pp, neighbors, polygon, cancelled):
         """Check only the open tool after release, including between samples."""

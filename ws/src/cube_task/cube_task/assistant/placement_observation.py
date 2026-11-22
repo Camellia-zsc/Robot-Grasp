@@ -11,10 +11,27 @@ import math
 import numpy as np
 
 from ..core.transforms import inv_T
-from ..perception.geometry import points_in_polygon, project_points
+from ..perception.geometry import points_in_polygon, project_points, object_prism, object_footprint
 from ..perception.grasp import (FINGER_HALF_BAND, FINGER_OUTER, RELEASE_OPEN_EXTRA,
-                                detection_table_z)
+                                detection_table_z,measured_tapered_contact)
 from ..task.reach import accepts_kwarg
+
+
+class JointTransitRoute(list):
+    """A joint-space segment with the exact start/end checked by FK sweep."""
+
+    def __init__(self, pose, start, end):
+        super().__init__([np.array(pose, copy=True)])
+        self.start_joints = np.array(start, copy=True)
+        self.end_joints = np.array(end, copy=True)
+
+
+def _grip_bend(reference, pose):
+    return math.acos(float(np.clip(reference[:3, 2] @ pose[:3, 2], -1., 1.)))
+
+
+def _tapered_contact(grasp):
+    return measured_tapered_contact(grasp.target)
 
 
 def _dimensions(det, nominal):
@@ -268,6 +285,19 @@ def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target
                                             support_starts, held_polygon, intrinsics)
 
     proposals = []
+    sample = arm.get_tcp_pose() if hasattr(arm, 'get_tcp_pose') else None
+    attitude = grasp.T_grasp if sample is None else np.asarray(sample.value)
+    # Moving the camera sideways can reveal a landing without bending the
+    # contact axis. This is especially useful for a measured tapered grip:
+    # repeatedly leaning it to the workspace tilt limit can slide the neck
+    # through the pads, even when the complete swept geometry is collision-free.
+    for height in (.23, .28, .33, .38):
+        for distance in (-.12, -.06, 0., .06, .12):
+            for side in (-.12, -.06, 0., .06, .12):
+                pose = attitude.copy()
+                pose[:2, 3] = target[:2] + distance*radial + side*lateral
+                pose[2, 3] = max(minimum_tcp_z, float(table_z)+height)
+                proposals.append((visibility_score(pose @ inv_T(T_camera_tcp)), pose))
     if progress is not None:
         progress({'phase': 'inspection_candidates', 'generated': 0, 'checked': 0, 'reachable': 0})
     for height in (.27, .32, .38, .44):
@@ -296,14 +326,28 @@ def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target
                     T_bc = np.eye(4)
                     T_bc[:3, :3], T_bc[:3, 3] = np.column_stack([c*x+s*y, -s*x+c*y, z]), eye
                     T_tcp = T_bc @ T_camera_tcp
-                    if float(T_tcp[2, 3]) >= minimum_tcp_z:
+                    tilt = math.degrees(math.acos(float(np.clip(-T_tcp[2, 2], -1., 1.))))
+                    # A target on the hard limit can land outside it after the
+                    # solver/servo's finite orientation error. Keep proposals
+                    # inside the limit; all actual path checks retain 40 deg.
+                    if (float(T_tcp[2, 3]) >= minimum_tcp_z
+                            and tilt <= max(0., free_tilt_deg-.25)
+                            and (not _tapered_contact(grasp)
+                                 or _grip_bend(attitude, T_tcp) <= math.radians(15.))):
                         proposals.append((visibility_score(T_bc), T_tcp))
     if progress is not None:
         progress({'phase': 'inspection_reachability', 'generated': len(proposals),
                   'checked': 0, 'reachable': 0})
     checked, reachable = 0, 0
     excluded = np.asarray(list(exclude_poses), float).reshape(-1, 4, 4)
-    for _score, T_tcp in sorted(proposals, key=lambda item: item[0], reverse=True):
+    def ranking(item):
+        score, pose = item
+        # Once a full landing is visible, preserve a tapered contact before
+        # optimizing fractional visibility of other, unnecessary directions.
+        if _tapered_contact(grasp):
+            return (bool(score[0]), -_grip_bend(attitude, pose), score[0], score[1])
+        return (bool(score[0]), score[0], score[1], -_grip_bend(attitude, pose))
+    for _score, T_tcp in sorted(proposals, key=ranking, reverse=True):
         if (_planning_cancelled(arm, cancelled)
                 or (max_checks is not None and checked >= max_checks)):
             return
@@ -347,7 +391,8 @@ def safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target_xy,
 def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
                           table_z=0., nominal=None, neighbor_nominal=None,
                           free_tilt_deg=40., *, cancelled=None, progress=None, max_checks=None,
-                          opening_uncertainty=0.):
+                          opening_uncertainty=0., allow_joint_route=False, bend_reference=None,
+                          allow_table_departure=False):
     """Return a fully prechecked linear held-camera route, or hold position.
 
     Endpoint reachability alone does not establish a reachable lift or a safe
@@ -377,8 +422,8 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
     table = detection_table_z(det)
     if table is None:
         return [], 'inspection route has no measured support height'
-    xy = _rectangle(np.asarray(det.center_base[:2]), length, width, float(det.yaw or 0.))
-    box = np.vstack([np.column_stack([xy, np.full(4, z)]) for z in (table, table + height)])
+    box = object_prism(det.center_base[:2], length, width, float(det.yaw or 0.),
+        table, height, label=det.label, resting_pose=det.extra.get('resting_pose'))
     local_boxes = [(box - grasp.T_grasp[:3, 3]) @ grasp.T_grasp[:3, :3]]
     signs = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
     for sign in (-1, 1):
@@ -397,7 +442,10 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
             yaw = float(other.yaw)
         except (ValueError, TypeError):
             return [], 'inspection route has incomplete neighbor geometry'
-        obstacles.append((_rectangle(np.asarray(other.center_base[:2]), a, b, yaw), top - h, top))
+        obstacles.append((object_footprint(other.center_base[:2], a, b, yaw,
+                          label=other.label, resting_pose=other.extra.get('resting_pose')), top - h, top,
+                          str(other.label), np.asarray(other.center_base[:2])))
+    blocked_by = ['table or unconfirmed geometry']
 
     def overlap(a, b, gap):
         for polygon in (a, b):
@@ -415,21 +463,42 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
     def clear(T, pad):
         if _planning_cancelled(arm, cancelled):
             return False
+        if (bend_reference is not None and _tapered_contact(grasp)
+                and _grip_bend(bend_reference, T) > math.radians(15.25)):
+            blocked_by[0] = 'measured tapered contact would bend beyond 15 degrees'
+            return False
         for local in local_boxes:
             carried = local @ T[:3, :3].T + T[:3, 3]
             low, high = float(carried[:, 2].min()), float(carried[:, 2].max())
             if low < float(table_z) + pad:
-                return False
+                # A freshly remeasured release can already touch the table.
+                # Permit only an unchanged-attitude vertical raise out of that
+                # contact; sideways drag, rotation and penetration still fail.
+                departing = (allow_table_departure and low >= float(table_z)-.002
+                    and T[2,3] >= current[2,3]-1e-6
+                    and np.linalg.norm(T[:2,3]-current[:2,3]) < 1e-6
+                    and np.allclose(T[:3,:3],current[:3,:3],atol=1e-6,rtol=0.))
+                if not departing:
+                    blocked_by[0] = 'table'
+                    return False
             polygon = cv2.convexHull(carried[:, :2].astype(np.float32)).reshape(-1, 2)
-            for footprint, bottom, top in obstacles:
+            for footprint, bottom, top, label, xy in obstacles:
                 if low > top + pad or high < bottom - pad:
                     continue
                 if overlap(polygon, footprint, pad):
+                    blocked_by[0] = '%s at (%.3f, %.3f)' % (label, *xy)
                     return False
         return True
 
     current, inspection = np.asarray(current, float), np.asarray(inspection, float)
     choices = [[inspection]]
+    if allow_table_departure:
+        # Full-height fixed-attitude raises can be unreachable from a low
+        # release. Clear the contact vertically first, then turn above it.
+        for height in (.016, .02, .04):
+            departure = current.copy()
+            departure[2, 3] += height
+            choices.append([departure, inspection])
     # Retract without rotating the held object before a high/leaned view. This
     # avoids asking a near-extended arm for an impossible fixed-XY vertical lift.
     radial = current[:2, 3] / max(float(np.linalg.norm(current[:2, 3])), 1e-6)
@@ -474,7 +543,8 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
             if not all(clear(pose, pad) for pose in samples):
                 if _planning_cancelled(arm, cancelled):
                     return [], 'aborted'
-                last_reason, accepted = 'inspection swept held object or fingers overlaps a measured obstacle', False
+                last_reason, accepted = ('inspection swept held object or fingers overlaps a measured obstacle: '
+                                         + blocked_by[0]), False
                 break
             native = getattr(arm, '_check_linear_path', None)
             if native is not None:
@@ -504,4 +574,32 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
             start = end
         if accepted:
             return route, ''
+    # A Cartesian line may cross a wrist singularity although a joint-space
+    # transfer is reachable. Check its actual FK sweep, not the Cartesian
+    # chord, and execute precisely these joint endpoints when accepted.
+    kin = getattr(arm, '_kin', None)
+    joints = arm.get_joints() if hasattr(arm, 'get_joints') else None
+    if (allow_joint_route and kin is not None and joints is not None
+            and hasattr(arm, '_ik_tcp') and hasattr(arm, '_T_ft')):
+        start_q = np.asarray(joints.value, float)
+        end_q, _ep, _eo = _planning_call(arm, cancelled, arm._ik_tcp, inspection, start_q)
+        if end_q is not None:
+            count = max(2, int(math.ceil(float(np.max(np.abs(end_q-start_q))) / math.radians(1.))))
+            poses = []
+            for fraction in np.linspace(0., 1., count+1):
+                if _planning_cancelled(arm, cancelled):
+                    return [], 'aborted'
+                pose = kin.fk(start_q+fraction*(end_q-start_q)) @ arm._T_ft
+                ok, last_reason = arm._guard.check_tcp(pose, table_z, max_tilt_deg=free_tilt_deg)
+                if not ok:
+                    break
+                poses.append(pose)
+            if len(poses) == count+1:
+                # Bound the between-sample travel of every carried corner.
+                corners = np.vstack(local_boxes)
+                swept = np.asarray([corners @ pose[:3, :3].T+pose[:3, 3] for pose in poses])
+                pad = .008 + float(np.max(np.linalg.norm(np.diff(swept, axis=0), axis=2)))/2
+                if all(clear(pose, pad) for pose in poses):
+                    return JointTransitRoute(inspection, start_q, end_q), ''
+                last_reason = 'joint sweep held object or fingers overlaps a measured obstacle: '+blocked_by[0]
     return [], last_reason

@@ -80,6 +80,29 @@ def catalog_entries() -> list[dict]:
     return entries
 
 
+def restoration_yaw_period(label, resting_pose=None):
+    """Geometric symmetry, independent of an unstable camera principal axis."""
+    try:
+        obj = make_catalog_object(label,'symmetry-prior',[0.,0.])
+    except ValueError:
+        return math.pi
+    if obj.shape=='sphere':
+        return None
+    if obj.shape in ('box','cube'):
+        return math.pi/2 if abs(obj.size[0]-obj.size[1])<1e-9 else math.pi
+    if obj.shape=='compound' and resting_pose=='upright':
+        for part in obj.size:
+            if np.linalg.norm(np.asarray(part['pos'])[:2])>1e-9 or any(k in part for k in ('quat','euler','rot')):
+                break
+            if part['shape']=='ellipsoid' and abs(part['size'][0]-part['size'][1])>1e-9:
+                break
+            if part['shape'] not in ('sphere','ellipsoid','cylinder'):
+                break
+        else:
+            return None
+    return math.pi
+
+
 def _segment_in_rectangle(a, b, lo, hi) -> bool:
     """Whether a polygon boundary enters an AABB's open interior."""
     lower, upper = 0.0, 1.0

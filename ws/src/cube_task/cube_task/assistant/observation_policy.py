@@ -84,7 +84,7 @@ def unique_target(detections, label, reference_xy=None, max_distance=.065, parti
 
 
 def merge_local_detections(previous, fresh, visible, association_dist=.04,
-                           forget=(), singleton_labels=()):
+                           forget=(), singleton_labels=(), preserve_incomplete=False):
     """Replace measured visible space; preserve the unobserved cached scene.
 
     ``fresh`` must already be consolidated across this local scan. ``visible``
@@ -97,10 +97,12 @@ def merge_local_detections(previous, fresh, visible, association_dist=.04,
     after a complete fresh camera measurement, even when it moved beyond the
     ordinary association radius. Ambiguous same-class fresh instances never
     trigger this override. A fresh ungraspable object still replaces its ghost.
+    With unchanged monitored physics, ``preserve_incomplete`` can retain a
+    complete old source outside full image coverage beside a new crop. It is
+    still subject to the normal fresh source checks before grasping.
     Inputs are returned by reference and are never mutated.
     """
     fresh = list(fresh)
-    fresh_xy = [p for d in fresh if (p := _xy(d)) is not None]
     rebound = {label for label in singleton_labels
                if sum(d.label == label and _xy(d) is not None for d in fresh) == 1}
     forgotten_xy = [(d.label, p) for d in forget if (p := _xy(d)) is not None]
@@ -116,7 +118,9 @@ def merge_local_detections(previous, fresh, visible, association_dist=.04,
             continue
         if visible(det):
             continue
-        if any(np.linalg.norm(xy - p) <= association_dist for p in fresh_xy):
+        nearby = [d for d in fresh if _xy(d) is not None
+                  and np.linalg.norm(xy-_xy(d)) <= association_dist]
+        if nearby and not (preserve_incomplete and det.valid and not any(d.valid for d in nearby)):
             continue
         kept.append(det)
     return kept + fresh

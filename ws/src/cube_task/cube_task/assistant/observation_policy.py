@@ -143,8 +143,10 @@ def merge_local_detections(previous, fresh, visible, association_dist=.04,
         nearby = [d for d in fresh if _xy(d) is not None
                   and np.linalg.norm(xy-_xy(d)) <= association_dist
                   and _same_layer(det, d)]
+        complete_nearby = any(d.valid and d.extra.get('catalog_complete', True)
+                              for d in nearby)
         if (preserve_incomplete and det.valid and nearby
-                and all(not d.valid for d in nearby)):
+                and not complete_nearby):
             # Seeing the old footprint is not proof that a cropped new
             # segmentation (whose class can also change at a crop) is a
             # better complete body measurement. Callers
@@ -153,7 +155,7 @@ def merge_local_detections(previous, fresh, visible, association_dist=.04,
             continue
         if visible(det):
             continue
-        if nearby and not (preserve_incomplete and det.valid and not any(d.valid for d in nearby)):
+        if nearby:
             continue
         kept.append(det)
     return kept + fresh

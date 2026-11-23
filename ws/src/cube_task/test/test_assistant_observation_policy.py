@@ -161,6 +161,18 @@ def test_cropped_wrong_class_cannot_erase_an_unchanged_complete_identity():
                                   preserve_incomplete=True) == [crop]
 
 
+@pytest.mark.parametrize('label',['unknown','banana'])
+def test_valid_geometry_without_complete_catalog_body_does_not_erase_tracked_object(label):
+    old,fragment = det(),det(label=label)
+    fragment.extra['catalog_complete']=False
+    assert fragment.valid
+    assert merge_local_detections([old],[fragment],lambda d:False,
+                                  preserve_incomplete=True)==[old,fragment]
+    fragment.extra['catalog_complete']=True
+    assert merge_local_detections([old],[fragment],lambda d:False,
+                                  preserve_incomplete=True)==[fragment]
+
+
 def test_new_upper_body_does_not_erase_its_occluded_known_support():
     base, upper = det(), det(label='pear')
     upper.top_z, upper.height = .16, .11

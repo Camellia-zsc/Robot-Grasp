@@ -52,5 +52,23 @@
       },
       "failed_actions": 0
     }
-  ]
+  ],
+  "edge_search_replay": {
+    "scenario": "original six-object layout, unchanged green cube",
+    "complete": true,
+    "all_requested_goals": true,
+    "physical_success": true,
+    "wall_seconds": 129.92,
+    "model_requests": 1,
+    "approvals": 0,
+    "drops": 0,
+    "scans": {
+      "frames": 9,
+      "full_scans": 0,
+      "local_scans": 5
+    },
+    "manipulation_steps": 1,
+    "failed_steps": 0,
+    "deferred_steps": 0
+  }
 }

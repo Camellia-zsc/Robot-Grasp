@@ -1496,10 +1496,13 @@ class PlacePlanner:
             if self.spread and not center_first:
                 candidates.extend(self._slots(zone, L))
         candidates.append(center)
+        seed_count = len(candidates)
+        compact_support = False
         if not fixed_xy:
             c, s = math.cos(zone.yaw), math.sin(zone.yaw)
             nx = int(float(zone.size[0]) / 2 / SLOT_GRID_STEP)
             ny = int(float(zone.size[1]) / 2 / SLOT_GRID_STEP)
+            compact_support = (2 * nx + 1) * (2 * ny + 1) <= SLOT_COARSE_MIN_POINTS
             # Cover the whole support before spending a bounded phase on
             # millimetre neighbours of an occupied/unobserved region centre.
             # Small supports retain fine local alternatives for narrow slots.
@@ -1518,7 +1521,7 @@ class PlacePlanner:
                     for i in range(-nx, nx + 1) for j in range(-ny, ny + 1)]
             candidates += sorted(grid, key=lambda p: math.hypot(p[0]-center[0], p[1]-center[1]))
 
-        def boundary_candidates():
+        def boundary_candidates(corners_only=False):
             # A 5 mm grid can miss a valid pocket between an occupied footprint
             # and the support's inset edge. Refine only that narrow boundary
             # band after the ordinary search; every seed keeps the same checks.
@@ -1538,7 +1541,11 @@ class PlacePlanner:
                          for turn in (0, 1, -1, 2, 3)]
             c, s = math.cos(zone.yaw), math.sin(zone.yaw)
             rotation = np.array([[c, -s], [s, c]])
-            insets = np.arange(9) * (SLOT_GRID_STEP / 4)
+            # A narrow safe pocket can lie between both the 5 mm grid and
+            # its 1.25 mm edge seeds. Refine only the same 10 mm edge band;
+            # keep the old seeds, full safety filters and cancellation budget.
+            insets = np.unique(np.r_[np.arange(9) * (SLOT_GRID_STEP / 4),
+                                      np.arange(21) * (SLOT_GRID_STEP / 10)])
             seen_bounds = set()
             for axis in axes:
                 cap = footprint_capsule(0., 0., L, W, axis)
@@ -1560,6 +1567,8 @@ class PlacePlanner:
                 for depth in insets:
                     if depth <= min(bounds)+1e-12:
                         yield from points(max(0., bounds[0]-depth), max(0., bounds[1]-depth))
+                if corners_only:
+                    continue
                 for x in levels[0]:
                     for y in levels[1]:
                         yield from points(x, y)
@@ -1572,7 +1581,13 @@ class PlacePlanner:
                     for x in along[0]:
                         yield from points(x, y)
         visited = set()
-        for x, y, boundary in chain(((x, y, False) for x, y in candidates), boundary_candidates()):
+        # Small cards have only a few usable corners once a large body shares
+        # them with a block. Try their bounded edge seeds before thousands of
+        # interior poses; larger table regions retain the broad coarse pass.
+        seeds = ((x, y, False) for x, y in candidates[:seed_count])
+        grid = ((x, y, False) for x, y in candidates[seed_count:])
+        early_edges = boundary_candidates(corners_only=True) if compact_support else ()
+        for x, y, boundary in chain(seeds, early_edges, grid, boundary_candidates()):
             if cancelled is not None and cancelled():
                 return None
             key = (round(x, 12), round(y, 12))

@@ -56,26 +56,31 @@ def test_measured_pear_and_green_cube_have_a_legal_pocket_between_grid_points():
 
 
 @pytest.mark.parametrize('yaw', [0., math.pi/5])
+@pytest.mark.parametrize('inset', [.00625, .0055])
 @pytest.mark.parametrize('length,width,elongated', [(.085, .085, False), (.12, .03, True)],
                          ids=['round', 'elongated'])
-def test_rotated_support_and_thin_capsule_keep_narrow_boundary_pocket(yaw, length, width, elongated):
+def test_rotated_support_and_thin_capsule_keep_narrow_boundary_pocket(yaw, inset, length, width, elongated):
     planner = PlacePlanner(make_cfg(robot__gripper__max_width=.1))
     zone = Zone('support', np.array([.3, 0., 0.]), (.2, .2), yaw=yaw)
     shape = dict(length=length, width=width, grip_width=.03, grip_z=.08,
                  elongated=elongated, axis_offset=0., _required_closing=yaw)
     extent = np.array([length/2, width/2])
-    local = np.array([.1-extent[0]-.00625, -(.1-extent[1]-.00625)])
+    local = np.array([.1-extent[0]-inset, -(.1-extent[1]-inset)])
     rotation = np.array([[math.cos(yaw), -math.sin(yaw)], [math.sin(yaw), math.cos(yaw)]])
     target = zone.center[:2]+rotation@local
 
+    checked = []
+    def measured_pocket(x, y, closing):
+        checked.append((x, y))
+        return np.linalg.norm(np.array([x,y])-target) < .0001
     result = planner.plan(zone, .08, .2, held=shape, strict=True,
-        pose_filter=lambda x, y, closing: np.linalg.norm(np.array([x,y])-target) < .0001)
+        pose_filter=measured_pocket, cancelled=lambda: len(checked) > 256)
 
     assert result.feasible, result.reason
     assert planner.last_info['xy'] == pytest.approx(target)
     assert planner.last_info['tier'] == 'strict_boundary'
     cap = footprint_capsule(*target, length, width, yaw if elongated else None)
-    assert capsule_edge_margin(zone, cap) == pytest.approx(.00625)
+    assert capsule_edge_margin(zone, cap) == pytest.approx(inset)
 
 
 def test_exact_point_never_uses_boundary_pocket_or_preferred_points():

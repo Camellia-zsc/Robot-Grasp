@@ -66,9 +66,12 @@ def test_explicit_edit_does_not_apply_stale_pose_of_an_unedited_held_body(build,
     physics, base, apple, _events = build()
     actual = physics.mujoco_world.object_pose(apple.name).copy()
     monkeypatch.setattr(physics.mujoco_world, 'held_objects', lambda: [apple.name])
-    apple.T_base_obj[:3,3] += [.001,0.,0.]
-    base.T_base_obj[:2,3] += [.02,0.]
-    edited = base.T_base_obj.copy()
+    stale=apple.T_base_obj
+    stale[:3,3] += [.001,0.,0.]
+    apple.T_base_obj=stale
+    edited=base.T_base_obj
+    edited[:2,3] += [.02,0.]
+    base.T_base_obj=edited
     physics.apply_scene_changes(changed_names=[base.name])
     np.testing.assert_array_equal(physics.mujoco_world.object_pose(apple.name), actual)
     np.testing.assert_allclose(physics.mujoco_world.object_pose(base.name), edited)

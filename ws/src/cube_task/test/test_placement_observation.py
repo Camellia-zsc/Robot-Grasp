@@ -201,6 +201,37 @@ def test_tapered_contact_inspects_by_translation_and_rejects_large_bending_route
     assert not route and 'tapered contact' in why
 
 
+def test_tapered_contact_can_turn_around_world_vertical_without_tipping_the_body():
+    from cube_task.core.transforms import rot_z
+    from cube_task.robot.kinematics import tilt_outward
+    target, grasp, _frame, _camera = inputs()
+    target.extra['grasp'] = {'neck': True}
+    start = tilt_outward(top_down_T(.3, 0., .3, 0.), np.deg2rad(35.))
+    grasp.T_grasp[:3, :3] = start[:3, :3]
+    end = start.copy()
+    end[:3, :3] = rot_z(np.deg2rad(90.)) @ start[:3, :3]
+    end[:2, 3] = [0., .3]
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                         _check_linear_path=lambda *a: (True, ''))
+    route, why = safe_inspection_route(arm, grasp, start, end, [], .05, bend_reference=start)
+    assert route, why
+
+
+def test_tapered_contact_rejects_tool_axis_spin_that_tips_a_leaned_carried_body():
+    from cube_task.core.transforms import rot_z
+    from cube_task.robot.kinematics import tilt_outward
+    target, grasp, _frame, _camera = inputs()
+    target.extra['grasp'] = {'neck': True}
+    start = tilt_outward(top_down_T(.3, 0., .3, 0.), np.deg2rad(35.))
+    grasp.T_grasp[:3, :3] = start[:3, :3]
+    end = start.copy()
+    end[:3, :3] = start[:3, :3] @ rot_z(np.deg2rad(90.))
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                         _check_linear_path=lambda *a: (True, ''))
+    route, why = safe_inspection_route(arm, grasp, start, end, [], .05, bend_reference=start)
+    assert not route and 'tapered contact' in why
+
+
 def test_inspection_checks_native_path_and_can_retract_without_an_unreachable_lift():
     _target, grasp, _frame, _camera = inputs()
     current = top_down_T(.4, 0., .15, 0.)

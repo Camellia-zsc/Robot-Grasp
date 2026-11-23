@@ -776,9 +776,16 @@ class SkillExecutor:
                     continue
                 clearance = min((np.linalg.norm(np.array([x, y]) - p) for p in occupied), default=.25)
                 separation = min(np.linalg.norm(np.array([x, y]) - p) for p in away)
-                points.append((min(clearance, .18) + min(separation, .25), destination))
-        points.sort(key=lambda item: (-item[0], item[1]['xy']))
-        return [destination for _score, destination in points]
+                radius = math.hypot(x, y)
+                room = min(x - bounds['x'][0], bounds['x'][1] - x,
+                    y - bounds['y'][0], bounds['y'][1] - y,
+                    radius - bounds['r_min'], bounds['r_max'] - radius)
+                points.append((min(clearance, .18) + min(separation, .25), room, destination))
+        # Saturated clearance scores used to tie-break at the smallest x/y,
+        # repeatedly searching workspace corners before equally clear interior
+        # points. Keep clearance priority, then reserve mechanical reach room.
+        points.sort(key=lambda item: (-item[0], -item[1], item[2]['xy']))
+        return [destination for _score, _room, destination in points]
 
     def _remember_failed_free(self, label, destination):
         key = (label, self.session._environment_revision)

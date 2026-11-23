@@ -1,5 +1,6 @@
 """Independent offline tests of actual pick-only and measured held placement."""
 import copy
+import math
 import socket
 import threading
 from types import SimpleNamespace
@@ -116,6 +117,21 @@ def test_dynamic_free_space_search_has_many_configured_candidates(tmp_path):
         changed = executor._candidates(target, {'type': 'auto_free'}, session._observed_detections)
         assert changed and changed != points
         assert all(.15 <= p['xy'][0] <= .35 for p in changed)
+
+
+def test_equal_free_clearance_prefers_workspace_room_over_boundary_points():
+    from types import SimpleNamespace
+    from cube_task.core.types import Detection
+    placement=dict(table_bounds={'x':[-.3,.9],'y':[-.7,.7]},
+        bounds={'x':[.08,.60],'y':[-.62,.62],'r_min':.1,'r_max':.62},margin=.005)
+    session=SimpleNamespace(_environment_revision=0,_placement=placement,
+        scene={'placement':placement},runner=SimpleNamespace(nominal={'pear':(.085,.085)}))
+    executor=SkillExecutor(session)
+    target=Detection('pear',1.,center_base=np.array([.27,-.11,.16]),
+                     length=.085,width=.085,height=.11,top_z=.16,yaw=0.)
+    candidates=executor._candidates(target,{'type':'auto_free'},[target])
+    x,y=candidates[0]['xy'];radius=math.hypot(x,y)
+    assert min(x-.08,.60-x,y+.62,.62-y,radius-.1,.62-radius)>.1
 
 
 def test_real_pick_auto_free_and_repick_original_object_without_final_goal_mutation(tmp_path):

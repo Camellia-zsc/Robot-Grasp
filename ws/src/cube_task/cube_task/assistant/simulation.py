@@ -653,12 +653,13 @@ class SimulationSession:
             neighbors = [d for d in self._observed_detections
                          if d.label != grasp.target.label and not d.label.startswith('unobserved_')]
             neighbors += observer.uncertainty_obstacles(exclude=[grasp.target.label])
+            current = self.arm.get_tcp_pose().value.copy()
             route, reason = budget.run(safe_inspection_route, self.arm, grasp,
-                self.arm.get_tcp_pose().value.copy(), pose, neighbors, width,
+                current, pose, neighbors, width,
                 table_z=table, nominal=self.runner.nominal.get(grasp.target.label),
                 neighbor_nominal=self.runner.nominal, free_tilt_deg=self.runner.free_tilt,
                 cancelled=budget.cancelled, opening_uncertainty=.001,
-                allow_joint_route=True, endpoint_clearance=.02)
+                allow_joint_route=True, endpoint_clearance=.02, bend_reference=current)
             if not route:
                 continue
             for waypoint in route:
@@ -896,7 +897,7 @@ class SimulationSession:
         target, destination, zone_name, options = self._active_placement
         self._apply_interventions()
         self._on_stage('placement_planning')
-        self._emit('inspect_place', {'message': '已到目标区域上方，正在局部确认空位'})
+        self._emit('inspect_place', {'message': '正在结合实时观测确认目标区域空位'})
         from .observation_policy import merge_local_detections, measurement_visible
         from .placement_observation import (candidate_visibility_filter, iter_safe_inspection_poses,
                                              safe_inspection_route, inspection_history,
@@ -937,6 +938,7 @@ class SimulationSession:
             support_current = True
             checks.update(capacity=None, capacity_reason='')
             revision = self._environment_revision
+            observer = getattr(self, '_motion_observer', None)
             fresh = self._stationary_recovery_observation(grasp=grasp, width=width)
             if revision != self._environment_revision:
                 support_views.clear()
@@ -960,6 +962,13 @@ class SimulationSession:
             # Only this release cycle's newly captured, unchanged-scene RGB-D
             # evidence can complement the current wrist view's self-occlusion.
             if revision == self._environment_revision:
+                if observer is not None:
+                    # Wrist motion can have supplied clearer views than the
+                    # stopped endpoint. Use the owner's current-revision rays,
+                    # including those captured during this inspection route.
+                    stamp = getattr(frame, 'stamp', None)
+                    support_views[:] = [view for view in observer.support_views()
+                        if stamp is None or getattr(view[0], 'stamp', None) != stamp]
                 support_views.append((copy.deepcopy(frame), pose.copy()))
                 del support_views[:-6]
             fresh = [d for d in fresh if d.center_base is not None and d.label != target.label]
@@ -972,11 +981,10 @@ class SimulationSession:
                                 if editor is not None and editor.metadata().get('one_per_class')
                                 else ())
             neighbors = merge_local_detections(
-                         [d for d in neighbors if not d.label.startswith('unobserved_')], fresh,
+                         [d for d in self._observed_detections if not d.label.startswith('unobserved_')], fresh,
                          lambda d: self._observation_replaced(d, frame, pose), forget=[target],
                          singleton_labels=singleton_labels,
                          preserve_incomplete=getattr(self, '_motion_observer', None) is not None)
-            observer = getattr(self, '_motion_observer', None)
             if observer is not None:
                 observer.remember(fresh, revision)
                 neighbors += observer.uncertainty_obstacles(exclude=[target.label])
@@ -991,7 +999,13 @@ class SimulationSession:
                 from .stacking import planning_options, annotate
                 support_current = False
                 try:
-                    options, support = planning_options(self, destination, fresh)
+                    # A carried object commonly hides its own landing base.
+                    # The monitor retains complete RGB-D geometry until that
+                    # body changes; a cropped endpoint view must not force an
+                    # otherwise unchanged base to be scanned all over again.
+                    support_measurements = (observer.current(destination['label'])
+                        if observer is not None else fresh)
+                    options, support = planning_options(self, destination, support_measurements)
                 except ValueError as exc:
                     return None, str(exc), revision
                 support_current = True
@@ -2608,7 +2622,8 @@ class SimulationSession:
         if (destination['type'] == 'point' and
                 np.linalg.norm(obj.center_xy() - destination['xy']) > self._placement['point_tolerance']):
             return False
-        return footprint_in_destination(np.vstack(obj.footprint_polygons()),
+        from .destinations import physical_outline
+        return footprint_in_destination(physical_outline(obj),
                                         {'placement': self._placement}, destination)
 
     def verify_goals(self, goals):

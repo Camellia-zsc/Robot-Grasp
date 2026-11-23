@@ -111,6 +111,24 @@ def footprint_corners(xy, length, width, yaw):
     return local @ np.array([[c, -s], [s, c]]).T + np.asarray(xy, float)
 
 
+def physical_outline(obj):
+    """Conservative convex outline of the actual 3-D solid, for audits only.
+
+    Adjacent supporting lines enclose the true projection. Unlike rotated
+    local bounding rectangles, they do not invent square corners on a sphere.
+    Camera geometry and motion planning do not consume this physical truth.
+    """
+    angles = np.arange(64) * (2 * math.pi / 64)
+    normals = np.column_stack((np.cos(angles), np.sin(angles)))
+    distances = np.array([obj.support([x, y, 0.]) for x, y in normals])
+    following = np.roll(normals, -1, axis=0)
+    next_distance = np.roll(distances, -1)
+    determinant = normals[:, 0] * following[:, 1] - normals[:, 1] * following[:, 0]
+    return np.column_stack((
+        (distances * following[:, 1] - next_distance * normals[:, 1]) / determinant,
+        (normals[:, 0] * next_distance - following[:, 0] * distances) / determinant))
+
+
 def footprint_in_destination(corners, scene, destination):
     """Full footprint must stay on the configured tabletop, and in a region."""
     if destination['type'] == 'on_object':

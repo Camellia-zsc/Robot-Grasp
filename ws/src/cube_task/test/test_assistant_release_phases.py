@@ -108,6 +108,84 @@ def test_release_merge_keeps_unchanged_complete_peers_next_to_invalid_crops(monk
     assert any(d.label == 'red' and d.valid for d in peers)
 
 
+def test_release_after_view_motion_uses_live_tracks_and_depth_captured_in_transit(monkeypatch):
+    import copy
+    from test_assistant_targeted_scan import block
+    session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
+    old = block('red', xy=(.4, .3))
+    moved = block('red', xy=(.2, -.3))
+    old.extra['catalog_complete'] = moved.extra['catalog_complete'] = True
+    session._observation_replaced = lambda *a: False
+    crop = copy.deepcopy(moved)
+    crop.extra['catalog_complete'] = False
+    session._observed_detections.append(old)
+    transit_frame = object()
+    session._motion_observer = SimpleNamespace(invalidated=set(),
+        support_views=lambda: [(transit_frame, np.eye(4))] if moves else [],
+        remember=lambda *a: None, uncertainty_obstacles=lambda **kw: [])
+    def capture(**kwargs):
+        if moves:
+            # MotionObservation already published a complete, new measurement
+            # while moving. The stopped wrist now sees only a crop of it.
+            session._observed_detections = [target, moved]
+            return [crop]
+        return []
+    session._stationary_recovery_observation = capture
+    visible = []
+    def visibility(*args, observations=(), **kwargs):
+        visible.append(list(observations))
+        return lambda *a, **k: True
+    monkeypatch.setattr('cube_task.assistant.placement_observation.candidate_visibility_filter', visibility)
+    def replan(det, gp, pp, width, neighbors, **kwargs):
+        if not moves:
+            return None, 'landing is not visible'
+        peers = [d for d in neighbors if d.label == 'red' and d.extra.get('catalog_complete')]
+        assert len(peers) == 1
+        np.testing.assert_allclose(peers[0].center_base[:2], moved.center_base[:2])
+        assert any(frame is transit_frame for views in visible for frame, _pose in views)
+        return place, ''
+    session.runner.replan_release = replan
+    assert session._before_release(grasp, place, .05, PickResult(False, detail={'holding': True})) is place
+
+
+@pytest.mark.parametrize('changed', [False, True])
+def test_stack_release_reuses_monitored_support_unless_it_has_changed(monkeypatch, changed):
+    import copy
+    from test_assistant_targeted_scan import block
+    session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
+    support = block('yellow', xy=(.3, -.1))
+    support.extra['catalog_complete'] = True
+    crop = copy.deepcopy(support)
+    crop.valid = False
+    crop.extra['catalog_complete'] = False
+    session._physics = object()
+    session._placement = {'table_bounds': {'x': [0., .7], 'y': [-.6, .6]}}
+    session._active_placement = (target, {'type': 'on_object', 'label': 'yellow'}, 'yellow', {})
+    session._observed_detections.append(support)
+    session._observation_replaced = lambda *a: False
+    observer = SimpleNamespace(invalidated={'yellow'} if changed else set(),
+        height_priors={'yellow': .05}, support_views=lambda: [], remember=lambda *a: None,
+        uncertainty_obstacles=lambda **kw: [],
+        current=lambda label: [] if changed else [support])
+    session._motion_observer = observer
+    session._stationary_recovery_observation = lambda **kw: [crop]
+    monkeypatch.setattr('cube_task.assistant.placement_observation.iter_safe_inspection_poses',
+                        lambda *a, **kw: iter([]))
+    def replan(det, gp, pp, width, neighbors, **kwargs):
+        assert not changed
+        assert kwargs['placement_zone'].center[2] == .05
+        assert gp.target.extra['_stack_support']['label'] == 'yellow'
+        return place, ''
+    session.runner.replan_release = replan
+    result = PickResult(False, detail={'holding': True})
+    updated = session._before_release(grasp, place, .05, result)
+    if changed:
+        assert updated is None
+        assert 'changed_object_not_observed' in result.detail['placement_planning_reason']
+    else:
+        assert updated is place and not moves
+
+
 def test_timed_slice_with_completed_rejections_continues_before_camera_motion(monkeypatch):
     session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
     states = []

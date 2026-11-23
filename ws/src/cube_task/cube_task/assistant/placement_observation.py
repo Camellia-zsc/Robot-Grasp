@@ -27,7 +27,11 @@ class JointTransitRoute(list):
 
 
 def _grip_bend(reference, pose):
-    return math.acos(float(np.clip(reference[:3, 2] @ pose[:3, 2], -1., 1.)))
+    # R_new @ R_reference.T rotates the carried body in world coordinates.
+    # Its vertical component measures tipping relative to gravity. Comparing
+    # tool Z columns instead would reject a harmless world-yaw turn of a
+    # leaned wrist, yet allow a tool-axis spin that actually tips the body.
+    return math.acos(float(np.clip(reference[2, :3] @ pose[2, :3], -1., 1.)))
 
 
 def _tapered_contact(grasp):

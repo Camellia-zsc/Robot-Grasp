@@ -6,7 +6,7 @@
 
 | 需求 | 入口 |
 |---|---|
-| 看模块分群 | [社区总览](../../graphify-out/graph-overview.html)，161 个社区 |
+| 看模块分群 | [社区总览](../../graphify-out/graph-overview.html)，160 个社区 |
 | 搜索类、函数、文件关系 | [完整交互图](../../graphify-out/graph.html)，4,959 个节点 |
 | 查看静态结构报告 | [GRAPH_REPORT.md](../../graphify-out/GRAPH_REPORT.md) |
 | 确认本次具体分析了哪些文件 | [scope.json](../../graphify-out/scope.json)，127 个 Python/JavaScript 源文件 |
@@ -97,7 +97,7 @@ $env:GRAPHIFY_QUERY_LOG_DISABLE = '1'
 
 ## 如何解释结果
 
-本次得到 **4,959 节点、13,931 边、161 社区**。核心枢纽包括 `Detection`、`SimObject`、`TaskRunner`、`SimulationSession`、`MujocoArm`；跨模块候选联系包括手持观察 `inspect_held()` 到放置观察 `safe_inspection_route()`。带 `INFERRED` 的边是解析器推断，需核查源码。
+本次得到 **4,959 节点、13,931 边、160 社区**。核心枢纽包括 `Detection`、`SimObject`、`TaskRunner`、`SimulationSession`、`MujocoArm`；跨模块候选联系包括手持观察 `inspect_held()` 到放置观察 `safe_inspection_route()`。带 `INFERRED` 的边是解析器推断，需核查源码。
 
 质量诊断明确记录：原始 AST 有 **1,414 条端点未解析的边、6 条自环**，简单有向图合并了 **769 条相同端点的边**。这些是静态解析与图表示的限制，不能直接认定为项目缺陷；完整原始调用关系、外部库、动态绑定、HTTP 与 ROS 通信可能无法由此恢复。JSON 中的置信度和来源位置应与源码一起使用。
 

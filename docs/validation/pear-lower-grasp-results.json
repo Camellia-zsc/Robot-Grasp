@@ -1,0 +1,56 @@
+{
+  "contact_height_comparison_mm": {
+    "before": 92.45,
+    "after": 77.45
+  },
+  "results": [
+    {
+      "scenario": "original layout (single pear goal)",
+      "instruction": "把梨子放到绿色区域",
+      "complete": true,
+      "physical_success": true,
+      "wall_seconds": 288.64,
+      "model_requests": 8,
+      "approvals": 4,
+      "drops": 0,
+      "scans": {
+        "frames": 46,
+        "full_scans": 0,
+        "local_scans": 9
+      },
+      "failed_actions": 4
+    },
+    {
+      "scenario": "stack and unstack",
+      "instruction": "把梨子放到黄色方块上面",
+      "complete": true,
+      "physical_success": true,
+      "wall_seconds": 163.53,
+      "model_requests": 1,
+      "approvals": 0,
+      "drops": 0,
+      "scans": {
+        "frames": 6,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "failed_actions": 0
+    },
+    {
+      "scenario": "stack and unstack",
+      "instruction": "把黄色方块放到黄色区域",
+      "complete": true,
+      "physical_success": true,
+      "wall_seconds": 289.11,
+      "model_requests": 1,
+      "approvals": 1,
+      "drops": 0,
+      "scans": {
+        "frames": 11,
+        "full_scans": 0,
+        "local_scans": 4
+      },
+      "failed_actions": 0
+    }
+  ]
+}

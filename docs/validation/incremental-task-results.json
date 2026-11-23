@@ -1,0 +1,275 @@
+{
+  "method": "online model + RGB-D + production skills + MuJoCo + independent physical audit",
+  "seed": 7,
+  "includes_initial_preparation": false,
+  "scope": "One fixed randomized layout for cases 1/4; declared stack and intervention layouts for cases 2/3/5.",
+  "evidence_notes": [
+    "Case 2 uses v14 evidence; later intervention/view fixes do not change its executed normal path.",
+    "Local-scan counters exclude held inspection moves, which are counted separately."
+  ],
+  "phases": [
+    {
+      "case": 1,
+      "phase": 1,
+      "evidence": "incremental-acceptance-v17",
+      "complete": true,
+      "physical_success": true,
+      "goals": 6,
+      "wall_seconds": 305.28,
+      "model_requests": 1,
+      "approvals": 0,
+      "manipulations": 5,
+      "actual_picked_labels": [
+        "green",
+        "pear",
+        "yellow",
+        "red",
+        "apple"
+      ],
+      "failed_steps": 0,
+      "deferred_steps": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "scans": {
+        "frames": 89,
+        "full_scans": 0,
+        "local_scans": 5
+      },
+      "observation_work": {
+        "stationary_frames": 7,
+        "inspection_motion_steps": 2
+      },
+      "motion_observation": {
+        "frames": 76,
+        "source_reuses": 9,
+        "verification_reuses": 2
+      },
+      "smooth": true
+    },
+    {
+      "case": 2,
+      "phase": 1,
+      "evidence": "incremental-acceptance-v14",
+      "complete": true,
+      "physical_success": true,
+      "goals": 1,
+      "wall_seconds": 147.33,
+      "model_requests": 1,
+      "approvals": 0,
+      "manipulations": 1,
+      "actual_picked_labels": [
+        "pear"
+      ],
+      "failed_steps": 0,
+      "deferred_steps": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "scans": {
+        "frames": 26,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "observation_work": {
+        "stationary_frames": 2,
+        "inspection_motion_steps": 1
+      },
+      "motion_observation": {
+        "frames": 23,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "smooth": true
+    },
+    {
+      "case": 2,
+      "phase": 2,
+      "evidence": "incremental-acceptance-v14",
+      "complete": true,
+      "physical_success": true,
+      "goals": 1,
+      "wall_seconds": 222.0,
+      "model_requests": 1,
+      "approvals": 1,
+      "manipulations": 2,
+      "actual_picked_labels": [
+        "pear",
+        "yellow"
+      ],
+      "failed_steps": 0,
+      "deferred_steps": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "scans": {
+        "frames": 42,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "motion_observation": {
+        "frames": 35,
+        "source_reuses": 3,
+        "verification_reuses": 2
+      },
+      "smooth": true
+    },
+    {
+      "case": 3,
+      "phase": 1,
+      "evidence": "incremental-acceptance-v17",
+      "complete": true,
+      "physical_success": true,
+      "goals": 1,
+      "wall_seconds": 162.31,
+      "model_requests": 1,
+      "approvals": 0,
+      "manipulations": 1,
+      "actual_picked_labels": [
+        "pear"
+      ],
+      "failed_steps": 0,
+      "deferred_steps": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "scans": {
+        "frames": 26,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "observation_work": {
+        "stationary_frames": 2,
+        "inspection_motion_steps": 1
+      },
+      "motion_observation": {
+        "frames": 23,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "smooth": true
+    },
+    {
+      "case": 3,
+      "phase": 2,
+      "evidence": "incremental-acceptance-v17",
+      "complete": true,
+      "physical_success": true,
+      "goals": 6,
+      "wall_seconds": 125.97,
+      "model_requests": 1,
+      "approvals": 0,
+      "manipulations": 2,
+      "actual_picked_labels": [
+        "pear",
+        "yellow"
+      ],
+      "failed_steps": 0,
+      "deferred_steps": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "scans": {
+        "frames": 32,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "observation_work": {
+        "stationary_frames": 2,
+        "inspection_motion_steps": 0
+      },
+      "motion_observation": {
+        "frames": 27,
+        "source_reuses": 3,
+        "verification_reuses": 6
+      },
+      "smooth": true
+    },
+    {
+      "case": 4,
+      "phase": 1,
+      "evidence": "incremental-acceptance-v17",
+      "complete": true,
+      "physical_success": true,
+      "goals": 6,
+      "wall_seconds": 310.45,
+      "model_requests": 1,
+      "approvals": 0,
+      "manipulations": 4,
+      "actual_picked_labels": [
+        "green",
+        "apple",
+        "banana",
+        "red"
+      ],
+      "failed_steps": 0,
+      "deferred_steps": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "scans": {
+        "frames": 77,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "motion_observation": {
+        "frames": 73,
+        "source_reuses": 8,
+        "verification_reuses": 6
+      },
+      "smooth": true
+    },
+    {
+      "case": 5,
+      "phase": 1,
+      "evidence": "incremental-acceptance-v17",
+      "complete": true,
+      "physical_success": true,
+      "goals": 2,
+      "wall_seconds": 233.75,
+      "model_requests": 1,
+      "approvals": 0,
+      "manipulations": 1,
+      "actual_picked_labels": [
+        "banana"
+      ],
+      "failed_steps": 0,
+      "deferred_steps": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "scans": {
+        "frames": 35,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "observation_work": {
+        "stationary_frames": 6,
+        "inspection_motion_steps": 4
+      },
+      "motion_observation": {
+        "frames": 29,
+        "source_reuses": 2,
+        "verification_reuses": 2
+      },
+      "smooth": true,
+      "intervention": {
+        "first": "banana",
+        "moved": "pear",
+        "applied": true,
+        "camera_updated_while_holding": true,
+        "redundant_grasps": 0,
+        "original_slot": [
+          0.14500000000000002,
+          -0.31499999999999995
+        ],
+        "final_slot": [
+          0.25,
+          -0.30999999999999994
+        ],
+        "passed": true
+      }
+    }
+  ]
+}

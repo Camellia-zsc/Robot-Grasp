@@ -21,6 +21,7 @@ INSTRUCTIONS = {
     2: ('把梨子放到黄色方块上面', '把黄色方块放到黄色区域'),
     3: ('把梨子放到黄色方块上面', '把所有物品放到各自默认区域'),
     4: ('把所有六个物品全部放回抓取区',),
+    5: ('把抓取区的香蕉和梨子都放到红色区域，依次完成',),
 }
 
 
@@ -75,11 +76,44 @@ def stacking_objects(session):
 
 
 class BenchSession(SimulationSession):
-    def __init__(self, *, stacking=False, **kwargs):
+    def __init__(self, *, stacking=False, intervention=False, **kwargs):
         super().__init__(backend='mujoco', **kwargs)
-        self.world.objects = stacking_objects(self) if stacking else random_objects(self, self.seed)
+        if intervention:
+            layout = dict(red=(.44, -.2, 0.), apple=(.32, -.2, 0.),
+                          green=(.12, .37, 0.), yellow=(.54, 0., 0.),
+                          banana=(.25, -.04, 0.), pear=(.32, .13, .3))
+            objects = []
+            for label, (x, y, yaw) in layout.items():
+                obj = make_catalog_object(label, 'bench-' + label, [x, y], yaw)
+                self.editor._check_placement(obj, objects)
+                objects.append(obj)
+            self.world.objects = objects
+        else:
+            self.world.objects = stacking_objects(self) if stacking else random_objects(self, self.seed)
+        self.bench_intervention = intervention
         self._physics.apply_scene_changes()
         self._remember_physics()
+        for zone in self.world.zones:
+            assert tuple(zone.size) == tuple(self.runner.zones[zone.name].size)
+            assert tuple(zone.size) == tuple(self._physics.mujoco_world.zones[zone.name].size)
+            assert min(zone.size) >= .30
+
+        invalidate = self._motion_observer.invalidate
+        self._invalidations_saved = 0
+        def record_invalidation(labels, **options):
+            import traceback
+            labels = tuple(labels)
+            if self._invalidations_saved < 6 and labels:
+                self._invalidations_saved += 1
+                path = self.logger.dir / ('evidence-invalidation-%d.pkl' % self._invalidations_saved)
+                path.write_bytes(pickle.dumps(dict(labels=labels, options=options,
+                    evidence={label:copy.deepcopy(self._motion_observer.evidence.get(label))
+                              for label in labels}, frame=getattr(self.camera, '_last', None),
+                    pose=self.camera.current_T_base_camera(), revision=self._environment_revision,
+                    stage=self._stage, stack=[(Path(t.filename).name,t.name,t.lineno)
+                        for t in traceback.extract_stack(limit=5)])))
+            return invalidate(labels, **options)
+        self._motion_observer.invalidate = record_invalidation
 
         # A rejected sweep needs the exact camera/grip inputs for an offline
         # diagnosis. Never pickle the controller, model client or credentials.
@@ -99,12 +133,41 @@ class BenchSession(SimulationSession):
             return route, reason
         record_route._bench_original = original
         placement_observation.safe_inspection_route = record_route
+        replan = self.runner.replan_release
+        def record_release(det, grasp, previous, width, neighbors, **options):
+            visibility = options.get('observation_filter')
+            counts = dict(checked=0, accepted=0)
+            if visibility is not None:
+                def measured(*args, **kwargs):
+                    value = visibility(*args, **kwargs)
+                    counts['checked'] += 1
+                    counts['accepted'] += bool(value)
+                    return value
+                options['observation_filter'] = measured
+            started = time.monotonic()
+            result = replan(det, grasp, previous, width, neighbors, **options)
+            with (self.logger.dir/'release-trace.jsonl').open('a', encoding='utf-8') as stream:
+                stream.write(json.dumps(dict(label=det.label, ok=result[0] is not None,
+                    why=result[1], wall_seconds=time.monotonic()-started, visibility=counts))+'\n')
+            if result[0] is None and not (self.logger.dir/'release-input.pkl').exists():
+                from ..core.extrinsics import camera_pose_in_base
+                (self.logger.dir/'release-input.pkl').write_bytes(pickle.dumps(dict(
+                    det=det, grasp=grasp, previous=previous, width=width, neighbors=neighbors,
+                    frame=self.camera._last, joints=self.arm.get_joints().value,
+                    pose=camera_pose_in_base(self.runner.ext, self.arm.get_flange_pose().value,
+                                            self.runner.T_flange_tcp),
+                    options={k:v for k,v in options.items() if k in
+                             ('placement_zone','placement_polygon','exact_xy')},
+                    observations=self._motion_observer.support_views())))
+            return result
+        self.runner.replan_release = record_release
 
 
 def run_phase(controller, instruction, output, timeout):
     output.mkdir(parents=True, exist_ok=True)
     session = controller._session
     before = copy.deepcopy(session._scan_stats)
+    motion_before = copy.deepcopy(session._motion_observer.stats)
     metrics_before = copy.deepcopy(controller.snapshot()['metrics'])
     event_start = controller._next_id
     started = time.monotonic()
@@ -114,8 +177,62 @@ def run_phase(controller, instruction, output, timeout):
     last_checkpoint = 0.
     saved_grips = set()
     drops = []
+    intervention = {}
+    planned = {}
+    observation_counts = dict(stationary_frames=0, inspection_motion_steps=0)
+    diagnostic_views = 0
+    picked_labels = []
     listener = session.on_event
     def record_event(kind, payload):
+        nonlocal diagnostic_views
+        if kind == 'decision' and payload.get('action') in ('pick', 'pick_only'):
+            planned.update(label=payload['label'], xy=payload.get('place', {}).get('xy'))
+            picked_labels.append(payload['label'])
+        if (getattr(session, 'bench_intervention', False) and not intervention
+                and kind == 'skill_step' and payload.get('stage') == 'lift'
+                and planned.get('label') in ('banana', 'pear')):
+            first = planned['label']
+            other = 'pear' if first == 'banana' else 'banana'
+            zone = session.runner.zones['zone_red']
+            # The human deliberately occupies the planner's provisional slot.
+            # Use UI catalog dimensions only to keep the edit inside the card.
+            margin = .055 if other == 'pear' else .085
+            half = np.asarray(zone.size)/2-margin
+            intended = zone.center[:2] if planned['xy'] is None else planned['xy']
+            xy = np.clip(np.asarray(intended), zone.center[:2]-half, zone.center[:2]+half)
+            snap = session.snapshot()
+            obj = next(o for o in snap['objects'] if o['label'] == other)
+            queued = controller.intervene_scene(dict(action='move', object_id=obj['id'],
+                xy=xy.tolist(), yaw=0., environment_revision=snap['environment_revision']))
+            intervention.update(first=first, moved=other, xy=xy.tolist(),
+                                original_slot=planned['xy'], queued=queued)
+        if kind == 'scene_intervention_applied':
+            intervention['applied'] = True
+        if kind == 'scene_intervention_rejected':
+            intervention.update(applied=False, error=payload.get('message'))
+        if kind == 'scene' and intervention.get('applied') and session.snapshot().get('held_object'):
+            from ..assistant.batch import whole_footprint_in_zone
+            observed = [o for o in payload.get('objects', ())
+                        if o.get('label') == intervention['moved'] and o.get('valid')]
+            if len(observed) == 1 and whole_footprint_in_zone(observed[0], payload, 'zone_red'):
+                intervention['camera_updated_while_holding'] = True
+        if kind == 'placement_refined' and intervention.get('applied'):
+            intervention['final_slot'] = payload.get('position')
+        if kind == 'recovery_observation':
+            observation_counts['stationary_frames'] += 1
+            if intervention and diagnostic_views < 8 and session.snapshot().get('held_object'):
+                diagnostic_views += 1
+                from ..core.extrinsics import camera_pose_in_base
+                (output/('stationary-view-%d.pkl' % diagnostic_views)).write_bytes(pickle.dumps(dict(
+                    frame=session.camera._last, detections=session._last_fresh,
+                    grasp=getattr(session.runner.skill, 'active_grasp', None),
+                    tcp=session.arm.get_tcp_pose().value,
+                    pose=camera_pose_in_base(session.runner.ext, session.arm.get_flange_pose().value,
+                                            session.runner.T_flange_tcp),
+                    revision=session._environment_revision,
+                    invalidated=sorted(session._motion_observer.invalidated))))
+        if kind == 'skill_step' and payload.get('stage') == 'inspect_place':
+            observation_counts['inspection_motion_steps'] += 1
         if kind == 'skill_step' and payload.get('stage') in ('close', 'lift', 'transit', 'inspect_place'):
             tcp = session.arm.get_tcp_pose().value
             objects = {o.label: o.T_base_obj.tolist() for o in session.world.objects}
@@ -186,6 +303,10 @@ def run_phase(controller, instruction, output, timeout):
         goals=goals, truth=truth, timed_out=timed_out,
         wall_seconds=round(time.monotonic() - started, 2),
         scans={key: session._scan_stats[key] - before[key] for key in before},
+        zone_sizes={name:list(zone.size) for name,zone in session.runner.zones.items()},
+        motion_observation={key: session._motion_observer.stats[key]-motion_before[key]
+                            for key in motion_before},
+        observation_work=observation_counts, picked_labels=picked_labels,
         model_requests=state['metrics']['model_requests'] - metrics_before['model_requests'],
         approvals=len(approvals), plans=state['skill_task']['plan_number'],
         failed_steps=[h for h in history if not h.get('ok') and not h.get('deferred')],
@@ -193,8 +314,18 @@ def run_phase(controller, instruction, output, timeout):
         manipulation_steps=sum(h.get('skill') in ('pick', 'place', 'move')
                                and h.get('skipped') is not True and not h.get('deferred')
                                and h.get('manipulation_started') is not False for h in history),
-        drops=len(drops),
+        drops=len(drops), unsupported_drops=sum(not d.get('support') for d in drops),
+        drop_events=drops,
         message=state['stage'], history=history)
+    if getattr(session, 'bench_intervention', False):
+        moved = intervention.get('moved')
+        extra_grasps = [label for label in picked_labels if label == moved]
+        summary['intervention'] = dict(intervention, redundant_grasps=len(extra_grasps),
+            passed=bool(intervention.get('applied') and not extra_grasps
+                        and intervention.get('camera_updated_while_holding')
+                        and summary['complete'] and summary['physical_success']
+                        and {g['label'] for g in goals} == {'banana', 'pear'}
+                        and all(g.get('zone_name') == 'zone_red' for g in goals)))
     write_json(output / 'summary.json', summary)
     write_json(output / 'dashboard-state.json', state)
     write_json(output / 'approvals.json', approvals)
@@ -206,7 +337,7 @@ def run_case(case, seed, output, timeout):
     directory = output / ('case%d-seed%d' % (case, seed))
     directory.mkdir(parents=True, exist_ok=True)
     def session_factory(**kwargs):
-        return BenchSession(stacking=case in (2, 3), **kwargs)
+        return BenchSession(stacking=case in (2, 3), intervention=case == 5, **kwargs)
     controller = DashboardController(seed=seed, realtime=False, session_factory=session_factory,
                                      log_dir=directory / 'logs', backend='mujoco')
     try:
@@ -229,6 +360,9 @@ def run_case(case, seed, output, timeout):
         result = dict(case=case, seed=seed, phases=phases,
             complete=len(phases) == len(INSTRUCTIONS[case]) and all(
                 p['complete'] and p['physical_success'] and p['all_requested_goals'] for p in phases))
+        if case == 5:
+            result['complete'] = result['complete'] and all(
+                p.get('intervention', {}).get('passed') for p in phases)
         write_json(directory / 'result.json', result)
         return result
     finally:
@@ -245,7 +379,7 @@ def main():
     cases = [int(v) for v in args.cases.split(',')]
     seeds = [int(v) for v in args.seeds.split(',')]
     if any(case not in INSTRUCTIONS for case in cases):
-        parser.error('cases must contain 1, 2, 3, or 4')
+        parser.error('cases must contain 1, 2, 3, 4, or 5')
     results = []
     for case in cases:
         for seed in seeds:

@@ -4,153 +4,154 @@
 - Scoped local AST only; repository documentation, tests, configs, assets and third-party packages are outside this graph.
 
 ## Summary
-- 4959 nodes · 13933 edges · 158 communities (104 shown, 54 thin omitted)
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 744 edges (avg confidence: 0.89)
+- 4995 nodes · 14058 edges · 155 communities (113 shown, 42 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 760 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
 - Onsite Components
-- Teach Classes Components
-- Calib Points Components
-- Simulation World State
-- Calib Verify Components
--  Components
-- Browser Task Controls
 - Onsite Components
-- Scenarios Components
-- Segment Components
-- Pipeline Components
-- MuJoCo Arm Control
-- Pyagxarm Arm Components
+- Teach Classes Components
+- Grasp Components
 - Legacy Task Runner
-- Render Components
-- Geometry Components
+- Calib Verify Components
+- Color Calib Components
+- MuJoCo Arm Control
+- Browser Task Controls
+- Scenarios Components
+- Preview Simulation Session
+- Safety Components
+- Pyagxarm Arm Components
+- Segment Components
+- Preview Simulation Session
+- Safety Components
 - Legacy Motion Skills
-- Camera Configuration Geometry
+- Legacy Task Runner
+- Check Setup Components
+- Color Calib Components
+- Teach Classes Components
+- Composable Skill Orchestration
+- Placement Region Observation
+- Geometry Components
+- Export Onnx Components
+- Pipeline Components
+- Selfcheck Components
+- Sim Arm Components
+- Validated Skill Execution
+- Teach Poses Components
+- Render Components
+- Simulation World State
+- Camera Handeye Calibration
 - Simulation World State
 - Standalone Cube Detection
-- Teach Record Components
-- Teach Poses Components
-- Teach Poses Components
-- Language Model Planning
-- Classify Color Components
-- Camera Handeye Calibration
-- Record Components
-- Teach Classes Components
-- Export Onnx Components
-- Preview Simulation Session
-- Composable Skill Orchestration
-- Safety Components
-- Interactive Physics Session
-- Sim Camera Components
-- Preview Simulation Session
-- Validated Skill Execution
-- Web Service Routes
-- Sim Arm Components
 - Simulation World State
-- Carried Observation Components
-- Safety Components
-- Ik Components
-- Logger Components
-- Run Components
-- Run Task Components
+- Web Service Routes
 - Views Components
-- Sim Bench Components
-- Make Dataset Components
-- Kinematics Components
-- Selfcheck Components
-- Legacy Task Runner
-- Color Calib Components
-- Catalog Perception Components
-- Preview Simulation Session
-- Pyagxarm Arm Components
-- Onsite Components
-- MuJoCo Scene Construction
-- Calib Points Components
-- Preview Simulation Session
-- Classify Knn Components
-- Placement Region Observation
-- Coordinate Transform Utilities
-- Obstacle Recovery Components
-- MuJoCo Scene Construction
-- Extrinsics Components
-- Motion Ctl Components
-- Skill Protocol Components
-- Ros Camera Components
+- Ik Components
+- Motion Observation Components
+- Logger Components
 - Teach Poses Components
-- Catalog Components
-- Color Calib Components
-- Grasp Components
-- Detector Onnx Components
-- MuJoCo Physics Engine
-- Sequential Batch Planning
-- Check Setup Components
-- Grasp Components
-- Legacy Task Runner
-- Held Recovery Components
-- Color Calib Components
-- Grasp Components
-- Legacy Task Runner
-- Operator Components
+- Coordinate Transform Utilities
+- Extrinsics Components
+- Make Dataset Components
+- Teach Record Components
 - Ros Camera Components
+- Sim Bench Components
+- Kinematics Components
+- Assistant Bench Components
+- Features Components
+- Pyagxarm Arm Components
+- Calib Points Components
+- Run Task Components
+- Record Components
+- Coordinate Transform Utilities
+- Interactive Physics Session
+- MuJoCo Scene Construction
+- Simulation World State
+- Simulation World State
+- Run Components
+- Classify Knn Components
 - Camera Configuration Geometry
-- Color Calib Components
-- Color Calib Components
+- Held Recovery Components
+- Motion Ctl Components
+- Reach Components
+- Skill Protocol Components
+- Table Components
+- Calib Points Components
+- Live Components
+- MuJoCo Scene Construction
+- Detector Onnx Components
+- Common Components
+- Calib Points Components
+- MuJoCo Physics Engine
+- Cli Components
+- Interfaces Components
+- Language Model Planning
+- Camera Configuration Geometry
+- Catalog Perception Components
+- Operator Components
+- Recorder Components
+- Language Model Planning
+- Scenarios Components
 - Ui Components
 - Browser Scene Editor
-- Video Components
-- Grasp Components
+- Sequential Batch Planning
 - Detector Onnx Components
-- Reach Components
 - Video Components
-- Detector Onnx Components
-- Grasp Components
-- Extrinsics Components
-- Interfaces Components
-- Assistant Bench Components
-- Calib Points Components
+- Live Components
+- File Camera Components
 - Moveit Bridge Components
-- Selection Components
-- Check Setup Components
+- Config Components
+- Video Components
+- Sim Camera Components
+- Calib Points Components
+- Detector Onnx Components
+- Observations Components
+- Stack Scene Observation
+- MuJoCo Scene Construction
+- Run Components
+- Calib Points Components
+- Clock Components
+- Calib Points Components
+- Onsite Components
+- Obstacle Recovery Components
 - Check Onnx Components
 - Standalone Cube Detection
-- Factory Components
+- Spherical Anchor Components
+- Teach Record Components
+- Calib Points Components
+- Teach Poses Components
+- L1 New Components
+- Scenarios Components
+- Run Task Components
+- Grasp Components
+- Pyagxarm Arm Components
 - MuJoCo Scene Construction
-- Selfcheck Components
 - Motion Ctl Components
-- MuJoCo Scene Construction
-- Color Calib Components
-- Color Calib Components
-- Pyagxarm Arm Components
-- Onsite Components
-- Live Components
+- Teach Poses Components
 - Web Service Routes
-- Preview Simulation Session
-- Pyagxarm Arm Components
-- Check Setup Components
-- Dialogue Context Management
+- Recovery Components
+- Extrinsics Components
+- Factory Components
+- Calib Points Components
 - Run Components
-- Live Components
+- Calib Points Components
+- Run Task Components
 - Sim Bench Components
 - Sim Bench Components
 - Assistant Ui Components
-- Registration Components
+- Language Model Planning
+- Common Components
+- Teach Poses Components
+- Dialogue Context Management
 - Simulation World State
+- Ros Camera Components
 - MuJoCo Arm Control
-- Selfcheck Components
--   Main   Components
-- Carried Observation Components
-- Sim Arm Components
-- MuJoCo Arm Control
-- Validated Skill Execution
 - Clock Components
-- Detector Onnx Components
-- Grasp Components
-- Make Dataset Components
 
 ## God Nodes (most connected - your core abstractions)
-1. `Detection` - 113 edges
-2. `SimulationSession` - 87 edges
+1. `Detection` - 117 edges
+2. `SimulationSession` - 90 edges
 3. `TaskRunner` - 82 edges
 4. `SimObject` - 79 edges
 5. `CameraIntrinsics` - 67 edges
@@ -161,460 +162,496 @@
 10. `SafeArm` - 50 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `inspect_held()` --indirect_call--> `safe_inspection_route()`  [INFERRED]
-  ws/src/cube_task/cube_task/assistant/active_observation.py → ws/src/cube_task/cube_task/assistant/placement_observation.py
+- `measured_neighbors()` --calls--> `stationary()`  [INFERRED]
+  ws/src/cube_task/cube_task/assistant/active_observation.py → ws/src/cube_task/cube_task/assistant/skill_execution.py
 - `_training_samples()` --uses--> `CameraIntrinsics`  [INFERRED]
   ws/src/cube_task/cube_task/assistant/catalog_perception.py → ws/src/cube_task/cube_task/core/types.py
 - `make_sandbox_perception()` --uses--> `Perception`  [INFERRED]
   ws/src/cube_task/cube_task/assistant/catalog_perception.py → ws/src/cube_task/cube_task/perception/pipeline.py
-- `DashboardPhysics` --uses--> `SafeArm`  [INFERRED]
-  ws/src/cube_task/cube_task/assistant/physics.py → ws/src/cube_task/cube_task/robot/safety.py
-- `DashboardPhysics` --uses--> `SafetyGuard`  [INFERRED]
-  ws/src/cube_task/cube_task/assistant/physics.py → ws/src/cube_task/cube_task/robot/safety.py
+- `MotionObservation` --uses--> `Detection`  [INFERRED]
+  ws/src/cube_task/cube_task/assistant/motion_observation.py → ws/src/cube_task/cube_task/core/types.py
+- `DashboardPhysics` --uses--> `Config`  [INFERRED]
+  ws/src/cube_task/cube_task/assistant/physics.py → ws/src/cube_task/cube_task/core/config.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (158 total, 54 thin omitted)
+## Communities (155 total, 42 thin omitted)
 
 ### Community 0 - "Onsite Components"
-Cohesion: 0.04
-Nodes (44): next_index(), deep_merge(), _parse_value(), read_yaml(), build_parser(), main(), build_parser(), main() (+36 more)
-
-### Community 1 - "Teach Classes Components"
 Cohesion: 0.03
-Nodes (36): list_frames(), accepted_labels(), add_sim_ground_truth(), Batch, build_report(), check_label(), clean_label(), config_hints() (+28 more)
+Nodes (46): next_index(), ArmError, build_parser(), main(), build_parser(), main(), auto_due(), build_extra() (+38 more)
 
-### Community 2 - "Calib Points Components"
+### Community 1 - "Onsite Components"
+Cohesion: 0.03
+Nodes (48): teach_exit_hint(), arm_firmware_version(), ArmPose, average_poses(), backup_file(), backup_path(), dotted_keys(), ensure_motion_ready() (+40 more)
+
+### Community 2 - "Teach Classes Components"
+Cohesion: 0.03
+Nodes (39): list_frames(), task_labels(), accepted_labels(), add_sim_ground_truth(), Batch, build_report(), check_label(), clean_label() (+31 more)
+
+### Community 3 - "Grasp Components"
 Cohesion: 0.04
-Nodes (36): _as_array(), _as_list(), check_args(), check_point_geometry(), clean_depth(), compare_extrinsics(), _copy_or_none(), _deg_between() (+28 more)
+Nodes (29): choose_closing_angle(), neutral_closing_angle(), top_down_T(), wrap_pi(), Zone, capsule_edge_margin(), _finite(), footprint_capsule() (+21 more)
 
-### Community 3 - "Simulation World State"
-Cohesion: 0.04
-Nodes (16): class_grasp(), _class_grasp(), compound_sections(), find_grasp(), find_top_down_grasp(), _footprint(), fully_visible(), _no_grasp_reason() (+8 more)
-
-### Community 4 - "Calib Verify Components"
-Cohesion: 0.04
-Nodes (33): approach_z(), check_args(), corrected_extrinsics(), corrected_transform(), _deviations(), _fmt_d(), hover_plan(), HoverPlan (+25 more)
-
-### Community 5 - " Components"
+### Community 4 - "Legacy Task Runner"
 Cohesion: 0.05
-Nodes (15): _ViewerClock, capture_averaged(), _compatible(), median_depth(), valid_depth_mask(), SimClock, load_config(), Clock (+7 more)
+Nodes (6): TaskReport, _NullLogger, pick_summary(), TaskRunner, interrupted(), _xy()
 
-### Community 6 - "Browser Task Controls"
+### Community 5 - "Calib Verify Components"
+Cohesion: 0.04
+Nodes (30): approach_z(), check_args(), corrected_extrinsics(), corrected_transform(), correction_formula(), _deviations(), _fmt_d(), hover_plan() (+22 more)
+
+### Community 6 - "Color Calib Components"
+Cohesion: 0.04
+Nodes (31): build_colors_yaml(), calib_header(), circular_mean_hue(), Command, compute_ranges(), _FlowList, fmt_ranges(), hue_stats() (+23 more)
+
+### Community 7 - "MuJoCo Arm Control"
+Cohesion: 0.05
+Nodes (6): MotionResult, _cfg_float(), _cfg_vec(), MujocoArm, _Profile, _Trajectory
+
+### Community 8 - "Browser Task Controls"
 Cohesion: 0.08
 Nodes (81): add(), api(), assistantText(), box(), cameraRefreshLoop(), canvas, colorKey(), context (+73 more)
 
-### Community 7 - "Onsite Components"
-Cohesion: 0.04
-Nodes (32): write_yaml(), aruco_dictionary(), correction_formula(), ArmPose, average_poses(), backup_file(), backup_path(), coverage_check() (+24 more)
-
-### Community 8 - "Scenarios Components"
+### Community 9 - "Scenarios Components"
 Cohesion: 0.05
-Nodes (44): g(), _as_list(), _axis_angle(), _catalog_object(), _catalog_objects(), _check_graspable(), default_intrinsics(), _draw_labels() (+36 more)
+Nodes (43): _arc_points(), _as_list(), _axis_angle(), _catalog_object(), _catalog_objects(), _check_graspable(), _edge_normals(), _eye_in_hand_observe() (+35 more)
 
-### Community 9 - "Segment Components"
-Cohesion: 0.06
-Nodes (36): _side_support_evidence(), _barriers(), cap_band(), cap_points(), completed_extents(), _crop(), _Ctx, depth_edges() (+28 more)
-
-### Community 10 - "Pipeline Components"
-Cohesion: 0.06
-Nodes (20): Detector2D, PerceptionResult, TablePlane, parse_zones(), parse_polygon(), points_in_zones(), _import_piper_vision(), L1NewPerception (+12 more)
-
-### Community 11 - "MuJoCo Arm Control"
+### Community 10 - "Preview Simulation Session"
 Cohesion: 0.05
-Nodes (3): _cfg_vec(), MujocoArm, _Trajectory
+Nodes (3): merge_local_detections(), SimulationSession, via()
+
+### Community 11 - "Safety Components"
+Cohesion: 0.06
+Nodes (9): ArmInterface, Clock, ArmHealth, GripperResult, Stamped, flange_to_tcp_from_cfg(), _need(), _need_float() (+1 more)
 
 ### Community 12 - "Pyagxarm Arm Components"
 Cohesion: 0.06
-Nodes (8): ArmError, canonical_pose6(), _import_sdk(), _num(), _opt(), PyAgxArm, _req(), zero_pose_problem()
+Nodes (6): canonical_pose6(), _num(), _opt(), PyAgxArm, _req(), zero_pose_problem()
 
-### Community 13 - "Legacy Task Runner"
+### Community 13 - "Segment Components"
 Cohesion: 0.06
-Nodes (4): TaskReport, _NullLogger, pick_summary(), TaskRunner
+Nodes (35): _barriers(), cap_band(), cap_points(), completed_extents(), _crop(), _Ctx, depth_edges(), depth_spikes() (+27 more)
 
-### Community 14 - "Render Components"
+### Community 14 - "Preview Simulation Session"
 Cohesion: 0.06
-Nodes (32): rot_z(), _box_prim(), camera_rays(), _check_intrinsics(), _discontinuities(), _gripper_prims(), _hit_box(), _hit_capsule() (+24 more)
+Nodes (20): whole_footprint_at_goal(), catalog_entries(), configure_sandbox(), completion_outline(), destination_label(), footprint_corners(), footprint_in_destination(), placement_metadata() (+12 more)
 
-### Community 15 - "Geometry Components"
+### Community 15 - "Safety Components"
 Cohesion: 0.05
-Nodes (27): _box_side_surfaces(), _LayerPerception, _observed_levels(), refine_supported_objects(), _support_evidence(), CameraIntrinsics, as_zone_list(), backproject() (+19 more)
+Nodes (6): make_arm(), interpolate_pose(), _rejected(), _rot_exp(), SafeArm, SafetyGuard
 
 ### Community 16 - "Legacy Motion Skills"
 Cohesion: 0.09
-Nodes (14): rotation_angle(), GraspPlan, PickResult, PlacePlan, linear_moves_enabled(), free_tilt_limit(), _force_value(), gripper_force_for() (+6 more)
+Nodes (13): rotation_angle(), GraspPlan, PickResult, PlacePlan, linear_moves_enabled(), _force_value(), gripper_force_for(), _Lost (+5 more)
 
-### Community 17 - "Camera Configuration Geometry"
+### Community 17 - "Legacy Task Runner"
 Cohesion: 0.06
-Nodes (28): _apply(), _as_matrix(), _atomic_write(), camera_pose_in_base(), _check_rigid(), Extrinsics, extrinsics_from_dict(), is_optical_frame() (+20 more)
+Nodes (24): _checked_placement(), center_supported(), object_footprint(), object_prism(), detection_table_z(), held_offset_of(), measured_tapered_contact(), transit_height() (+16 more)
 
-### Community 18 - "Simulation World State"
+### Community 18 - "Check Setup Components"
+Cohesion: 0.05
+Nodes (25): main(), camera_pose_for_check(), pick_area_mask(), _arm_fix(), build_parser(), camera_topics(), can_up_command(), check_can() (+17 more)
+
+### Community 19 - "Color Calib Components"
+Cohesion: 0.05
+Nodes (11): _ColorCalib, draw_texts(), effective_classes(), hue_distance(), overlap_pairs(), overlap_warnings(), same_layout(), _View (+3 more)
+
+### Community 20 - "Teach Classes Components"
 Cohesion: 0.04
-Nodes (9): LivePreview, layout_reach_report(), _release_xys(), _check_color(), _finite_array(), _normalize_part(), _positive(), SimWorld (+1 more)
+Nodes (11): format_table(), ground_truth_label(), sim_relayout(), command_kind(), counts_text(), instance_rows(), layout_unchanged(), parse_label_command() (+3 more)
 
-### Community 19 - "Standalone Cube Detection"
+### Community 21 - "Composable Skill Orchestration"
+Cohesion: 0.08
+Nodes (5): _complete_geometry(), goal_worklist(), physically_settled(), plan_limit(), SkillOrchestrator
+
+### Community 22 - "Placement Region Observation"
 Cohesion: 0.06
-Nodes (17): Intrinsics, cmd_l1(), load_frame(), load_image_pair(), RgbdFrame, color_mask(), CubeDetection, depth_to_base() (+9 more)
+Nodes (30): inspect_held(), measured_neighbors(), measurements_changed(), candidate_visibility_filter(), allowed(), _dimensions(), _grip_bend(), _inspection_geometry() (+22 more)
 
-### Community 20 - "Teach Record Components"
-Cohesion: 0.06
-Nodes (23): depth_to_mm(), _imwrite_atomic(), save_frame(), atomic_write_text(), run_review(), contact_sheet(), crop_of(), instance_records() (+15 more)
+### Community 23 - "Geometry Components"
+Cohesion: 0.07
+Nodes (25): _check_intr(), _has_dist(), register_depth_to_color(), camera_info_to_intrinsics(), CameraIntrinsics, as_zone_list(), backproject(), check_depth() (+17 more)
 
-### Community 21 - "Teach Poses Components"
-Cohesion: 0.05
-Nodes (30): parse_zone(), apply_changes(), ccw_polygon(), _Delete, distance_to_polygon(), effective(), _finite_number(), _fmt_joints() (+22 more)
-
-### Community 22 - "Teach Poses Components"
-Cohesion: 0.05
-Nodes (11): operator_action(), clip_to_limits(), draw_map(), _floats_or(), joint_limit_violations(), _joint_limits(), map_px(), _Teacher (+3 more)
-
-### Community 23 - "Language Model Planning"
-Cohesion: 0.05
-Nodes (21): _CancellableStream, _iter_sse(), _json_object(), LLMError, LLMSettings, load_settings(), _model_placement(), number() (+13 more)
-
-### Community 24 - "Classify Color Components"
-Cohesion: 0.06
-Nodes (21): InstanceClassifier, Detection, Frame, _check_ranges(), _circular_mean_hue(), ColorClassifier, hsv_ranges_from_samples(), in_ranges() (+13 more)
-
-### Community 25 - "Camera Handeye Calibration"
-Cohesion: 0.06
-Nodes (22): build_parser(), cmd_board(), cmd_handeye(), cmd_show(), cmd_transform(), _collect_offline(), _default(), _load_cam() (+14 more)
-
-### Community 26 - "Record Components"
-Cohesion: 0.06
-Nodes (19): CameraConfig, cmd_record(), _collect_live(), ArmPoseReader, _image_to_numpy(), RosRgbd, _atomic_imwrite(), _atomic_text() (+11 more)
-
-### Community 27 - "Teach Classes Components"
-Cohesion: 0.05
-Nodes (8): command_kind(), counts_text(), instance_rows(), layout_unchanged(), parse_label_command(), plan_labeling(), _Teacher, wrap_lines()
-
-### Community 28 - "Export Onnx Components"
+### Community 24 - "Export Onnx Components"
 Cohesion: 0.06
 Nodes (23): run_cmd(), box_iou(), build_parser(), compare_onnx_outputs(), default_images(), export(), main(), match_detections() (+15 more)
 
-### Community 29 - "Preview Simulation Session"
+### Community 25 - "Pipeline Components"
+Cohesion: 0.09
+Nodes (13): Detector2D, InstanceClassifier, Frame, PerceptionResult, ColorClassifier, make_classifier(), annotate_neighbors(), _finite() (+5 more)
+
+### Community 26 - "Selfcheck Components"
 Cohesion: 0.07
-Nodes (15): _coverage(), inspect_held(), measurements_changed(), measurement_visible(), merge_local_detections(), _xy(), inspection_history(), remember_inspection() (+7 more)
+Nodes (31): parse_zones(), free_tilt_limit(), arm_self_check(), at_observe_pose(), _camera_frame(), _check_arm(), _check_assets(), _check_camera() (+23 more)
 
-### Community 31 - "Safety Components"
+### Community 27 - "Sim Arm Components"
+Cohesion: 0.07
+Nodes (3): _cfg_float(), _Fault, SimArm
+
+### Community 28 - "Validated Skill Execution"
+Cohesion: 0.10
+Nodes (8): _PlanChanged, SkillExecutor, stationary(), guard(), interrupted(), progress(), search(), _TargetUnavailable
+
+### Community 29 - "Teach Poses Components"
 Cohesion: 0.06
-Nodes (14): ArmInterface, pose_error(), ArmHealth, GripperResult, flange_to_tcp_from_cfg(), tilt_outward(), piper_firmware_tuple(), interpolate_pose() (+6 more)
+Nodes (25): parse_zone(), ccw_polygon(), distance_to_polygon(), effective(), _finite_number(), get_dotted(), is_convex_polygon(), joint_limit_violations() (+17 more)
 
-### Community 32 - "Interactive Physics Session"
-Cohesion: 0.06
-Nodes (9): DashboardPhysics, Config, _find_root(), _set_dotted(), ensure_sim_knn(), _knn_loadable(), Session, _sim_knn_fingerprint() (+1 more)
+### Community 30 - "Render Components"
+Cohesion: 0.08
+Nodes (26): measurement_absent(), measurement_visible(), rank_views(), _same_layer(), _xy(), _box_prim(), camera_rays(), _check_intrinsics() (+18 more)
 
-### Community 33 - "Sim Camera Components"
-Cohesion: 0.05
-Nodes (9): make_camera(), _make_sim_camera(), _pose(), FileCamera, _check_idx(), load_frame(), _name(), CameraSource (+1 more)
+### Community 31 - "Simulation World State"
+Cohesion: 0.07
+Nodes (9): class_grasp(), _class_grasp(), compound_sections(), find_grasp(), find_top_down_grasp(), fully_visible(), _no_grasp_reason(), official_graspability() (+1 more)
 
-### Community 34 - "Preview Simulation Session"
-Cohesion: 0.05
-Nodes (4): footprint_corners(), rank_views(), SimulationSession, via()
+### Community 32 - "Camera Handeye Calibration"
+Cohesion: 0.07
+Nodes (16): Extrinsics, cmd_board(), cmd_handeye(), _collect_live(), board_corners_3d(), BoardSpec, coverage_warning(), detect_board() (+8 more)
 
-### Community 35 - "Validated Skill Execution"
-Cohesion: 0.11
-Nodes (7): _PlanChanged, SkillExecutor, stationary(), guard(), interrupted(), progress(), search()
+### Community 33 - "Simulation World State"
+Cohesion: 0.08
+Nodes (7): _check_color(), check_pose(), _dome_taper_deg(), _finite_array(), _normalize_part(), _positive(), SimWorld
+
+### Community 34 - "Standalone Cube Detection"
+Cohesion: 0.09
+Nodes (14): _import_piper_vision(), Intrinsics, color_mask(), CubeDetection, depth_to_base(), draw_result(), fit_table_plane(), _in_polygon() (+6 more)
 
 ### Community 36 - "Web Service Routes"
 Cohesion: 0.09
 Nodes (10): idle_batch(), BusyError, DashboardController, editable_session(), run(), work(), run(), run() (+2 more)
 
-### Community 39 - "Carried Observation Components"
+### Community 37 - "Views Components"
 Cohesion: 0.07
-Nodes (22): _compound_core_supported(), mask_carried_depth(), _pose(), _solid_box_source(), _source_surface_supported(), held_anchor(), seating_requires_feedback(), source_anchor() (+14 more)
+Nodes (23): Detection, clearances(), is_blacklisted(), _radius(), select_target(), dist(), iso_key(), tie() (+15 more)
 
-### Community 40 - "Safety Components"
-Cohesion: 0.09
-Nodes (4): MotionResult, _rejected(), SafeArm, SafetyGuard
-
-### Community 41 - "Ik Components"
+### Community 38 - "Ik Components"
 Cohesion: 0.09
 Nodes (4): PhysicsKinematics, _check_pose(), MujocoIK, _wrap_into()
 
-### Community 42 - "Logger Components"
+### Community 39 - "Motion Observation Components"
+Cohesion: 0.06
+Nodes (12): CarriedDetections, _compound_core_supported(), mask_carried_depth(), _pose(), _solid_box_source(), _source_surface_supported(), apply_translation_anchor(), seating_requires_feedback() (+4 more)
+
+### Community 40 - "Logger Components"
 Cohesion: 0.08
 Nodes (6): _EventLogger, dumps_compact(), RunLogger, safe_filename(), _short(), to_jsonable()
 
-### Community 43 - "Run Components"
+### Community 41 - "Teach Poses Components"
 Cohesion: 0.07
-Nodes (10): _EventTap, expected_zones(), failure_causes(), final_truth(), _object_cause(), _ObjState, PhysicsMonitor, _pick_cause() (+2 more)
+Nodes (3): clip_to_limits(), _Teacher, zone_users()
 
-### Community 44 - "Run Task Components"
+### Community 42 - "Coordinate Transform Utilities"
+Cohesion: 0.09
+Nodes (19): _as_matrix(), _check_rigid(), extrinsics_from_dict(), is_optical_frame(), _matrix_list(), _parse_transform(), _rotation_of(), _translation_of() (+11 more)
+
+### Community 43 - "Extrinsics Components"
 Cohesion: 0.10
-Nodes (26): _attach_mujoco(), _base_summary(), build_parser(), _classifier_text(), _close_log(), _close_mujoco(), _confirm(), _deg() (+18 more)
+Nodes (20): _check_radians(), Extrinsics, extrinsics_from_cfg(), extrinsics_from_dict(), is_optical_frame(), _json_file_as_yaml(), _link_to_optical(), load_extrinsics() (+12 more)
 
-### Community 45 - "Views Components"
+### Community 44 - "Make Dataset Components"
+Cohesion: 0.09
+Nodes (17): build_dataset(), build_parser(), fit_plane_ransac(), iter_session(), _load_capture_frame(), main(), box_fn(), ModelBoxes (+9 more)
+
+### Community 45 - "Teach Record Components"
 Cohesion: 0.08
-Nodes (21): _capture_of(), _cloud(), _distances(), merge_observations(), _prefer_pear_neck_views(), _separate_residual(), _uniform(), points_in_polygon() (+13 more)
+Nodes (16): contact_sheet(), crop_of(), instance_records(), load_instances(), load_labels(), load_samples(), loo_predictions(), match_instances() (+8 more)
 
-### Community 46 - "Sim Bench Components"
+### Community 46 - "Ros Camera Components"
+Cohesion: 0.09
+Nodes (6): check_depth_scale(), depth_msg_to_meters(), image_msg_to_bgr(), _image_view(), RosCamera, _stamp_to_sec()
+
+### Community 47 - "Sim Bench Components"
 Cohesion: 0.09
 Nodes (21): aggregate(), build_parser(), _cause_key(), failure_report(), fault_point(), format_report(), ground_truth(), is_success() (+13 more)
 
-### Community 47 - "Make Dataset Components"
-Cohesion: 0.10
-Nodes (16): build_dataset(), fit_plane_ransac(), iter_session(), _load_capture_frame(), main(), box_fn(), ModelBoxes, _parse_roi() (+8 more)
-
 ### Community 48 - "Kinematics Components"
-Cohesion: 0.10
-Nodes (4): _as_joints(), _check_pose(), PiperKinematics, _cfg_float()
-
-### Community 49 - "Selfcheck Components"
-Cohesion: 0.10
-Nodes (23): arm_self_check(), at_observe_pose(), _check_arm(), _check_assets(), _check_camera(), _check_extrinsics(), _check_reachable(), _check_robot_config() (+15 more)
-
-### Community 50 - "Legacy Task Runner"
-Cohesion: 0.10
-Nodes (13): _checked_placement(), detection_table_z(), held_offset_of(), transit_height(), _footprint(), footprint_dims(), _has_xy(), held_shape() (+5 more)
-
-### Community 52 - "Catalog Perception Components"
 Cohesion: 0.09
-Nodes (13): catalog_entries(), _cache_path(), _center_round_fruit(), _classifier(), _ColorSeededKnn, completeness(), configure_sandbox(), make_sandbox_perception() (+5 more)
+Nodes (7): _as_joints(), _check_pose(), PiperKinematics, rot_log(), piper_firmware_tuple(), seamless_teach_switch(), _live_arm()
 
-### Community 55 - "Onsite Components"
-Cohesion: 0.07
-Nodes (9): camera_pose_for_frame(), compose_view(), depth_range_auto(), flange_to_tcp(), text_panel(), depth_colormap(), side_by_side(), FpsMeter (+1 more)
+### Community 49 - "Assistant Bench Components"
+Cohesion: 0.09
+Nodes (18): whole_footprint_in_zone(), CatalogEditor, make_catalog_object(), _number(), restoration_yaw_period(), _segment_in_rectangle(), _xy(), camera_pose_in_base() (+10 more)
 
-### Community 56 - "MuJoCo Scene Construction"
+### Community 50 - "Features Components"
+Cohesion: 0.08
+Nodes (14): _check_ranges(), _circular_mean_hue(), hsv_ranges_from_samples(), in_ranges(), bgr_to_hsv_pixels(), _crop_mask(), feature_vector(), footprint_shape() (+6 more)
+
+### Community 51 - "Pyagxarm Arm Components"
+Cohesion: 0.09
+Nodes (3): _import_sdk(), SdkCallError, _SdkPort
+
+### Community 52 - "Calib Points Components"
+Cohesion: 0.09
+Nodes (15): aruco_dictionary(), BlockParams, check_args(), clean_depth(), compare_extrinsics(), detect_markers(), fit_plane_ransac(), _lsq_plane() (+7 more)
+
+### Community 53 - "Run Task Components"
+Cohesion: 0.13
+Nodes (20): _attach_mujoco(), _base_summary(), build_parser(), _close_log(), _close_mujoco(), _confirm(), exit_code_for(), failure_lines() (+12 more)
+
+### Community 54 - "Record Components"
+Cohesion: 0.10
+Nodes (13): cmd_record(), ArmPoseReader, _atomic_imwrite(), _atomic_text(), depth_to_mm(), next_index(), _Pose, record_bag() (+5 more)
+
+### Community 55 - "Coordinate Transform Utilities"
+Cohesion: 0.11
+Nodes (17): closing_angle_of(), inv_T(), is_rotation(), make_T(), pose6_to_T(), pose_error(), quat_to_rot(), rot_to_quat() (+9 more)
+
+### Community 56 - "Interactive Physics Session"
+Cohesion: 0.08
+Nodes (3): DashboardPhysics, _Cancellation, _ViewerClock
+
+### Community 57 - "MuJoCo Scene Construction"
 Cohesion: 0.14
-Nodes (19): _add_environment(), _add_object(), _add_zone(), _as_list(), _camera(), _camera_housing(), _el(), _f() (+11 more)
+Nodes (20): rot_z(), _add_environment(), _add_object(), _add_zone(), _as_list(), _camera(), _camera_housing(), _compound_part() (+12 more)
 
-### Community 57 - "Calib Points Components"
-Cohesion: 0.09
-Nodes (3): _Calib, measurement_line(), grab_frames()
+### Community 58 - "Simulation World State"
+Cohesion: 0.08
+Nodes (7): _box_surface(), _capsule_surface(), _cylinder_surface(), densify_polyline(), _ellipsoid_surface(), fibonacci_sphere(), pad_section()
 
-### Community 58 - "Preview Simulation Session"
-Cohesion: 0.09
-Nodes (9): destination_label(), unique_target(), GoalVerification, confirmed(), audit(), camera_confirmed(), measured_support(), planning_options() (+1 more)
+### Community 59 - "Simulation World State"
+Cohesion: 0.07
+Nodes (3): LivePreview, _release_xys(), SimZone
 
-### Community 59 - "Classify Knn Components"
+### Community 60 - "Run Components"
+Cohesion: 0.10
+Nodes (10): collect_samples(), _EventTap, expected_zones(), failure_causes(), final_truth(), match_objects(), _object_cause(), _pick_cause() (+2 more)
+
+### Community 61 - "Classify Knn Components"
 Cohesion: 0.12
 Nodes (3): KnnClassifier, nan_free(), train_knn_from_sim()
 
-### Community 60 - "Placement Region Observation"
-Cohesion: 0.11
-Nodes (19): _dimensions(), _grip_bend(), _inspection_geometry(), _inspection_visibility_score(), iter_safe_inspection_poses(), ranking(), visibility_score(), JointTransitRoute (+11 more)
-
-### Community 61 - "Coordinate Transform Utilities"
-Cohesion: 0.12
-Nodes (18): closing_angle_of(), fit_rigid(), make_T(), pose6_to_T(), quat_to_rot(), rot_to_quat(), rot_to_rpy(), rot_x() (+10 more)
-
-### Community 62 - "Obstacle Recovery Components"
-Cohesion: 0.10
-Nodes (18): completion_outline(), footprint_in_destination(), _number(), validate_destination(), whole_footprint_at_destination(), _angle_error(), _at_origin(), _bind() (+10 more)
-
-### Community 63 - "MuJoCo Scene Construction"
+### Community 62 - "Camera Configuration Geometry"
 Cohesion: 0.09
-Nodes (13): assets_dir_for(), build_scene(), _cfg_get(), _compile(), fovy_deg(), _init_arm(), intrinsics_for_fovy(), _make_meta() (+5 more)
+Nodes (10): _apply(), _atomic_write(), camera_pose_in_base(), CameraConfig, load_camera_config(), points_base_to_camera(), points_camera_to_base(), save_camera_config() (+2 more)
 
-### Community 64 - "Extrinsics Components"
+### Community 63 - "Held Recovery Components"
+Cohesion: 0.11
+Nodes (19): _action(), _ActionFailed, _center(), _destination(), execute_held_recovery(), record(), stopped(), _fresh_target() (+11 more)
+
+### Community 64 - "Motion Ctl Components"
+Cohesion: 0.15
+Nodes (18): _arm_selfcheck(), cmd_gripper(), cmd_home(), cmd_joints(), cmd_moveit(), cmd_pick(), cmd_vision(), _confirm() (+10 more)
+
+### Community 65 - "Reach Components"
 Cohesion: 0.12
-Nodes (12): Extrinsics, extrinsics_from_cfg(), extrinsics_from_dict(), is_optical_frame(), _json_file_as_yaml(), load_extrinsics(), non_optical_frame_message(), normalize_mount() (+4 more)
-
-### Community 65 - "Motion Ctl Components"
-Cohesion: 0.16
-Nodes (18): _arm_selfcheck(), cmd_gripper(), cmd_home(), cmd_joints(), cmd_moveit(), cmd_pick(), cmd_status(), cmd_vision() (+10 more)
+Nodes (17): gap(), accepts_kwarg(), adjust_plan_poses(), _at_z(), _check(), _heights(), _planning_cancelled(), reach_adjust() (+9 more)
 
 ### Community 66 - "Skill Protocol Components"
-Cohesion: 0.15
-Nodes (20): plan_limit(), _capabilities(), _destination_summary(), _failure_summary(), _fields(), _final_audit_summary(), _finite(), _goal_worklist_summary() (+12 more)
+Cohesion: 0.16
+Nodes (22): model_conversation(), _number(), validate_destination(), _capabilities(), _destination_summary(), _failure_summary(), _fields(), _final_audit_summary() (+14 more)
 
-### Community 67 - "Ros Camera Components"
+### Community 67 - "Table Components"
 Cohesion: 0.11
-Nodes (3): camera_info_to_intrinsics(), RosCamera, CameraError
+Nodes (8): TablePlane, parse_polygon(), fit_table_plane(), fit_table_plane_detailed(), _plane_from_points(), _restrict(), TableFit, TableParams
 
-### Community 68 - "Teach Poses Components"
-Cohesion: 0.07
-Nodes (12): kinematic_arm(), sim_arm(), sim_drag_joints(), sim_drag_tcp(), pose_report(), post_write_report(), reach_report(), reach_text() (+4 more)
+### Community 69 - "Live Components"
+Cohesion: 0.08
+Nodes (3): _image_to_numpy(), RosRgbd, RosTcpPose
 
-### Community 69 - "Catalog Components"
+### Community 70 - "MuJoCo Scene Construction"
 Cohesion: 0.10
-Nodes (12): CatalogEditor, make_catalog_object(), _number(), restoration_yaw_period(), _segment_in_rectangle(), _xy(), _arc_capsules(), _banana_parts() (+4 more)
+Nodes (12): assets_dir_for(), build_scene(), _cfg_get(), _compile(), fovy_deg(), _init_arm(), _make_meta(), _part_area() (+4 more)
 
-### Community 70 - "Color Calib Components"
+### Community 71 - "Detector Onnx Components"
+Cohesion: 0.13
+Nodes (11): build_label_mapping(), _check_metadata(), _check_names(), DetectorError, _first_line(), OnnxInfo, _onnxruntime_available(), _OpenCVRunner (+3 more)
+
+### Community 72 - "Common Components"
+Cohesion: 0.12
+Nodes (8): Config, _apply_extra(), ensure_sim_knn(), _knn_loadable(), _mujoco_cfg_world(), _scenario_task(), _sim_knn_fingerprint(), summarize_cfg()
+
+### Community 73 - "Calib Points Components"
 Cohesion: 0.09
-Nodes (14): build_colors_yaml(), circular_mean_hue(), _FlowList, fmt_ranges(), hue_stats(), inside_fraction(), _num(), overlap_fractions() (+6 more)
+Nodes (7): average_measurements(), _copy_or_none(), draw_measurement(), Measurement, measurement_line(), parse_command(), grab_frames()
 
-### Community 71 - "Grasp Components"
-Cohesion: 0.12
-Nodes (8): neutral_closing_angle(), wrap_pi(), Zone, PlacePlanner, boundary_candidates(), contact_order(), release_slots(), strip_axis()
-
-### Community 72 - "Detector Onnx Components"
+### Community 75 - "Cli Components"
 Cohesion: 0.13
-Nodes (10): build_label_mapping(), _check_metadata(), _check_names(), DetectorError, _first_line(), OnnxInfo, _OpenCVRunner, _probability() (+2 more)
+Nodes (11): build_parser(), cmd_l1(), cmd_show(), cmd_transform(), _collect_offline(), _default(), main(), list_frames() (+3 more)
 
-### Community 74 - "Sequential Batch Planning"
-Cohesion: 0.12
-Nodes (12): bind_item(), build_items(), completed_position(), _in_completed_zone(), matching_objects(), whole_footprint_at_goal(), whole_footprint_in_zone(), _complete_geometry() (+4 more)
-
-### Community 75 - "Check Setup Components"
-Cohesion: 0.12
-Nodes (12): build_parser(), camera_topics(), can_up_command(), check_can(), check_modules(), check_ros(), main(), official_can_script() (+4 more)
-
-### Community 76 - "Grasp Components"
-Cohesion: 0.13
-Nodes (3): choose_closing_angle(), GraspPlanner, _identity_plan()
-
-### Community 77 - "Legacy Task Runner"
-Cohesion: 0.11
-Nodes (10): adjust_plan_poses(), release_workspace_reason(), _placement_anchor_center(), interrupted(), candidate_allowed(), cell_key(), interrupted(), interruption_reason() (+2 more)
-
-### Community 78 - "Held Recovery Components"
-Cohesion: 0.14
-Nodes (16): _action(), _ActionFailed, _center(), _destination(), execute_held_recovery(), record(), stopped(), _fresh_target() (+8 more)
-
-### Community 79 - "Color Calib Components"
+### Community 76 - "Interfaces Components"
 Cohesion: 0.10
-Nodes (12): Command, match_label(), normalize_line(), parse_command(), _parse_margins(), prepare_pose(), same_layout(), _View (+4 more)
+Nodes (7): make_camera(), _make_sim_camera(), _pose(), capture_averaged(), _compatible(), median_depth(), CameraSource
 
-### Community 80 - "Grasp Components"
-Cohesion: 0.11
-Nodes (10): _finite(), _occupied_capsule(), _pad_taper_deg(), section_center_shift(), section_profile(), section_width(), _seg_dist(), table_floor_z() (+2 more)
+### Community 77 - "Language Model Planning"
+Cohesion: 0.12
+Nodes (10): _iter_sse(), _json_object(), LLMError, _model_placement(), number(), pair(), ModelClient, check_cancel() (+2 more)
 
-### Community 81 - "Legacy Task Runner"
-Cohesion: 0.13
-Nodes (11): candidate_visibility_filter(), allowed(), center_supported(), object_footprint(), object_prism(), polygons_overlap(), prepare_polygon(), PreparedPolygon (+3 more)
+### Community 79 - "Catalog Perception Components"
+Cohesion: 0.12
+Nodes (9): _cache_path(), _center_round_fruit(), _classifier(), _ColorSeededKnn, completeness(), make_sandbox_perception(), pear_pose(), SandboxPerception (+1 more)
 
-### Community 83 - "Ros Camera Components"
-Cohesion: 0.15
-Nodes (6): check_depth_scale(), depth_msg_to_meters(), fit_intrinsics(), image_msg_to_bgr(), _image_view(), _stamp_to_sec()
+### Community 81 - "Recorder Components"
+Cohesion: 0.16
+Nodes (8): _check_idx(), depth_to_mm(), _imwrite_atomic(), load_frame(), _name(), save_frame(), valid_depth_mask(), atomic_write_text()
 
-### Community 85 - "Color Calib Components"
+### Community 82 - "Language Model Planning"
 Cohesion: 0.10
-Nodes (7): build_parser(), calib_header(), compute_ranges(), main(), options_from_args(), RangeOptions, _run()
+Nodes (5): LLMSettings, load_settings(), _NoRedirect, _open(), _read_config()
 
-### Community 86 - "Color Calib Components"
-Cohesion: 0.11
-Nodes (3): InstanceSample, SampleBook, weak_instance_warnings()
+### Community 83 - "Scenarios Components"
+Cohesion: 0.12
+Nodes (12): g(), _arc_capsules(), _banana_parts(), default_intrinsics(), _draw_labels(), layout_intrinsics(), _legacy_scenario(), make_scenario() (+4 more)
 
-### Community 88 - "Browser Scene Editor"
+### Community 85 - "Browser Scene Editor"
 Cohesion: 0.25
 Nodes (18): buildLibrary(), chooseMode(), clearDestination(), controls(), draw(), drawObject(), drawPlacementPoint(), drawPrimitive() (+10 more)
 
-### Community 90 - "Grasp Components"
-Cohesion: 0.11
-Nodes (9): expected_table_z(), max_gripper_width(), _required_float(), observe_views(), home_target(), jog_target(), _manual_detection(), parse_targets() (+1 more)
-
-### Community 91 - "Detector Onnx Components"
+### Community 86 - "Sequential Batch Planning"
 Cohesion: 0.14
-Nodes (6): decode_output(), letterbox(), nms_per_label(), OnnxDetector, _shape_mismatch_message(), unletterbox_boxes()
+Nodes (9): bind_item(), build_items(), completed_position(), _in_completed_zone(), matching_objects(), validate_decision(), valid_zone(), _xyz_is_finite() (+1 more)
 
-### Community 92 - "Reach Components"
-Cohesion: 0.21
-Nodes (10): supported_grasp(), gap(), accepts_kwarg(), _at_z(), _check(), _heights(), _planning_cancelled(), reach_adjust() (+2 more)
+### Community 87 - "Detector Onnx Components"
+Cohesion: 0.14
+Nodes (7): decode_output(), letterbox(), nms_per_label(), OnnxDetector, _shape_mismatch_message(), to_pixel_box(), unletterbox_boxes()
 
-### Community 93 - "Video Components"
+### Community 88 - "Video Components"
 Cohesion: 0.15
 Nodes (3): _LoggerTap, _NullLogger, _PerceptionTap
 
-### Community 94 - "Detector Onnx Components"
-Cohesion: 0.17
-Nodes (9): _check_image(), _fields(), _onnxruntime_available(), opencv_version(), read_onnx_info(), _text(), to_pixel_box(), _value_info() (+1 more)
+### Community 89 - "Live Components"
+Cohesion: 0.14
+Nodes (7): apply_live(), drop_live_seen(), drop_unconfirmed_live(), LiveSettings, LiveWatcher, _rot_deg(), _xy()
 
-### Community 95 - "Grasp Components"
+### Community 91 - "Moveit Bridge Components"
+Cohesion: 0.12
+Nodes (3): execution_waypoints(), MoveItBridge, resample_waypoints()
+
+### Community 92 - "Config Components"
+Cohesion: 0.22
+Nodes (8): _find_root(), load_config(), package_root(), _parse_value(), read_yaml(), _set_dotted(), write_yaml(), zone_sources()
+
+### Community 95 - "Calib Points Components"
+Cohesion: 0.12
+Nodes (4): marker_corners_base(), paint_marker(), sim_touch_pose(), _SimOperator
+
+### Community 96 - "Detector Onnx Components"
+Cohesion: 0.18
+Nodes (8): _check_image(), _fields(), opencv_version(), _OrtRunner, read_onnx_info(), _text(), _value_info(), _varint()
+
+### Community 97 - "Observations Components"
+Cohesion: 0.18
+Nodes (9): _coverage(), _capture_of(), _cloud(), _distances(), merge_observations(), _prefer_pear_neck_views(), _separate_residual(), _uniform() (+1 more)
+
+### Community 98 - "Stack Scene Observation"
 Cohesion: 0.16
-Nodes (6): capsule_edge_margin(), footprint_capsule(), done(), evaluate(), reserve_ok(), skip()
+Nodes (7): _box_side_surfaces(), _LayerPerception, _observed_levels(), refine_supported_objects(), _side_support_evidence(), _support_evidence(), transform_cloud()
 
-### Community 96 - "Extrinsics Components"
-Cohesion: 0.23
-Nodes (9): _check_radians(), _link_to_optical(), _numbers(), _parse_transform(), _quat_rot(), _rotation_any(), _tcp_to_flange(), validate_transform() (+1 more)
+### Community 99 - "MuJoCo Scene Construction"
+Cohesion: 0.12
+Nodes (7): _cfg_get(), require_mujoco(), camera_table(), _geom_min_z(), intrinsics_for_fovy(), mujoco_to_optical(), piper_geometry()
 
-### Community 98 - "Assistant Bench Components"
-Cohesion: 0.20
-Nodes (8): BenchSession, main(), random_objects(), run_case(), session_factory(), run_phase(), stacking_objects(), write_json()
-
-### Community 99 - "Calib Points Components"
+### Community 100 - "Run Components"
 Cohesion: 0.16
-Nodes (6): average_measurements(), BlockParams, fit_plane_ransac(), measure_target_block(), Measurement, _pick_block()
+Nodes (3): _ObjState, PhysicsMonitor, _r()
 
-### Community 101 - "Selection Components"
-Cohesion: 0.25
-Nodes (8): clearances(), is_blacklisted(), _radius(), select_target(), dist(), iso_key(), tie(), _xy()
+### Community 101 - "Calib Points Components"
+Cohesion: 0.15
+Nodes (6): _as_array(), _as_list(), check_point_geometry(), line_offset(), pairs_from_json(), pairs_to_json()
 
-### Community 103 - "Check Onnx Components"
+### Community 102 - "Clock Components"
+Cohesion: 0.16
+Nodes (4): SimClock, deep_merge(), scenario_config_overlay(), collect_sim_samples()
+
+### Community 103 - "Calib Points Components"
+Cohesion: 0.18
+Nodes (6): fit_rigid(), transform_points(), pair_arrays(), PointPair, prediction_error(), solve_extrinsics()
+
+### Community 104 - "Onsite Components"
+Cohesion: 0.15
+Nodes (5): camera_pose_for_frame(), compose_view(), depth_range_auto(), depth_colormap(), side_by_side()
+
+### Community 105 - "Obstacle Recovery Components"
+Cohesion: 0.22
+Nodes (9): _angle_error(), _at_origin(), _bind(), _cancelled(), pose_filter(), execute_clearance(), perform(), _holding() (+1 more)
+
+### Community 106 - "Check Onnx Components"
 Cohesion: 0.20
 Nodes (5): build_parser(), _env(), main(), run(), _synthetic_image()
 
-### Community 104 - "Standalone Cube Detection"
+### Community 107 - "Standalone Cube Detection"
 Cohesion: 0.18
 Nodes (3): _load_l1(), _check_ranges(), L1Params
 
-### Community 105 - "Factory Components"
-Cohesion: 0.28
-Nodes (5): classifier_backend(), make_classifier(), make_detector(), make_perception(), task_labels()
-
-### Community 106 - "MuJoCo Scene Construction"
-Cohesion: 0.17
-Nodes (5): _cfg_get(), require_mujoco(), camera_table(), _geom_min_z(), piper_geometry()
-
-### Community 107 - "Selfcheck Components"
-Cohesion: 0.21
-Nodes (7): _camera_frame(), camera_pose_for_check(), check_pick_area(), _pick_area_depth(), pick_area_mask(), _live_camera(), _pick_area_depth()
-
-### Community 108 - "Motion Ctl Components"
-Cohesion: 0.18
-Nodes (6): package_root(), build_parser(), _common_parent(), main(), motion_tuning_file(), _open()
-
-### Community 109 - "MuJoCo Scene Construction"
-Cohesion: 0.18
-Nodes (5): _compound_part(), object_mass(), object_material(), object_material_name(), _object_parts()
-
-### Community 110 - "Color Calib Components"
-Cohesion: 0.17
-Nodes (5): effective_classes(), missing_label_warnings(), overlap_pairs(), overlap_warnings(), view_warnings()
-
-### Community 111 - "Color Calib Components"
-Cohesion: 0.20
-Nodes (4): draw_texts(), _eroded_upper_pixels(), hue_distance(), instance_hsv()
-
-### Community 113 - "Onsite Components"
-Cohesion: 0.24
-Nodes (5): arm_firmware_version(), ensure_motion_ready(), health_of(), take_can_control_confirmed(), _leave_teach_mode()
-
-### Community 117 - "Pyagxarm Arm Components"
-Cohesion: 0.25
-Nodes (5): T_to_pose6(), seamless_teach_switch(), teach_exit_hint(), _arm_fix(), _live_arm()
-
-### Community 118 - "Check Setup Components"
+### Community 108 - "Spherical Anchor Components"
 Cohesion: 0.22
-Nodes (4): check_config(), check_live(), config_fix(), config_messages()
+Nodes (7): held_anchor(), _acceptable(), fit_spherical_anchor(), _hypothesis(), _quality(), _refine(), validate_anchor_pair()
 
-### Community 119 - "Dialogue Context Management"
-Cohesion: 0.32
-Nodes (3): conversation_summary(), model_conversation(), _safe_text()
+### Community 110 - "Calib Points Components"
+Cohesion: 0.21
+Nodes (6): _deg_between(), sanity_report(), table_in_base(), _table_rows(), _unit(), view_geometry()
 
-### Community 125 - "Registration Components"
-Cohesion: 0.38
-Nodes (3): _check_intr(), _has_dist(), register_depth_to_color()
+### Community 111 - "Teach Poses Components"
+Cohesion: 0.17
+Nodes (5): apply_changes(), check_tasks(), file_header(), pop_dotted(), set_dotted()
 
-### Community 129 - "Selfcheck Components"
-Cohesion: 0.40
-Nodes (3): _point_in_polygon(), _polygons_overlap(), _segments_cross()
+### Community 113 - "Scenarios Components"
+Cohesion: 0.18
+Nodes (6): _image_margin(), layout_reach_report(), entry(), layout_view_report(), official_zones(), _reach_tilt()
+
+### Community 114 - "Run Task Components"
+Cohesion: 0.20
+Nodes (8): cmd_status(), _arm_text(), _classifier_text(), _deg(), _extrinsics_text(), _observe_text(), _sources(), summary_lines()
+
+### Community 115 - "Grasp Components"
+Cohesion: 0.24
+Nodes (4): expected_table_z(), _float(), max_gripper_width(), _required_float()
+
+### Community 117 - "MuJoCo Scene Construction"
+Cohesion: 0.22
+Nodes (4): object_mass(), object_material(), object_material_name(), _object_parts()
+
+### Community 118 - "Motion Ctl Components"
+Cohesion: 0.22
+Nodes (5): build_parser(), _common_parent(), main(), motion_tuning_file(), _open()
+
+### Community 119 - "Teach Poses Components"
+Cohesion: 0.20
+Nodes (3): _floats_or(), zone_changes(), zone_name_problem()
+
+### Community 121 - "Recovery Components"
+Cohesion: 0.39
+Nodes (5): _copy_fields(), model_recovery_context(), _number(), _text(), validate_recovery_decision()
+
+### Community 123 - "Factory Components"
+Cohesion: 0.31
+Nodes (3): classifier_backend(), make_detector(), make_perception()
+
+### Community 124 - "Calib Points Components"
+Cohesion: 0.22
+Nodes (4): point_in_polygon(), marker_image(), sim_spots(), sim_target()
+
+### Community 126 - "Calib Points Components"
+Cohesion: 0.25
+Nodes (3): find_outliers(), iso_now(), residual_table()
+
+### Community 127 - "Run Task Components"
+Cohesion: 0.25
+Nodes (3): home_target(), parse_targets(), Refused
 
 ## Knowledge Gaps
 - **11 isolated node(s):** `stateLabels`, `labelNames`, `palette`, `ui`, `canvas` (+6 more)
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 2035 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **54 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 2050 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **42 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `open_session()` connect `Onsite Components` to `Interactive Physics Session`, `Sim Camera Components`, ` Components`, `Factory Components`, `Logger Components`, `Clock Components`, `Operator Components`?**
-  _High betweenness centrality (0.002) - this node is a cross-community bridge._
-- **Are the 8 inferred relationships involving `SimulationSession` (e.g. with `CarriedDetections` and `CatalogEditor`) actually correct?**
-  _`SimulationSession` has 8 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `SimulationSession` connect `Preview Simulation Session` to `Grasp Components`, `Legacy Task Runner`, `Views Components`, `Motion Observation Components`, `Preview Simulation Session`, `Operator Components`, `Assistant Bench Components`, `Legacy Task Runner`, `Composable Skill Orchestration`, `Placement Region Observation`, `Geometry Components`, `Interactive Physics Session`?**
+  _High betweenness centrality (0.003) - this node is a cross-community bridge._
+- **Are the 9 inferred relationships involving `SimulationSession` (e.g. with `CarriedDetections` and `CatalogEditor`) actually correct?**
+  _`SimulationSession` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `stateLabels`, `labelNames`, `palette` to the rest of the system?**
   _11 weakly-connected nodes found - possible missing edges._
 - **Should `Onsite Components` be split into smaller, more focused modules?**
-  _Cohesion score 0.03783783783783784 - nodes in this community are weakly interconnected._
-- **Why does `make_arm()` connect ` Components` to `Sim Arm Components`, `Safety Components`, `MuJoCo Arm Control`, `Pyagxarm Arm Components`, `Kinematics Components`, `Safety Components`?**
+  _Cohesion score 0.03230479501665942 - nodes in this community are weakly interconnected._
+- **Why does `build_scene()` connect `MuJoCo Scene Construction` to `Simulation World State`, `MuJoCo Scene Construction`, `Grasp Components`, `Simulation World State`, `Scenarios Components`, `Simulation World State`, `MuJoCo Scene Construction`, `MuJoCo Scene Construction`, `Render Components`?**
+  _High betweenness centrality (0.002) - this node is a cross-community bridge._
+- **Should `Onsite Components` be split into smaller, more focused modules?**
+  _Cohesion score 0.030727155727155727 - nodes in this community are weakly interconnected._
+- **Why does `make_scenario()` connect `Scenarios Components` to `Scenarios Components`, `Simulation World State`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Should `Teach Classes Components` be split into smaller, more focused modules?**
-  _Cohesion score 0.03498168498168498 - nodes in this community are weakly interconnected._
-- **Should `Calib Points Components` be split into smaller, more focused modules?**
-  _Cohesion score 0.03559870550161812 - nodes in this community are weakly interconnected._
 ## Scope and interpretation
 
 See [scope.json](scope.json) for the exact source list and [the project guide](../docs/architecture/graphify-guide.md) for verified execution boundaries.
@@ -623,6 +660,6 @@ Only Graphify AST extraction was used: no semantic model calls, uploaded project
 
 Graph health diagnostics are recorded in [health.json](health.json). Static resolution can have dangling/merged edges and cannot establish runtime reachability, browser HTTP wiring, physical grasp success, or ROS hardware readiness.
 
-Health warning: 1414 raw AST edges have unresolved endpoints; 6 self-loops; 769 same-endpoint edges merge in the simple directed graph. These are navigation limits, not confirmed application defects.
+Health warning: 1415 raw AST edges have unresolved endpoints; 6 self-loops; 774 same-endpoint edges merge in the simple directed graph. These are navigation limits, not confirmed application defects.
 
 graphify-out/ is written into the working tree; review which generated outputs to share before committing.

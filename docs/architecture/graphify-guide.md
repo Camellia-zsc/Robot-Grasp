@@ -6,10 +6,10 @@
 
 | 需求 | 入口 |
 |---|---|
-| 看模块分群 | [社区总览](../../graphify-out/graph-overview.html)，158 个社区 |
-| 搜索类、函数、文件关系 | [完整交互图](../../graphify-out/graph.html)，4,959 个节点 |
+| 看模块分群 | [社区总览](../../graphify-out/graph-overview.html)，155 个社区 |
+| 搜索类、函数、文件关系 | [完整交互图](../../graphify-out/graph.html)，4,995 个节点 |
 | 查看静态结构报告 | [GRAPH_REPORT.md](../../graphify-out/GRAPH_REPORT.md) |
-| 确认本次具体分析了哪些文件 | [scope.json](../../graphify-out/scope.json)，127 个 Python/JavaScript 源文件 |
+| 确认本次具体分析了哪些文件 | [scope.json](../../graphify-out/scope.json)，128 个 Python/JavaScript 源文件 |
 | 查看解析质量和局限 | [health.json](../../graphify-out/health.json) |
 
 上述数量描述已生成的图谱快照，不保证与后续修改的工作区同步。生成图谱本身只读取白名单源码，不搬动源码或改动抓取执行逻辑。交互 HTML 使用 Graphify 默认的公开 vis-network CDN 库；JSON 和 Markdown 可离线读取。
@@ -27,6 +27,9 @@ flowchart TD
     Orchestrator --> Executor[SkillExecutor]
     Executor --> Session[SimulationSession]
     Session --> Perception[观测与 catalog / stack 感知]
+    Session --> Incremental[MotionObservation / 逐物品证据]
+    Incremental --> Perception
+    Incremental -->|变化使旧证据失效| Executor
     Session --> Runner[TaskRunner / task.skills]
     Session --> Physics[DashboardPhysics]
     Physics --> Arm[SafeArm / MujocoArm]
@@ -43,6 +46,7 @@ flowchart TD
 | 阶段 | 建议阅读顺序 | 关键职责 |
 |---|---|---|
 | 启动与网页 | `tools/assistant_ui.py` → `assistant/server.py` 的 `DashboardController`、`DashboardHandler` → `assistant/static/` | 入口默认 `mujoco`，服务绑定本机；控制器管理任务、停止、场景修改与恢复 |
+| 运动中状态更新 | `assistant/motion_observation.py` → `observation_policy.py` → `simulation.py` 的运动回调与 `server.py` 场景发布 | 管理实际 RGB-D、身份连续性、完整源测量、背景深度和逐物品失效；裁剪、支撑遮挡与真实移动分开处理 |
 | 自然语言转计划 | `DashboardController.submit` → `SkillOrchestrator.run` → `ModelClient.plan_skills` → `skill_protocol.py` | 当前客户端支持 `plan_skills` 时进入技能编排；模型响应通过协议校验 |
 | 技能执行 | `skill_execution.py` 的 `SkillExecutor.execute`、`_pick`、`_place`、`_move` | 检查计划版本、观测目标，执行抓取、放置、搬运；动作结果回到编排器 |
 | 观测与操作会话 | `simulation.py` 的 `SimulationSession`、`observe`、`execute` | 管理场景、观测、停止、版本、动作执行，复用任务与感知层 |

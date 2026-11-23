@@ -28,6 +28,7 @@
     "ws/src/cube_task/cube_task/assistant/held_anchor.py",
     "ws/src/cube_task/cube_task/assistant/held_recovery.py",
     "ws/src/cube_task/cube_task/assistant/llm.py",
+    "ws/src/cube_task/cube_task/assistant/motion_observation.py",
     "ws/src/cube_task/cube_task/assistant/observation_policy.py",
     "ws/src/cube_task/cube_task/assistant/observations.py",
     "ws/src/cube_task/cube_task/assistant/obstacle_recovery.py",

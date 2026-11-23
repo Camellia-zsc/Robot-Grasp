@@ -1711,8 +1711,9 @@ class TaskRunner:
         if zone is None or (placement_zone is None and zone not in self.zones):
             return None, ('no zone for label %r (zone=%r, class_to_zone=%s, zones=%s)'
                           % (det.label, zone, self.class_to_zone, sorted(self.zones)))
-        if not math.isfinite(self._deadline):
-            self._deadline = self.clock.now() + float(budget_s)
+        # This public one-shot seam starts a new operation, possibly after a
+        # long human wait. Competition run() owns its separate round deadline.
+        self._deadline = self.clock.now() + float(budget_s)
         rep = TaskReport(task=self.task, ok=False, required=1, time_limit=self.time_limit,
                          log_dir=str(getattr(self.logger, 'dir', '')))
         stop, res = self._attempt(det, zone, rep, list(neighbors) or [det],
@@ -1739,8 +1740,7 @@ class TaskRunner:
             return None, 'pick-only requires measured gripper feedback, not dry-run'
         if self.has_held_recovery:
             return None, 'an object is already held; place it before another pick'
-        if not math.isfinite(self._deadline):
-            self._deadline = self.clock.now() + float(budget_s)
+        self._deadline = self.clock.now() + float(budget_s)
         stop = self._stop_check()
         if stop is not None:
             return None, 'stopped before moving: %s' % stop

@@ -64,10 +64,12 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
                                 margin_px=8, depth_tolerance=.008, *, observations=(), landing_z=None):
     """Return a pose filter proving full support/finger footprints are observed.
 
-    Every sample must see the landing plane in a supplied fresh view. A
-    foreground object, the carried target itself, a depth hole or image crop
-    cannot establish a clear landing area. This complements measured collision
-    checks; it never interprets an unobserved area as empty. ``landing_z`` is
+    Object-support samples must see the landing plane in a fresh view; finger
+    samples must prove free space below the conservative finger envelope. A
+    low neighbor may lie safely below suspended fingers. Foreground entering
+    the required space, depth holes and image crops cannot establish clearance.
+    This complements measured collision checks and never treats unseen space
+    as empty. ``landing_z`` is
     the actual destination support height. Source geometry keeps its original
     support frame when carrying an object from a pedestal to the table.
     """
@@ -92,11 +94,18 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
         views.append((T_bc, inv_T(T_bc), intr, depth))
     source_center = np.r_[det.center_base[:2], table + height / 2]
     original_yaw = float(det.yaw or 0.)
-    source_xy = _rectangle(source_center[:2], length, width, original_yaw)
-    source_box = np.vstack([np.column_stack([source_xy, np.full(4, z)])
-                            for z in (table, table + height)])
+    resting_pose = det.extra.get('resting_pose')
+    source_box = object_prism(source_center[:2], length, width, original_yaw, table, height,
+                              label=det.label, resting_pose=resting_pose)
     offset = np.asarray(det.center_base[:2]) - grasp.T_grasp[:2, 3]
     opening_default = min(float(max_open_width), float(grasp.expected_width) + RELEASE_OPEN_EXTRA)
+    # Bound depth tolerance along every calibrated image ray, leaving an
+    # additional 4 mm below the real fingers. The object's support still
+    # requires the landing plane; suspended fingers only require clear air.
+    ray_bound = max((math.sqrt(1. + (max(intr.cx, intr.width-1-intr.cx)/intr.fx)**2
+                                  + (max(intr.cy, intr.height-1-intr.cy)/intr.fy)**2)
+                     for _bc, _cb, intr, _depth in views), default=1.)
+    finger_margin = .004 + max(0., float(depth_tolerance))*ray_bound
 
     def allowed(x, y, closing, gripper_pose=None, opening=None):
         if not views:
@@ -106,8 +115,8 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
         rotated_offset = np.array([[c, -s], [s, c]]) @ offset
         tcp_xy = np.array([x, y]) - rotated_offset
         if gripper_pose is None:
-            object_polygon = _rectangle(np.array([x, y]), length + .004, width + .004,
-                                        original_yaw + delta)
+            object_polygon = object_footprint([x, y], length + .004, width + .004,
+                original_yaw + delta, label=det.label, resting_pose=resting_pose)
         else:
             import cv2
             pose = np.asarray(gripper_pose, float)
@@ -117,8 +126,9 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
             tcp_xy = pose[:2, 3]
         actual_opening = opening_default if opening is None else float(opening)
         if gripper_pose is None:
-            fingers = [_rectangle(tcp_xy, actual_opening + 2 * FINGER_OUTER,
-                                  2 * FINGER_HALF_BAND, float(closing))]
+            low = landing_z + max(0., float(grasp.T_grasp[2, 3])-table) - .015
+            fingers = [(_rectangle(tcp_xy, actual_opening + 2 * FINGER_OUTER,
+                                  2 * FINGER_HALF_BAND, float(closing)), low)]
         else:
             import cv2
             signs = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)])
@@ -126,9 +136,15 @@ def candidate_visibility_filter(det, grasp, frame, T_base_camera, nominal=None,
             for sign in (-1, 1):
                 center = np.array([0., sign * (actual_opening / 2 + .006), -.025])
                 box = ((center + signs * [.010, .006, .025]) @ pose[:3, :3].T + pose[:3, 3])
-                fingers.append(cv2.convexHull(box[:, :2].astype(np.float32)).reshape(-1, 2))
-        xy = np.vstack([_samples(p, sample_step) for p in [object_polygon] + fingers])
-        points = np.column_stack([xy, np.full(len(xy), landing_z + .001)])
+                fingers.append((cv2.convexHull(box[:, :2].astype(np.float32)).reshape(-1, 2),
+                                float(box[:, 2].min())))
+        groups = [(object_polygon, landing_z + .001)] + [
+            (polygon, max(landing_z + .001, low-finger_margin)) for polygon, low in fingers]
+        points = []
+        for polygon, z in groups:
+            xy = _samples(polygon, sample_step)
+            points.append(np.column_stack([xy, np.full(len(xy), z)]))
+        points = np.vstack(points)
         covered = np.zeros(len(points), bool)
         for T_bc, T_cb, intr, depth in views:
             remaining = np.flatnonzero(~covered)

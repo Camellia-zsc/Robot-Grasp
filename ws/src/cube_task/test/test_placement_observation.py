@@ -52,6 +52,45 @@ def test_finger_area_must_be_observed_even_when_the_object_footprint_is_clear():
     assert not candidate_visibility_filter(target, grasp, frame, camera)(0., 0., 0.)
 
 
+@pytest.mark.parametrize('resting_pose,allowed', [('upright', True), ('uncertain', False)])
+def test_round_body_visibility_does_not_demand_clearance_for_empty_box_corners(resting_pose, allowed):
+    target, grasp, frame, camera = inputs()
+    target.label = 'pear'
+    target.length = target.width = .085
+    target.center_base[2] = target.top_z = target.height = .112
+    grasp.T_grasp[2, 3] = .077
+    target.extra['resting_pose'] = resting_pose
+    # Foreground lies outside the full round body and both finger sweeps,
+    # but inside the old 85 x 85 mm enclosing square's empty corner.
+    frame.depth[181:187, 213:219] = .7
+    check = candidate_visibility_filter(target, grasp, frame, camera)
+    assert check(0., 0., 0.) is allowed
+    assert check(0., 0., 0., gripper_pose=top_down_T(0., 0., .077, 0.)) is allowed
+
+
+@pytest.mark.parametrize('height,allowed', [(.05, True), (.09, False)])
+def test_visible_low_neighbor_below_fingers_does_not_block_the_free_landing_surface(height, allowed):
+    target, grasp, frame, camera = inputs()
+    target.center_base[2] = target.top_z = target.height = .10
+    grasp.T_grasp[2, 3] = .08
+    # The 50 mm neighbor is outside the object's footprint and below the
+    # 80 mm fingertips. A 90 mm neighbor would obstruct the actual fingers.
+    frame.depth[196:205, 213:222] = 1. - height
+    check = candidate_visibility_filter(target, grasp, frame, camera)
+    assert check(0., 0., 0.) is allowed
+    assert check(0., 0., 0., gripper_pose=top_down_T(0., 0., .08, 0.)) is allowed
+
+
+def test_low_foreground_under_the_object_still_blocks_the_landing_plane():
+    target, grasp, frame, camera = inputs()
+    target.center_base[2] = target.top_z = target.height = .10
+    grasp.T_grasp[2, 3] = .08
+    frame.depth[190:211, 190:211] = .95
+    check = candidate_visibility_filter(target, grasp, frame, camera)
+    assert not check(0., 0., 0.)
+    assert not check(0., 0., 0., gripper_pose=top_down_T(0., 0., .08, 0.))
+
+
 def test_free_slot_outside_carried_objects_image_occlusion_remains_available():
     target, grasp, frame, camera = inputs()
     frame.depth[192:209, 192:209] = .7

@@ -894,6 +894,10 @@ class SkillExecutor:
             session._publish_snapshot()
             self._check_plan()
             result, why = session.runner.execute_held_transfer(bundle)
+            if automatic and result is not None:
+                # This authority comes from the validated auto_free step,
+                # never from a user-specified point or the model's coordinates.
+                result.detail['automatic_staging'] = True
             outcome = session._finish_attempt(result, why, 'skill-held-target', zone_name,
                                              target, session._recovery_evaluation,
                                              external_destination)

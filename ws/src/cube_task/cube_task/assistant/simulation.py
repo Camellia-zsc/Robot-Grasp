@@ -1653,6 +1653,19 @@ class SimulationSession:
         det = unique_target(fresh, goal['label'])
         return bool(det is not None and whole_footprint_at_goal(det.summary(), self._scene, goal))
 
+    def _camera_staging_confirmed(self, label, fresh, revision):
+        """Auto staging asks for a measured tabletop rest, not a fixed point."""
+        from .observation_policy import unique_target
+        from ..perception.grasp import detection_table_z
+        det = unique_target(fresh, label)
+        floor = detection_table_z(det) if det is not None else None
+        if (det is None or det.extra.get('catalog_complete') is not True
+                or det.center_base is None or floor is None
+                or abs(float(floor) - self.world.table_z) > .01):
+            return False
+        goal = dict(label=label, destination={'type': 'point', 'xy': det.center_base[:2].tolist()})
+        return self._camera_goal_confirmed(goal, fresh, revision)
+
     def _stable_cloud(self, det, revision):
         if det is None or det.center_base is None:
             return None
@@ -2626,6 +2639,20 @@ class SimulationSession:
         return footprint_in_destination(physical_outline(obj),
                                         {'placement': self._placement}, destination)
 
+    def _verify_staging(self, obj):
+        """Independent tabletop, workspace and 8 mm neighbor-gap audit."""
+        if obj is None:
+            return False
+        try:
+            destination = validate_destination({'type': 'point', 'xy': obj.center_xy().tolist()},
+                                               {'placement': self._placement})
+            if not self._verify_destination(obj, destination):
+                return False
+            self.editor._check_placement(obj, [other for other in self.world.objects if other is not obj])
+        except ValueError:
+            return False
+        return True
+
     def verify_goals(self, goals):
         """Recheck changed completed goals, sharing one local view per destination."""
         from .batch import whole_footprint_at_goal
@@ -2724,6 +2751,7 @@ class SimulationSession:
         summary = (pick_summary(result) if result is not None else
                    {'ok': False, 'stage': 'plan', 'error': why, 'label': det.label,
                     'zone': zone_name, 'duration': 0.0})
+        staging = bool(result is not None and result.detail.get('automatic_staging') is True)
         if result is not None:
             summary['diagnostics'] = str(result.detail.get('last_motion_detail') or
                                          result.detail.get('placement_planning_reason') or
@@ -2779,11 +2807,16 @@ class SimulationSession:
                     if destination is not None:
                         goal['destination'] = destination
                     query['verify_goals'] = [goal]
+                    if staging:
+                        # The existing target/height scan stops once this body
+                        # is seen, without searching for the provisional point.
+                        query.pop('verify_goals', None)
                 observer = getattr(self, '_motion_observer', None)
                 pooled = observer.current() if observer is not None else []
                 if (result is not None and result.ok and pooled and
-                        self._camera_goal_confirmed(query['verify_goals'][0], pooled,
-                                                    self._environment_revision)):
+                        (self._camera_staging_confirmed(det.label, pooled, self._environment_revision)
+                         if staging else self._camera_goal_confirmed(query['verify_goals'][0], pooled,
+                                                                   self._environment_revision))):
                     self._last_fresh = pooled
                     self._observation_revision = self._environment_revision
                     observer.stats['verification_reuses'] += 1
@@ -2800,6 +2833,8 @@ class SimulationSession:
         truth_success = self._verify_zone(evaluation_object, zone_name) if destination is None else False
         if destination is not None:
             truth_success = self._verify_destination(evaluation_object, destination)
+        if staging:
+            truth_success = self._verify_staging(evaluation_object)
         resting = (self._physics.resting_status(evaluation_object.name)
                    if self._physics is not None and evaluation_object is not None else None)
         if resting is not None:
@@ -2817,11 +2852,22 @@ class SimulationSession:
             if destination['type'] == 'on_object':
                 from .stacking import audit
                 summary['truth']['support'] = audit(self, evaluation_object, destination)
+        if staging:
+            summary['automatic_staging'] = True
+            summary['truth']['completion_requirement'] = 'safe_tabletop_staging'
+            summary['truth']['planned_destination'] = summary['truth'].pop('expected_destination', None)
+            if evaluation_object is not None and destination is not None and destination.get('xy') is not None:
+                summary['placement_actual_xy'] = evaluation_object.center_xy().tolist()
+                summary['placement_offset_m'] = float(np.linalg.norm(
+                    evaluation_object.center_xy() - destination['xy']))
         from .batch import whole_footprint_at_goal
         goal = {'zone_name': zone_name}
         if destination is not None:
             goal['destination'] = destination
-        if destination is not None and destination['type'] == 'on_object':
+        if staging:
+            camera_success = self._camera_staging_confirmed(
+                det.label, getattr(self, '_last_fresh', []), self._observation_revision)
+        elif destination is not None and destination['type'] == 'on_object':
             from .stacking import camera_confirmed
             camera_success = camera_confirmed(self, det.label, destination)
         else:
@@ -2856,6 +2902,8 @@ class SimulationSession:
             summary['message'] = '已将%s放到%s' % (
                 names.get(det.label, det.label), destination_label(destination) if destination else
                 colors.get(zone_label, zone_label or zone_name) + '区域')
+            if staging:
+                summary['message'] = '已将%s暂放到安全桌面空位' % names.get(det.label, det.label)
         elif summary['controller_ok']:
             if summary['error'] == 'pear_not_upright':
                 summary['message'] = '梨子已放下但未保持直立，需要重新观察并调整放置姿态'
@@ -2870,13 +2918,16 @@ class SimulationSession:
                     '物品已放下，但物品或底座仍在运动，尚未落稳'
                     if support.get('stable') is False and support.get('contact') is True else
                     '叠放尚未通过支撑与落稳核验，需要重新确认目标与底座')
+            elif staging:
+                summary['message'] = '暂放尚未通过桌面范围、物品间隙或落稳核验，需要重新观察'
             else:
                 summary['message'] = ('抓放动作已结束，但无法唯一核对目标物品'
                     if evaluation_object is None else '抓放动作已结束，但目标物品没有位于指定区域')
         else:
             summary['message'] = '本次抓取未完成，请查看执行记录并重新观察场景'
         self._append_check('placement', truth_success,
-                           '已独立核验物品落入指定区域' if truth_success else '落位核验未通过')
+                           ('已独立核验桌面落稳与物品间隙' if staging else
+                            '已独立核验物品落入指定区域') if truth_success else '落位核验未通过')
         self.logger.save_json('last_result.json', summary)
         self._publish_snapshot()
         self._emit('execution_result', summary)

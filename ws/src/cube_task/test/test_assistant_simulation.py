@@ -142,9 +142,11 @@ def test_requested_placement_is_independently_checked_against_truth(
     red = next(obj for obj in session.world.objects if obj.label == 'red')
     green_zone = session.world.zone('zone_green')
 
-    def report_success(det, zone_name=None, neighbors=()):
+    def report_success(det, zone_name=None, neighbors=(), *,
+                       placement_zone=None, placement_polygon=None, exact_xy=False):
         # Model a controller that releases in green, regardless of its requested
         # destination; the independent evaluator must detect any mismatch.
+        session._motion_observer.invalidate([det.label])  # Real lift revokes the source track.
         red.place_upright(*green_zone.center[:2], 0.0, green_zone.floor_z)
         return PickResult(ok=True, stage='done', label=det.label, zone=zone_name), ''
 
@@ -167,7 +169,9 @@ def test_ambiguous_truth_identity_cannot_count_as_verified_success(session, monk
     session.world.add_object(duplicate)
     red_zone = session.world.zone('zone_red')
 
-    def report_success(det, zone_name=None, neighbors=()):
+    def report_success(det, zone_name=None, neighbors=(), *,
+                       placement_zone=None, placement_polygon=None, exact_xy=False):
+        session._motion_observer.invalidate([det.label])
         red.place_upright(*red_zone.center[:2], 0.0, red_zone.floor_z)
         return PickResult(ok=True, stage='done', label=det.label, zone=zone_name), ''
 

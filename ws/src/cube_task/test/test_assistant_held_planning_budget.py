@@ -47,7 +47,7 @@ def held_search(monkeypatch, *, candidate_seconds=40., count=1, stop=False, succ
         # Physical movement belongs outside the computation deadline.
         now[0] += 30.
         assert not session.arm._planning_cancelled()
-        return SimpleNamespace(ok=True), ''
+        return SimpleNamespace(ok=True, detail={}), ''
 
     session.runner = SimpleNamespace(_held_recovery_context=context, has_held_recovery=True,
                                     plan_held_transfer=plan, execute_held_transfer=Mock(side_effect=execute))
@@ -134,7 +134,7 @@ def fixed_search(monkeypatch):
     from test_runner_held_transfer import transfer_scene
     executor, session, action, now, events, _calls = held_search(monkeypatch)
     runner, target, _grasp, zone = transfer_scene()
-    runner.execute_held_transfer = Mock(return_value=(SimpleNamespace(ok=True), ''))
+    runner.execute_held_transfer = Mock(return_value=(SimpleNamespace(ok=True, detail={}), ''))
     session.runner = runner
     executor._resolve = lambda *a: (dict(type='point', xy=zone.center[:2].tolist()), None)
     executor._options = lambda *a: dict(placement_zone=zone,

@@ -64,3 +64,42 @@ def test_placement_feedback_fails_when_motion_finished_outside_target_zone(sessi
     assert summary['error'] == 'placement_not_verified'
     assert session._feedback['checks'][-1] == {
         'stage': 'placement', 'ok': False, 'message': '落位核验未通过'}
+
+
+@pytest.mark.parametrize('mode,ok', [
+    ('automatic', True), ('specified_point', False), ('specified_point_close', True), ('overlap', False),
+    ('outside_workspace', False), ('unobserved', False), ('incomplete', False),
+    ('ambiguous', False), ('fallen', False), ('fault', False)])
+def test_automatic_staging_checks_safe_rest_instead_of_an_unrequested_exact_point(tmp_path, mode, ok):
+    with SimulationSession(realtime=False, log_dir=tmp_path) as session:
+        xy = [.413, .186] if mode != 'outside_workspace' else [.68, .58]
+        if mode == 'specified_point_close':
+            xy = [.410, .124]
+        obj = make_catalog_object('pear', 'staged-pear', xy)
+        session.world.objects = [obj]
+        if mode == 'overlap':
+            session.world.objects.append(make_catalog_object('red', 'nearby-red', [.45, .19]))
+        observed = Detection('pear', 1., center_base=np.r_[xy, .112],
+            top_z=.112, height=.112, length=.085, width=.085, yaw=0.,
+            extra={'catalog_complete': mode != 'incomplete',
+                   'resting_pose': 'side' if mode == 'fallen' else 'upright'})
+        session._last_fresh = [] if mode == 'unobserved' else [observed]
+        if mode == 'ambiguous':
+            import copy
+            session._last_fresh.append(copy.deepcopy(observed))
+        session._environment_revision = session._observation_revision = 0
+        session._scene = {'placement': session._placement, 'objects': [observed.summary()]}
+        session._placement_center = [.4085, .1229]
+        session.observe = Mock()
+        # Exercise the production finishing seam after a real, nontrivial
+        # displacement. A user-specified point keeps the original 15 mm rule.
+        motion = PickResult(mode != 'fault', stage='done', label='pear',
+            detail={'automatic_staging': not mode.startswith('specified_point'), 'fault': mode == 'fault'})
+        outcome = session._finish_attempt(motion, '', 'pear', 'desktop_point', observed, obj,
+            {'type': 'point', 'xy': [.4085, .1229]})
+        assert outcome['ok'] is ok, outcome
+        if ok:
+            assert outcome['camera_verified'] and outcome['truth']['success']
+        if mode == 'automatic':
+            assert outcome['automatic_staging']
+            assert outcome['placement_offset_m'] > .06

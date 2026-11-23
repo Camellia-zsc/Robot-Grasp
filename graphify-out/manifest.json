@@ -36,10 +36,10 @@
     "semantic_hash": "4a0925a0bbd0b70edb8307bac9478b9c"
   },
   "ws/src/cube_task/cube_task/assistant/catalog_perception.py": {
-    "mtime": 1795434547.1824036,
-    "seen": 1795435185.5979478,
-    "ast_hash": "d10ab743a1db2f89b5657dbd9d4867d3",
-    "semantic_hash": "d10ab743a1db2f89b5657dbd9d4867d3"
+    "mtime": 1795448980.768839,
+    "seen": 1795451228.284042,
+    "ast_hash": "f68de3330f61a9e6cee34d51e7598576",
+    "semantic_hash": "f68de3330f61a9e6cee34d51e7598576"
   },
   "ws/src/cube_task/cube_task/assistant/conversation.py": {
     "mtime": 1795282872.944684,
@@ -48,10 +48,10 @@
     "semantic_hash": "bf79d858291c6b24e956dafe12deab23"
   },
   "ws/src/cube_task/cube_task/assistant/destinations.py": {
-    "mtime": 1795282872.944684,
-    "seen": 1795359304.2881334,
-    "ast_hash": "186f77a5fa428930e7bde480f4d7ae7d",
-    "semantic_hash": "186f77a5fa428930e7bde480f4d7ae7d"
+    "mtime": 1795456640.8357327,
+    "seen": 1795457542.8258488,
+    "ast_hash": "3f717977f891a0bdc75db3bd5278cf18",
+    "semantic_hash": "3f717977f891a0bdc75db3bd5278cf18"
   },
   "ws/src/cube_task/cube_task/assistant/held_recovery.py": {
     "mtime": 1795282872.9490454,
@@ -66,10 +66,10 @@
     "semantic_hash": "bebda046f26142b0ae2270fa653afe28"
   },
   "ws/src/cube_task/cube_task/assistant/observation_policy.py": {
-    "mtime": 1795441081.1483986,
-    "seen": 1795441319.1517794,
-    "ast_hash": "dbaf0927a4616b4c5a726ccb8e274f68",
-    "semantic_hash": "dbaf0927a4616b4c5a726ccb8e274f68"
+    "mtime": 1795453141.060099,
+    "seen": 1795457542.8258488,
+    "ast_hash": "4e0129981fee2e9e6669f361b281d76a",
+    "semantic_hash": "4e0129981fee2e9e6669f361b281d76a"
   },
   "ws/src/cube_task/cube_task/assistant/observations.py": {
     "mtime": 1795344205.6118524,
@@ -84,16 +84,16 @@
     "semantic_hash": "fd12408b2b7981c090dfe990eef0c940"
   },
   "ws/src/cube_task/cube_task/assistant/physics.py": {
-    "mtime": 1795348228.9022038,
-    "seen": 1795359304.2881334,
-    "ast_hash": "7d99c4e16f4e1de3408861f85d5e6e2f",
-    "semantic_hash": "7d99c4e16f4e1de3408861f85d5e6e2f"
+    "mtime": 1795448665.604697,
+    "seen": 1795451228.284042,
+    "ast_hash": "65d4adcc2668fd090bb3f89812618e4b",
+    "semantic_hash": "65d4adcc2668fd090bb3f89812618e4b"
   },
   "ws/src/cube_task/cube_task/assistant/placement_observation.py": {
-    "mtime": 1795443811.706039,
-    "seen": 1795444343.536151,
-    "ast_hash": "3fb816f8c75865e249004d3a00590244",
-    "semantic_hash": "3fb816f8c75865e249004d3a00590244"
+    "mtime": 1795456503.4594514,
+    "seen": 1795457542.8258488,
+    "ast_hash": "cf6b09a0944d9bccfb5e1252e872c20a",
+    "semantic_hash": "cf6b09a0944d9bccfb5e1252e872c20a"
   },
   "ws/src/cube_task/cube_task/assistant/preview.py": {
     "mtime": 1795282872.9547496,
@@ -114,16 +114,16 @@
     "semantic_hash": "3fd6c38457e78ae9370cfc0a363303d8"
   },
   "ws/src/cube_task/cube_task/assistant/simulation.py": {
-    "mtime": 1795443811.71793,
-    "seen": 1795444343.536151,
-    "ast_hash": "5d4d5ba8dc30f391e0e5669310ffc8ee",
-    "semantic_hash": "5d4d5ba8dc30f391e0e5669310ffc8ee"
+    "mtime": 1795458495.5508697,
+    "seen": 1795459180.65963,
+    "ast_hash": "8002bc4b61006c5a29767bfdb8ca6232",
+    "semantic_hash": "8002bc4b61006c5a29767bfdb8ca6232"
   },
   "ws/src/cube_task/cube_task/assistant/skill_execution.py": {
-    "mtime": 1795439186.4322803,
-    "seen": 1795441319.1517794,
-    "ast_hash": "96f775cb392360b9abb3240a9807c6d6",
-    "semantic_hash": "96f775cb392360b9abb3240a9807c6d6"
+    "mtime": 1795458303.8763971,
+    "seen": 1795459180.65963,
+    "ast_hash": "6d0c718211337e3678f90f2e437e06b3",
+    "semantic_hash": "6d0c718211337e3678f90f2e437e06b3"
   },
   "ws/src/cube_task/cube_task/assistant/skill_orchestrator.py": {
     "mtime": 1795425413.9512968,
@@ -390,10 +390,10 @@
     "semantic_hash": "bc90d14a47490b92ac4cf8c1d3ce1654"
   },
   "ws/src/cube_task/cube_task/sim/mujoco/arm.py": {
-    "mtime": 1795282873.0102277,
-    "seen": 1795359304.2881334,
-    "ast_hash": "c3197b03879109c15f4d6bb4aa535416",
-    "semantic_hash": "c3197b03879109c15f4d6bb4aa535416"
+    "mtime": 1795450729.173316,
+    "seen": 1795451228.284042,
+    "ast_hash": "387655b9ef61e58b39a563251a478a14",
+    "semantic_hash": "387655b9ef61e58b39a563251a478a14"
   },
   "ws/src/cube_task/cube_task/sim/mujoco/camera.py": {
     "mtime": 1795282873.0102277,
@@ -486,16 +486,16 @@
     "semantic_hash": "2963a514d15eb7c3ba02bbe5bbe06ed8"
   },
   "ws/src/cube_task/cube_task/task/reach.py": {
-    "mtime": 1795282873.026861,
-    "seen": 1795359304.2891686,
-    "ast_hash": "aa9c16a2adf8df71fd4978c562abcde6",
-    "semantic_hash": "aa9c16a2adf8df71fd4978c562abcde6"
+    "mtime": 1795450351.7606747,
+    "seen": 1795451228.284042,
+    "ast_hash": "17c1ed4a2212a04f016cf07806b2231b",
+    "semantic_hash": "17c1ed4a2212a04f016cf07806b2231b"
   },
   "ws/src/cube_task/cube_task/task/runner.py": {
-    "mtime": 1795440799.5288012,
-    "seen": 1795441319.1517794,
-    "ast_hash": "2596a8f108a9ea696511866859252a43",
-    "semantic_hash": "2596a8f108a9ea696511866859252a43"
+    "mtime": 1795448472.5007405,
+    "seen": 1795451228.284042,
+    "ast_hash": "b05a17b642c3a72f2e84b94f36376ebe",
+    "semantic_hash": "b05a17b642c3a72f2e84b94f36376ebe"
   },
   "ws/src/cube_task/cube_task/task/selection.py": {
     "mtime": 1795282873.026861,
@@ -720,10 +720,10 @@
     "semantic_hash": "d16fba911f64665b1bccd048103aeeec"
   },
   "ws/src/cube_task/cube_task/assistant/held_anchor.py": {
-    "mtime": 1795348933.1672883,
-    "seen": 1795359304.2881334,
-    "ast_hash": "70fe37ef8d1236a6b887d869708dd870",
-    "semantic_hash": "70fe37ef8d1236a6b887d869708dd870"
+    "mtime": 1795450863.3977973,
+    "seen": 1795451228.284042,
+    "ast_hash": "58675f50da8cb80b26230035d73cc130",
+    "semantic_hash": "58675f50da8cb80b26230035d73cc130"
   },
   "ws/src/cube_task/cube_task/assistant/spherical_anchor.py": {
     "mtime": 1795282872.9610126,
@@ -750,16 +750,16 @@
     "semantic_hash": "f0650ed3f67d87f9a2203dce6d35e2d8"
   },
   "ws/src/cube_task/cube_task/task/grasp_contact.py": {
-    "mtime": 1795357555.3458364,
-    "seen": 1795359304.2891686,
-    "ast_hash": "1178aebb7e6029f488aa2f0bd28959f4",
-    "semantic_hash": "1178aebb7e6029f488aa2f0bd28959f4"
+    "mtime": 1795448980.7793355,
+    "seen": 1795451228.284042,
+    "ast_hash": "53c928991cbd50ebe67147724c4ab1ff",
+    "semantic_hash": "53c928991cbd50ebe67147724c4ab1ff"
   },
   "ws/src/cube_task/cube_task/tools/assistant_bench.py": {
-    "mtime": 1795438563.0665357,
-    "seen": 1795441319.1517794,
-    "ast_hash": "a706c60189ee2efb8292de3b009648fb",
-    "semantic_hash": "a706c60189ee2efb8292de3b009648fb"
+    "mtime": 1795459492.9038165,
+    "seen": 1795459782.461952,
+    "ast_hash": "a36a2554d24f3585d5c82471ca0ff668",
+    "semantic_hash": "a36a2554d24f3585d5c82471ca0ff668"
   },
   "ws/src/cube_task/cube_task/assistant/motion_observation.py": {
     "mtime": 1795441519.904981,

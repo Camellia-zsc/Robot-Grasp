@@ -1,0 +1,2958 @@
+{
+  "date": "2026-11-24",
+  "note": "Full RGB-D, MuJoCo, online-model trials. Earlier failed and interrupted rounds remain included; suite names distinguish snapshots.",
+  "trials": [
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 214.83,
+      "model_requests": 1,
+      "scans": {
+        "frames": 94,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "motion_observation": {
+        "frames": 84,
+        "source_reuses": 11,
+        "verification_reuses": 5
+      },
+      "observation_work": {
+        "stationary_frames": 7,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 6,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "apple",
+        "green",
+        "banana",
+        "yellow",
+        "red",
+        "pear"
+      ],
+      "suite": "wide-v1",
+      "case": 1,
+      "seed": 19,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 456.39,
+      "model_requests": 4,
+      "scans": {
+        "frames": 90,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "motion_observation": {
+        "frames": 80,
+        "source_reuses": 8,
+        "verification_reuses": 3
+      },
+      "observation_work": {
+        "stationary_frames": 10,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 5,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "banana",
+        "green",
+        "yellow",
+        "red"
+      ],
+      "suite": "wide-v1",
+      "case": 1,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "red",
+          "stage": "inspect_place",
+          "error": "placement_changed",
+          "diagnostics": "joint sweep held object or fingers overlaps a measured obstacle: unknown at (0.216, -0.381)"
+        },
+        {
+          "skill": "observe",
+          "label": null,
+          "stage": "",
+          "error": "no_safe_observation_path",
+          "diagnostics": null
+        },
+        {
+          "skill": "place",
+          "label": "red",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "joint sweep held object or fingers overlaps a measured obstacle: unknown at (0.220, -0.389)"
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": false
+        },
+        {
+          "label": "red",
+          "ok": false
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 393.99,
+      "model_requests": 1,
+      "scans": {
+        "frames": 85,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 80,
+        "source_reuses": 8,
+        "verification_reuses": 3
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 4,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "apple",
+        "red",
+        "banana",
+        "green"
+      ],
+      "suite": "wide-v1",
+      "case": 4,
+      "seed": 19,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 63.69,
+      "model_requests": 4,
+      "scans": {
+        "frames": 7,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 0,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 0,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [],
+      "suite": "stack-v1",
+      "case": 2,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "unreachable leaned release has no full footprint or finger clearance",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 222.81,
+      "model_requests": 4,
+      "scans": {
+        "frames": 6,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "motion_observation": {
+        "frames": 0,
+        "source_reuses": 4,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 0,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 2,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [],
+      "suite": "stack-v1",
+      "case": 3,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "unreachable leaned release has no full footprint or finger clearance",
+          "diagnostics": null
+        },
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "unreachable leaned release has no full footprint or finger clearance",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 226.81,
+      "model_requests": 2,
+      "scans": {
+        "frames": 36,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 28,
+        "source_reuses": 2,
+        "verification_reuses": 2
+      },
+      "observation_work": {
+        "stationary_frames": 6,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 2,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "stack-v1",
+      "case": 5,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "held_transit",
+          "error": "scene_changed",
+          "diagnostics": ""
+        }
+      ],
+      "deferred": [
+        "banana"
+      ],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ],
+      "intervention": {
+        "applied": false,
+        "first": "pear",
+        "moved": "banana",
+        "camera_updated_while_holding": null,
+        "redundant_grasps": 0,
+        "passed": false
+      }
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 255.92,
+      "model_requests": 3,
+      "scans": {
+        "frames": 34,
+        "full_scans": 0,
+        "local_scans": 4
+      },
+      "motion_observation": {
+        "frames": 20,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 2,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "stack-v2",
+      "case": 2,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "retreat",
+          "error": "retreat_scene_changed",
+          "diagnostics": ""
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 368.05,
+      "model_requests": 4,
+      "scans": {
+        "frames": 42,
+        "full_scans": 0,
+        "local_scans": 6
+      },
+      "motion_observation": {
+        "frames": 20,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 2,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "stack-v2",
+      "case": 3,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "retreat",
+          "error": "retreat_scene_changed",
+          "diagnostics": ""
+        },
+        {
+          "skill": "verify",
+          "label": null,
+          "stage": "",
+          "error": "verification_incomplete",
+          "diagnostics": null
+        },
+        {
+          "skill": "verify",
+          "label": null,
+          "stage": "",
+          "error": "verification_incomplete",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [
+        "pear",
+        "pear"
+      ],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": true,
+      "wall_seconds": 600.88,
+      "model_requests": 2,
+      "scans": {
+        "frames": 122,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 108,
+        "source_reuses": 10,
+        "verification_reuses": 3
+      },
+      "observation_work": {
+        "stationary_frames": 13,
+        "inspection_motion_steps": 4
+      },
+      "manipulation_steps": 6,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "yellow",
+        "banana",
+        "pear",
+        "red",
+        "apple"
+      ],
+      "suite": "wide-v3",
+      "case": 1,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "banana",
+          "stage": "inspect_place",
+          "error": "placement_changed",
+          "diagnostics": "placement_planning_budget_exceeded"
+        },
+        {
+          "skill": "move",
+          "label": "apple",
+          "stage": "close",
+          "error": "gripper_aborted",
+          "diagnostics": ""
+        }
+      ],
+      "deferred": [
+        "green"
+      ],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": false
+        },
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": true,
+      "wall_seconds": 601.73,
+      "model_requests": 2,
+      "scans": {
+        "frames": 140,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "motion_observation": {
+        "frames": 131,
+        "source_reuses": 12,
+        "verification_reuses": 4
+      },
+      "observation_work": {
+        "stationary_frames": 7,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 6,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "yellow",
+        "green",
+        "red",
+        "banana",
+        "apple",
+        "apple"
+      ],
+      "suite": "wide-v3",
+      "case": 4,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "apple",
+          "stage": "transit",
+          "error": "timeout",
+          "diagnostics": "motion did not finish within 7.29 s (tcp 7.3 mm / 9.02 deg from the target)"
+        },
+        {
+          "skill": "move",
+          "label": "apple",
+          "stage": "transit",
+          "error": "aborted",
+          "diagnostics": "abort requested during motion"
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": false
+        },
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 556.41,
+      "model_requests": 1,
+      "scans": {
+        "frames": 132,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 121,
+        "source_reuses": 10,
+        "verification_reuses": 5
+      },
+      "observation_work": {
+        "stationary_frames": 7,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 6,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "apple",
+        "green",
+        "banana",
+        "yellow",
+        "red",
+        "pear"
+      ],
+      "suite": "final-wide",
+      "case": 1,
+      "seed": 19,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 387.28,
+      "model_requests": 2,
+      "scans": {
+        "frames": 88,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 82,
+        "source_reuses": 8,
+        "verification_reuses": 9
+      },
+      "observation_work": {
+        "stationary_frames": 6,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 4,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "banana",
+        "apple",
+        "green",
+        "yellow"
+      ],
+      "suite": "final-wide",
+      "case": 1,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "observe",
+          "label": "yellow",
+          "stage": "observe",
+          "error": "no_safe_observation_path",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 1144.42,
+      "model_requests": 5,
+      "scans": {
+        "frames": 232,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "motion_observation": {
+        "frames": 185,
+        "source_reuses": 11,
+        "verification_reuses": 8
+      },
+      "observation_work": {
+        "stationary_frames": 44,
+        "inspection_motion_steps": 25
+      },
+      "manipulation_steps": 10,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "banana",
+        "green",
+        "yellow",
+        "red",
+        "pear",
+        "apple"
+      ],
+      "suite": "final-wide",
+      "case": 1,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "red",
+          "stage": "held_transit",
+          "error": "placement_changed",
+          "diagnostics": "changed_object_not_observed: "
+        },
+        {
+          "skill": "place",
+          "label": "red",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "changed_object_not_observed: "
+        },
+        {
+          "skill": "place",
+          "label": "red",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "changed_object_not_observed: "
+        },
+        {
+          "skill": "place",
+          "label": "red",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "changed_object_not_observed: "
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 205.45,
+      "model_requests": 1,
+      "scans": {
+        "frames": 34,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 28,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "final-stacks",
+      "case": 2,
+      "seed": 19,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 241.27,
+      "model_requests": 1,
+      "scans": {
+        "frames": 47,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 42,
+        "source_reuses": 4,
+        "verification_reuses": 2
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 2,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear",
+        "yellow"
+      ],
+      "suite": "final-stacks",
+      "case": 2,
+      "seed": 19,
+      "phase": 2,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 170.44,
+      "model_requests": 1,
+      "scans": {
+        "frames": 32,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 27,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "final-stacks",
+      "case": 2,
+      "seed": 29,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 10.44,
+      "model_requests": 1,
+      "scans": {
+        "frames": 0,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "motion_observation": {
+        "frames": 0,
+        "source_reuses": 0,
+        "verification_reuses": 1
+      },
+      "observation_work": {
+        "stationary_frames": 0,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 0,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [],
+      "suite": "final-stacks",
+      "case": 2,
+      "seed": 29,
+      "phase": 2,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 199.58,
+      "model_requests": 1,
+      "scans": {
+        "frames": 34,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 28,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "final-stacks",
+      "case": 3,
+      "seed": 19,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 595.2,
+      "model_requests": 1,
+      "scans": {
+        "frames": 133,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "motion_observation": {
+        "frames": 123,
+        "source_reuses": 12,
+        "verification_reuses": 5
+      },
+      "observation_work": {
+        "stationary_frames": 8,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 6,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "green",
+        "apple",
+        "pear",
+        "yellow",
+        "banana",
+        "red"
+      ],
+      "suite": "final-stacks",
+      "case": 3,
+      "seed": 19,
+      "phase": 2,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 183.89,
+      "model_requests": 1,
+      "scans": {
+        "frames": 32,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 27,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "final-stacks",
+      "case": 3,
+      "seed": 29,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 363.86,
+      "model_requests": 1,
+      "scans": {
+        "frames": 81,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "motion_observation": {
+        "frames": 77,
+        "source_reuses": 8,
+        "verification_reuses": 6
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 4,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "banana",
+        "pear",
+        "green",
+        "apple"
+      ],
+      "suite": "final-stacks",
+      "case": 3,
+      "seed": 29,
+      "phase": 2,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 261.52,
+      "model_requests": 1,
+      "scans": {
+        "frames": 42,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 35,
+        "source_reuses": 1,
+        "verification_reuses": 2
+      },
+      "observation_work": {
+        "stationary_frames": 6,
+        "inspection_motion_steps": 4
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "banana"
+      ],
+      "suite": "final-stacks",
+      "case": 5,
+      "seed": 19,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ],
+      "intervention": {
+        "applied": true,
+        "first": "banana",
+        "moved": "pear",
+        "camera_updated_while_holding": true,
+        "redundant_grasps": 0,
+        "passed": true
+      }
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 251.41,
+      "model_requests": 5,
+      "scans": {
+        "frames": 22,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 11,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 9,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 3,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "final-stacks",
+      "case": 5,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "held_transit",
+          "error": "placement_changed",
+          "diagnostics": "changed_object_not_observed"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "held_transit_planning_budget_exceeded"
+        },
+        {
+          "skill": "observe",
+          "label": null,
+          "stage": "",
+          "error": "no_safe_observation_path",
+          "diagnostics": null
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "held_transit_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [
+        "banana"
+      ],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ],
+      "intervention": {
+        "applied": true,
+        "first": "pear",
+        "moved": "banana",
+        "camera_updated_while_holding": null,
+        "redundant_grasps": 0,
+        "passed": false
+      }
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 279.06,
+      "model_requests": 2,
+      "scans": {
+        "frames": 36,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 27,
+        "source_reuses": 4,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "final-stacks-new",
+      "case": 2,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "place infeasible: no_clear_supported_release",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 230.11,
+      "model_requests": 4,
+      "scans": {
+        "frames": 15,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "motion_observation": {
+        "frames": 10,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 5,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 2,
+      "approvals": 3,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "final-stacks-new",
+      "case": 2,
+      "seed": 53,
+      "phase": 2,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "place",
+          "error": "placement_planning_budget_exceeded",
+          "diagnostics": "placement_planning_budget_exceeded"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "place",
+          "error": "placement_planning_budget_exceeded",
+          "diagnostics": "placement_planning_budget_exceeded"
+        },
+        {
+          "skill": "observe",
+          "label": null,
+          "stage": "",
+          "error": "no_safe_observation_path",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 266.27,
+      "model_requests": 2,
+      "scans": {
+        "frames": 36,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 27,
+        "source_reuses": 4,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "final-stacks-new",
+      "case": 3,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "place infeasible: no_clear_supported_release",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 683.19,
+      "model_requests": 1,
+      "scans": {
+        "frames": 145,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 133,
+        "source_reuses": 12,
+        "verification_reuses": 6
+      },
+      "observation_work": {
+        "stationary_frames": 10,
+        "inspection_motion_steps": 4
+      },
+      "manipulation_steps": 6,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "banana",
+        "green",
+        "yellow",
+        "red",
+        "apple",
+        "pear"
+      ],
+      "suite": "fixed-memory-wide",
+      "case": 1,
+      "seed": 53,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 688.67,
+      "model_requests": 5,
+      "scans": {
+        "frames": 141,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "motion_observation": {
+        "frames": 130,
+        "source_reuses": 12,
+        "verification_reuses": 24
+      },
+      "observation_work": {
+        "stationary_frames": 7,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 6,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "yellow",
+        "green",
+        "red",
+        "banana",
+        "apple",
+        "pear"
+      ],
+      "suite": "fixed-memory-wide",
+      "case": 4,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "done",
+          "error": "placement_not_verified",
+          "diagnostics": ""
+        },
+        {
+          "skill": "verify",
+          "label": null,
+          "stage": "",
+          "error": "verification_incomplete",
+          "diagnostics": null
+        },
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "already_satisfied",
+          "error": "completion_not_verified",
+          "diagnostics": null
+        },
+        {
+          "skill": "verify",
+          "label": null,
+          "stage": "",
+          "error": "verification_incomplete",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 213.34,
+      "model_requests": 1,
+      "scans": {
+        "frames": 36,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 30,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "fixed-memory-stacks",
+      "case": 2,
+      "seed": 29,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 281.39,
+      "model_requests": 2,
+      "scans": {
+        "frames": 50,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 44,
+        "source_reuses": 4,
+        "verification_reuses": 1
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 2,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear",
+        "yellow"
+      ],
+      "suite": "fixed-memory-stacks",
+      "case": 2,
+      "seed": 29,
+      "phase": 2,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "done",
+          "error": "placement_not_verified",
+          "diagnostics": ""
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 251.11,
+      "model_requests": 2,
+      "scans": {
+        "frames": 36,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 27,
+        "source_reuses": 4,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "fixed-memory-stacks",
+      "case": 2,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "place infeasible: no_clear_supported_release",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 243.56,
+      "model_requests": 4,
+      "scans": {
+        "frames": 21,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "motion_observation": {
+        "frames": 14,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 7,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 3,
+      "approvals": 3,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "fixed-memory-stacks",
+      "case": 2,
+      "seed": 53,
+      "phase": 2,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "place",
+          "error": "placement_planning_budget_exceeded",
+          "diagnostics": "placement_planning_budget_exceeded"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "place",
+          "error": "placement_planning_budget_exceeded",
+          "diagnostics": "placement_planning_budget_exceeded"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "place",
+          "error": "placement_planning_budget_exceeded",
+          "diagnostics": "placement_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 288.44,
+      "model_requests": 5,
+      "scans": {
+        "frames": 26,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 13,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 11,
+        "inspection_motion_steps": 3
+      },
+      "manipulation_steps": 3,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "fixed-memory-stacks",
+      "case": 5,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "held_transit",
+          "error": "placement_changed",
+          "diagnostics": "changed_object_not_observed"
+        },
+        {
+          "skill": "observe",
+          "label": null,
+          "stage": "",
+          "error": "no_safe_observation_path",
+          "diagnostics": null
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "held_transit_planning_budget_exceeded"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "held_transit_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [
+        "banana"
+      ],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ],
+      "intervention": {
+        "applied": true,
+        "first": "pear",
+        "moved": "banana",
+        "camera_updated_while_holding": null,
+        "redundant_grasps": 0,
+        "passed": false
+      }
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 299.09,
+      "model_requests": 2,
+      "scans": {
+        "frames": 51,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "motion_observation": {
+        "frames": 40,
+        "source_reuses": 2,
+        "verification_reuses": 2
+      },
+      "observation_work": {
+        "stationary_frames": 11,
+        "inspection_motion_steps": 6
+      },
+      "manipulation_steps": 2,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "banana"
+      ],
+      "suite": "fixed-memory-stacks",
+      "case": 5,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "banana",
+          "stage": "held_transit",
+          "error": "placement_changed",
+          "diagnostics": "placement_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ],
+      "intervention": {
+        "applied": true,
+        "first": "banana",
+        "moved": "pear",
+        "camera_updated_while_holding": true,
+        "redundant_grasps": 0,
+        "passed": true
+      }
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 59.69,
+      "model_requests": 1,
+      "scans": {
+        "frames": 5,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "motion_observation": {
+        "frames": 0,
+        "source_reuses": 0,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 0,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 0,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [],
+      "suite": "audit-replay",
+      "case": 4,
+      "seed": 53,
+      "phase": 1,
+      "failed": [],
+      "deferred": [
+        "pear"
+      ],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ],
+      "replay_kind": "saved_end_scene_audit"
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 286.83,
+      "model_requests": 6,
+      "scans": {
+        "frames": 39,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 24,
+        "source_reuses": 2,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 14,
+        "inspection_motion_steps": 6
+      },
+      "manipulation_steps": 3,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "yellow"
+      ],
+      "suite": "staging-replay",
+      "case": 2,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "yellow",
+          "stage": "held_transit",
+          "error": "placement_changed",
+          "diagnostics": "changed_object_not_observed: "
+        },
+        {
+          "skill": "place",
+          "label": "yellow",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "held_transit_planning_budget_exceeded"
+        },
+        {
+          "skill": "observe",
+          "label": null,
+          "stage": "",
+          "error": "observation_planning_budget_exceeded",
+          "diagnostics": null
+        },
+        {
+          "skill": "place",
+          "label": "yellow",
+          "stage": "transit",
+          "error": "placement_changed",
+          "diagnostics": "held_transit_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": false
+        }
+      ],
+      "replay_kind": "saved_scene_restoration_not_equivalent_to_full_task"
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 634.36,
+      "model_requests": 1,
+      "scans": {
+        "frames": 139,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 130,
+        "source_reuses": 12,
+        "verification_reuses": 6
+      },
+      "observation_work": {
+        "stationary_frames": 7,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 6,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "yellow",
+        "green",
+        "red",
+        "banana",
+        "apple",
+        "pear"
+      ],
+      "suite": "outline-acceptance",
+      "case": 4,
+      "seed": 53,
+      "phase": 1,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        },
+        {
+          "label": "green",
+          "ok": true
+        },
+        {
+          "label": "red",
+          "ok": true
+        },
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "apple",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 331.45,
+      "model_requests": 2,
+      "scans": {
+        "frames": 43,
+        "full_scans": 0,
+        "local_scans": 2
+      },
+      "motion_observation": {
+        "frames": 30,
+        "source_reuses": 2,
+        "verification_reuses": 1
+      },
+      "observation_work": {
+        "stationary_frames": 10,
+        "inspection_motion_steps": 5
+      },
+      "manipulation_steps": 2,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "upright-intervention",
+      "case": 5,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "held_transit",
+          "error": "placement_changed",
+          "diagnostics": "placement_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [
+        "banana"
+      ],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ],
+      "intervention": {
+        "applied": true,
+        "first": "pear",
+        "moved": "banana",
+        "camera_updated_while_holding": true,
+        "redundant_grasps": 0,
+        "passed": true
+      }
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 363.06,
+      "model_requests": 2,
+      "scans": {
+        "frames": 51,
+        "full_scans": 0,
+        "local_scans": 0
+      },
+      "motion_observation": {
+        "frames": 40,
+        "source_reuses": 2,
+        "verification_reuses": 2
+      },
+      "observation_work": {
+        "stationary_frames": 11,
+        "inspection_motion_steps": 6
+      },
+      "manipulation_steps": 2,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "banana"
+      ],
+      "suite": "upright-intervention",
+      "case": 5,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "banana",
+          "stage": "held_transit",
+          "error": "placement_changed",
+          "diagnostics": "placement_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ],
+      "intervention": {
+        "applied": true,
+        "first": "banana",
+        "moved": "pear",
+        "camera_updated_while_holding": true,
+        "redundant_grasps": 0,
+        "passed": true
+      }
+    },
+    {
+      "complete": false,
+      "smooth": false,
+      "physical_success": false,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 1162.28,
+      "model_requests": 8,
+      "scans": {
+        "frames": 155,
+        "full_scans": 0,
+        "local_scans": 4
+      },
+      "motion_observation": {
+        "frames": 110,
+        "source_reuses": 8,
+        "verification_reuses": 1
+      },
+      "observation_work": {
+        "stationary_frames": 40,
+        "inspection_motion_steps": 19
+      },
+      "manipulation_steps": 8,
+      "approvals": 4,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear",
+        "banana",
+        "pear"
+      ],
+      "suite": "upright-staging",
+      "case": 2,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "place infeasible: no_clear_supported_release",
+          "diagnostics": null
+        },
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "inspect_place",
+          "error": "placement_changed",
+          "diagnostics": "相机尚未完整确认指定底座，请先观察底座"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "inspect_place",
+          "error": "placement_changed",
+          "diagnostics": "相机尚未完整确认指定底座，请先观察底座"
+        },
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "inspect_place",
+          "error": "placement_changed",
+          "diagnostics": "相机尚未完整确认指定底座，请先观察底座"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "transit",
+          "error": "unreachable",
+          "diagnostics": "linear path: joint jump 0.227 rad at waypoint 11/69 (singularity or limit)"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "inspect_place",
+          "error": "placement_changed",
+          "diagnostics": "相机尚未完整确认指定底座，请先观察底座"
+        },
+        {
+          "skill": "place",
+          "label": "pear",
+          "stage": "place",
+          "error": "placement_planning_budget_exceeded",
+          "diagnostics": "placement_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": false
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 364.11,
+      "model_requests": 2,
+      "scans": {
+        "frames": 45,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 33,
+        "source_reuses": 2,
+        "verification_reuses": 2
+      },
+      "observation_work": {
+        "stationary_frames": 10,
+        "inspection_motion_steps": 5
+      },
+      "manipulation_steps": 2,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "live-release-intervention",
+      "case": 5,
+      "seed": 29,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "held_transit",
+          "error": "placement_changed",
+          "diagnostics": "placement_planning_budget_exceeded"
+        }
+      ],
+      "deferred": [
+        "banana"
+      ],
+      "goals": [
+        {
+          "label": "banana",
+          "ok": true
+        },
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ],
+      "intervention": {
+        "applied": true,
+        "first": "pear",
+        "moved": "banana",
+        "camera_updated_while_holding": true,
+        "redundant_grasps": 0,
+        "passed": true
+      }
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 299.12,
+      "model_requests": 2,
+      "scans": {
+        "frames": 34,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 25,
+        "source_reuses": 4,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 3,
+        "inspection_motion_steps": 2
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "live-release-staging",
+      "case": 2,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "place infeasible: no_clear_supported_release",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 227.17,
+      "model_requests": 1,
+      "scans": {
+        "frames": 41,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 36,
+        "source_reuses": 4,
+        "verification_reuses": 2
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 2,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear",
+        "yellow"
+      ],
+      "suite": "live-release-staging",
+      "case": 2,
+      "seed": 53,
+      "phase": 2,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 252.05,
+      "model_requests": 2,
+      "scans": {
+        "frames": 29,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 21,
+        "source_reuses": 4,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 2,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "support-release-staging",
+      "case": 2,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "place infeasible: no_clear_supported_release",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 212.52,
+      "model_requests": 2,
+      "scans": {
+        "frames": 43,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 37,
+        "source_reuses": 4,
+        "verification_reuses": 1
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 2,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear",
+        "yellow"
+      ],
+      "suite": "support-release-staging",
+      "case": 2,
+      "seed": 53,
+      "phase": 2,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "done",
+          "error": "placement_not_verified",
+          "diagnostics": ""
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 216.23,
+      "model_requests": 2,
+      "scans": {
+        "frames": 29,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 21,
+        "source_reuses": 4,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 2,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "staging-semantics-final",
+      "case": 2,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "place infeasible: no_clear_supported_release",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": false,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 209.95,
+      "model_requests": 2,
+      "scans": {
+        "frames": 29,
+        "full_scans": 0,
+        "local_scans": 3
+      },
+      "motion_observation": {
+        "frames": 21,
+        "source_reuses": 4,
+        "verification_reuses": 0
+      },
+      "observation_work": {
+        "stationary_frames": 2,
+        "inspection_motion_steps": 1
+      },
+      "manipulation_steps": 1,
+      "approvals": 0,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear"
+      ],
+      "suite": "staging-semantics-acceptance",
+      "case": 2,
+      "seed": 53,
+      "phase": 1,
+      "failed": [
+        {
+          "skill": "move",
+          "label": "pear",
+          "stage": "plan",
+          "error": "place infeasible: no_clear_supported_release",
+          "diagnostics": null
+        }
+      ],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "pear",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "smooth": true,
+      "physical_success": true,
+      "all_requested_goals": true,
+      "timed_out": false,
+      "wall_seconds": 204.3,
+      "model_requests": 1,
+      "scans": {
+        "frames": 42,
+        "full_scans": 0,
+        "local_scans": 1
+      },
+      "motion_observation": {
+        "frames": 37,
+        "source_reuses": 4,
+        "verification_reuses": 2
+      },
+      "observation_work": {
+        "stationary_frames": 4,
+        "inspection_motion_steps": 0
+      },
+      "manipulation_steps": 2,
+      "approvals": 1,
+      "drops": 0,
+      "unsupported_drops": 0,
+      "picked_labels": [
+        "pear",
+        "yellow"
+      ],
+      "suite": "staging-semantics-acceptance",
+      "case": 2,
+      "seed": 53,
+      "phase": 2,
+      "failed": [],
+      "deferred": [],
+      "goals": [
+        {
+          "label": "yellow",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "suite": "upright-staging",
+      "case": 2,
+      "seed": 29,
+      "phase": 1,
+      "complete": false,
+      "smooth": false,
+      "physical_success": null,
+      "interrupted": true,
+      "reason": "superseded_batch_stopped_without_final_audit"
+    },
+    {
+      "suite": "staging-semantics-final",
+      "case": 2,
+      "seed": 53,
+      "phase": 2,
+      "complete": false,
+      "smooth": false,
+      "physical_success": null,
+      "interrupted": true,
+      "reason": "windows_checkpoint_replace_denied_no_final_audit"
+    }
+  ]
+}

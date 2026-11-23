@@ -1,17 +1,17 @@
 {
-  "node_count": 4943,
+  "node_count": 4952,
   "unverified_node_count": 0,
-  "raw_edge_count": 14832,
+  "raw_edge_count": 14868,
   "non_object_edges": 0,
   "missing_endpoint_edges": 0,
-  "dangling_endpoint_edges": 1415,
+  "dangling_endpoint_edges": 1420,
   "external_reference_edges": 0,
   "self_loop_edges": 6,
-  "valid_candidate_edges": 13417,
+  "valid_candidate_edges": 13448,
   "exact_duplicate_edges": 0,
-  "directed_unique_endpoint_pairs": 12643,
+  "directed_unique_endpoint_pairs": 12674,
   "directed_same_endpoint_collapsed_edges": 774,
-  "undirected_unique_endpoint_pairs": 12629,
+  "undirected_unique_endpoint_pairs": 12660,
   "undirected_same_endpoint_collapsed_edges": 788,
   "same_endpoint_group_count": 733,
   "relation_variant_groups": 485,
@@ -19,8 +19,8 @@
   "source_location_variant_groups": 2,
   "context_variant_groups": 256,
   "post_build_graph_type": "DiGraph",
-  "post_build_node_count": 4995,
-  "post_build_edge_count": 14058,
+  "post_build_node_count": 5004,
+  "post_build_edge_count": 14094,
   "post_build_error": "",
   "producer_suppression": {
     "path": "graphify/extract.py (installed package)",
@@ -161,8 +161,8 @@
         "ws/src/cube_task/cube_task/assistant/catalog_perception.py"
       ],
       "source_locations": [
-        "L279",
-        "L293"
+        "L289",
+        "L303"
       ],
       "contexts": [
         "",

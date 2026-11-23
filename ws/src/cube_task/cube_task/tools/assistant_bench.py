@@ -29,30 +29,57 @@ def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix+'.tmp')
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding='utf-8')
-    temporary.replace(path)
+    # Windows readers/scanners can briefly open the old checkpoint without
+    # FILE_SHARE_DELETE. A progress viewer must not abort a physical trial.
+    for attempt in range(10):
+        try:
+            temporary.replace(path)
+            break
+        except PermissionError:
+            if attempt == 9:
+                raise
+            time.sleep(.02)
 
 
-def random_objects(session, seed):
-    """Generate a reproducible nonoverlapping tabletop scene, independently of planning."""
+def random_objects(session, seed, *, scenario='tabletop'):
+    """Sample edits, never prefilter layouts using perception or task/IK success.
+
+    General scenes cover both sides of the old +/-40 cm strip and the near/far
+    workspace. Stack bases use a central band; intervention fruits start in
+    separate portions of the pickup area. Every position and yaw varies by seed.
+    """
     random = np.random.default_rng(seed)
     for _ in range(100):
         objects = []
         for label in random.permutation(LABELS):
             for _ in range(300):
-                xy = random.uniform([.18, -.24], [.48, .24])
+                low, high = [.14, -.44], [.53, .44]
+                if scenario == 'stacking' and label == 'yellow':
+                    low, high = [.23, -.14], [.34, .14]
+                elif scenario == 'intervention' and label == 'banana':
+                    low, high = [.25, -.10], [.37, -.04]
+                elif scenario == 'intervention' and label == 'pear':
+                    low, high = [.24, .10], [.41, .15]
+                xy = random.uniform(low, high)
+                if not .23 <= np.linalg.norm(xy) <= .56:
+                    continue
                 yaw = random.uniform(-np.pi, np.pi)
+                if scenario == 'intervention' and label == 'banana':
+                    yaw = random.uniform(-.25, .25)
                 candidate = make_catalog_object(str(label), 'bench-' + label, xy, yaw)
+                if scenario == 'intervention' and label in ('banana', 'pear'):
+                    from ..perception.geometry import points_in_polygon
+                    lo, hi = candidate.aabb()
+                    corners = np.array([[lo[0],lo[1]],[lo[0],hi[1]],
+                                        [hi[0],lo[1]],[hi[0],hi[1]]])
+                    if not np.all(points_in_polygon(corners, session.editor.pick_polygon, margin=-.005)):
+                        continue
                 try:
                     session.editor._check_placement(candidate, objects)
                 except ValueError:
                     continue
-                # A small additional setup gap permits ordinary independent
-                # grasps while retaining random positions and orientations.
-                if any(np.linalg.norm(candidate.center_xy() - other.center_xy())
-                       < .5 * max(candidate.aabb()[1][:2] - candidate.aabb()[0][:2])
-                       + .5 * max(other.aabb()[1][:2] - other.aabb()[0][:2]) + .02
-                       for other in objects):
-                    continue
+                # Use the same 8 mm non-overlap rule as the human editor, with
+                # no extra easy-grasp gap and no successful-plan selection.
                 objects.append(candidate)
                 break
             else:
@@ -62,34 +89,15 @@ def random_objects(session, seed):
     raise RuntimeError('Could not generate all six objects in the declared random workspace')
 
 
-def stacking_objects(session):
-    """Six objects with a reachable empty base and the other objects nearby."""
-    layout = dict(red=(.12, -.37, 0.), apple=(.22, -.32, 0.),
-                  green=(.12, .37, 0.), banana=(.54, 0., np.pi / 2),
-                  yellow=(.25, 0., 0.), pear=(.35, .14, .3))
-    objects = []
-    for label, (x, y, yaw) in layout.items():
-        obj = make_catalog_object(label, 'bench-' + label, [x, y], yaw)
-        session.editor._check_placement(obj, objects)
-        objects.append(obj)
-    return objects
+def stacking_objects(session, seed):
+    return random_objects(session, seed, scenario='stacking')
 
 
 class BenchSession(SimulationSession):
     def __init__(self, *, stacking=False, intervention=False, **kwargs):
         super().__init__(backend='mujoco', **kwargs)
-        if intervention:
-            layout = dict(red=(.44, -.2, 0.), apple=(.32, -.2, 0.),
-                          green=(.12, .37, 0.), yellow=(.54, 0., 0.),
-                          banana=(.25, -.04, 0.), pear=(.32, .13, .3))
-            objects = []
-            for label, (x, y, yaw) in layout.items():
-                obj = make_catalog_object(label, 'bench-' + label, [x, y], yaw)
-                self.editor._check_placement(obj, objects)
-                objects.append(obj)
-            self.world.objects = objects
-        else:
-            self.world.objects = stacking_objects(self) if stacking else random_objects(self, self.seed)
+        self.world.objects = random_objects(self, self.seed,
+            scenario='intervention' if intervention else 'stacking' if stacking else 'tabletop')
         self.bench_intervention = intervention
         self._physics.apply_scene_changes()
         self._remember_physics()
@@ -313,10 +321,14 @@ def run_phase(controller, instruction, output, timeout):
         deferred_steps=[h for h in history if h.get('deferred')],
         manipulation_steps=sum(h.get('skill') in ('pick', 'place', 'move')
                                and h.get('skipped') is not True and not h.get('deferred')
+                               and h.get('stage') != 'plan'
                                and h.get('manipulation_started') is not False for h in history),
         drops=len(drops), unsupported_drops=sum(not d.get('support') for d in drops),
         drop_events=drops,
         message=state['stage'], history=history)
+    summary['smooth'] = bool(summary['complete'] and summary['physical_success']
+        and not summary['failed_steps'] and not summary['deferred_steps']
+        and not summary['drops'] and not summary['timed_out'])
     if getattr(session, 'bench_intervention', False):
         moved = intervention.get('moved')
         extra_grasps = [label for label in picked_labels if label == moved]
@@ -363,6 +375,7 @@ def run_case(case, seed, output, timeout):
         if case == 5:
             result['complete'] = result['complete'] and all(
                 p.get('intervention', {}).get('passed') for p in phases)
+        result['smooth'] = bool(result['complete'] and all(p['smooth'] for p in phases))
         write_json(directory / 'result.json', result)
         return result
     finally:
@@ -371,8 +384,8 @@ def run_case(case, seed, output, timeout):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--cases', default='1,2,3,4')
-    parser.add_argument('--seeds', default='7,19')
+    parser.add_argument('--cases', default='1,2,3,4,5')
+    parser.add_argument('--seeds', default='19,29,53')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--timeout', type=float, default=1200.)
     args = parser.parse_args()

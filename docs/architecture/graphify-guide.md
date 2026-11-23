@@ -6,13 +6,15 @@
 
 | 需求 | 入口 |
 |---|---|
-| 看模块分群 | [社区总览](../../graphify-out/graph-overview.html)，155 个社区 |
-| 搜索类、函数、文件关系 | [完整交互图](../../graphify-out/graph.html)，4,995 个节点 |
+| 看模块分群 | [社区总览](../../graphify-out/graph-overview.html)，142 个社区 |
+| 查看源码关系图 | [交互图](../../graphify-out/graph.html)，5,004 个源码节点，默认按社区合并显示 |
 | 查看静态结构报告 | [GRAPH_REPORT.md](../../graphify-out/GRAPH_REPORT.md) |
 | 确认本次具体分析了哪些文件 | [scope.json](../../graphify-out/scope.json)，128 个 Python/JavaScript 源文件 |
 | 查看解析质量和局限 | [health.json](../../graphify-out/health.json) |
 
 上述数量描述已生成的图谱快照，不保证与后续修改的工作区同步。生成图谱本身只读取白名单源码，不搬动源码或改动抓取执行逻辑。交互 HTML 使用 Graphify 默认的公开 vis-network CDN 库；JSON 和 Markdown 可离线读取。
+
+当前节点数超过 5,000，HTML 为便于浏览采用社区总览；要精确查询单个类、函数和调用关系，请使用下方命令或 `graph.json`。
 
 ## 当前网页的执行链
 

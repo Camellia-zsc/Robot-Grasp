@@ -475,13 +475,18 @@ class SimulationSession:
                                 (o is self.world.held and
                                  float(o.aabb()[0][2]) > float(candidate.aabb()[1][2]) + .008)])
                 # Keep object identity: held/evaluation references must remain meaningful.
+                previous_pose = obj.T_base_obj.copy()
                 obj.T_base_obj = candidate.T_base_obj.copy()
+                if self._physics is not None:
+                    try:
+                        self._physics.apply_scene_changes(changed_names=[obj.name])
+                    except ValueError:
+                        obj.T_base_obj = previous_pose
+                        raise
+                    self._remember_physics()
                 if getattr(self, '_released_observation_obstacle', None) is not None and self._released_observation_obstacle.label == obj.label:
                     self._released_observation_obstacle = None
                 getattr(self, '_released_observation_hints', {}).pop(obj.label, None)
-                if self._physics is not None:
-                    self._physics.apply_scene_changes()
-                    self._remember_physics()
                 self._environment_revision += 1
                 observer = getattr(self, '_motion_observer', None)
                 if observer is not None:
@@ -1016,6 +1021,7 @@ class SimulationSession:
                               progress=progress, **options)
             if (updated is None and why == 'placement_planning_budget_exceeded'
                     and (search_state.get('avoided') or search_state.get('avoided_poses'))
+                    and not search_state.get('unseen_xy')
                     and not budget.cancelled()):
                 self._apply_interventions()
                 if revision != self._environment_revision:
@@ -2727,11 +2733,11 @@ class SimulationSession:
             from .placement_observation import forget_inspection
             forget_inspection(self)
         self._recovery_context = None
-        if destination is not None and result is None and not summary['aborted']:
+        if result is None and not summary['aborted']:
             self._status, self._stage = 'ready', ''
         else:
             self._status = 'ready'
-        if result is None and destination is not None and not summary['aborted']:
+        if result is None and not summary['aborted']:
             pass  # Planning refusal sent no commands and preserves this observation.
         elif not summary['aborted'] and not summary.get('fault') and not summary['holding']:
             try:

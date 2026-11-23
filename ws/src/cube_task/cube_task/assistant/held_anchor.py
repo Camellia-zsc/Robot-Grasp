@@ -98,6 +98,56 @@ def source_anchor(grasp):
     return fitted
 
 
+def support_geometry(grasp):
+    """Bind an upright, axisymmetric class solid to its fitted RGB-D bulb.
+
+    A footprint extruded down to the floor invents wide bottom corners on a
+    round fruit. Use the known solid for vertical support contact only; full
+    measured envelopes still constrain neighboring bodies and the gripper.
+    """
+    from .catalog import make_catalog_object
+    prior = spherical_model(grasp.target)
+    anchor = source_anchor(grasp) if prior is not None else {}
+    if not anchor.get('ok'):
+        return None
+    model = make_catalog_object(grasp.target.label, 'support-prior', [0., 0.])
+    if model.shape == 'sphere':
+        parts = [dict(shape='sphere', size=model.size, pos=[0.,0.,float(model.size[0])])]
+    elif model.shape == 'compound':
+        parts = model.size
+    else:
+        return None
+    # The current catalog models use coaxial parts. Reject unmodelled local
+    # rotations/asymmetry rather than claiming their contact height is known.
+    if any(part['shape'] not in ('sphere','ellipsoid','cylinder')
+           or any(key in part for key in ('quat','euler','rot'))
+           or (part['shape']=='ellipsoid' and abs(part['size'][0]-part['size'][1])>1e-9)
+           or np.linalg.norm(np.asarray(part['pos'])[:2]) > 1e-9 for part in parts):
+        return None
+    sphere = max((part for part in parts if part['shape']=='sphere'),
+                 key=lambda part: float(part['size'][0]))
+    origin = np.asarray(anchor['center'])-np.asarray(sphere['pos'])
+    return dict(parts=copy.deepcopy(parts), origin=origin)
+
+
+def support_bottom(model, grasp, release):
+    """Exact lowest height of the confirmed solid after the proposed transfer."""
+    R = release[:3,:3] @ grasp.T_grasp[:3,:3].T
+    values = []
+    for part in model['parts']:
+        center = release[:3,3] + R @ (model['origin']+part['pos']-grasp.T_grasp[:3,3])
+        size = np.asarray(part['size'],float)
+        if part['shape']=='sphere':
+            extent = float(size[0])
+        elif part['shape']=='ellipsoid':
+            extent = float(np.linalg.norm(R[2]*size))
+        else:
+            cosine = abs(float(R[2,2]))
+            extent = float(size[1])/2*cosine + float(size[0])*math.sqrt(max(0.,1-cosine*cosine))
+        values.append(float(center[2])-extent)
+    return min(values)
+
+
 def held_anchor(detections, grasp, source, tcp):
     """Keep semantic uniqueness even when the whole held silhouette is cropped."""
     from .spherical_anchor import fit_spherical_anchor
@@ -111,9 +161,19 @@ def held_anchor(detections, grasp, source, tcp):
         return dict(ok=False, error='held_tcp_unconfirmed')
     reference = np.r_[np.asarray(source['center'], float), 1.]
     predicted = (T @ inv_T(grasp.T_grasp) @ reference)[:3]
+    tracked = grasp.target.extra.get('_held_translation_anchor') or {}
+    # A cropped bulb can lose its class at the low release pose. Identity has
+    # already been established by a two-frame seated-grip fit; only an unknown
+    # fragment fitting that same body within 8 mm may continue this track.
+    # This never relabels detections or makes an unknown scene object executable.
+    pair = tracked.get('pair') or {}
+    allow_unknown = (tracked.get('translation_only') is True
+                     and pair.get('ok') is True and pair.get('translation_only') is True)
+    has_unknown = False
     candidates, masks = [], []
     for detection in detections:
-        if detection.label != grasp.target.label:
+        unknown = detection.label == 'unknown' and allow_unknown
+        if detection.label != grasp.target.label and not unknown:
             continue
         points = np.asarray(detection.extra.get('_points_base', []), float)
         if points.ndim != 2 or points.shape[1:] != (3,):
@@ -125,6 +185,7 @@ def held_anchor(detections, grasp, source, tcp):
         if len(near) >= 100:
             candidates.append(near)
             masks.append(detection.mask)
+            has_unknown |= unknown
     if not candidates:
         return dict(ok=False, error='held_spherical_identity_unconfirmed')
     if len(candidates) > 1:
@@ -150,6 +211,10 @@ def held_anchor(detections, grasp, source, tcp):
         if np.max(np.linalg.norm(centers[:, None]-centers[None, :], axis=2)) > .001:
             return dict(ok=False, error='held_spherical_fragments_disagree')
     fitted = fit_spherical_anchor(np.vstack(candidates), source['radius'], predicted)
+    if fitted.get('ok') and has_unknown:
+        if np.linalg.norm(np.asarray(fitted['center'])-predicted) > .008:
+            return dict(ok=False, error='held_unknown_fragment_outside_track')
+        fitted['tracked_unknown_fragment'] = True
     if fitted.get('ok') and len(candidates) > 1:
         fractions = [float(np.mean(np.abs(np.linalg.norm(points-np.asarray(fitted['center']), axis=1)
                                          -float(source['radius'])) < .0012)) for points in candidates]

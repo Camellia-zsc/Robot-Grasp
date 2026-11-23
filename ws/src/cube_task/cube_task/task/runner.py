@@ -962,9 +962,14 @@ class TaskRunner:
         stacked = (det.extra or {}).get('_stack_support') is not None
         retry_limit = STACK_RELEASE_RETRIES if stacked else RELEASE_RETRIES
         while not ok and footprint is not None and len(avoid) + len(avoided_poses) < retry_limit:
+            if why.startswith(('grasp:', 'pre_grasp:', 'lift:', 'aborted')):
+                break  # Changing the destination cannot repair a source failure.
             # That release position is out of reach: the next free one, not on top of
             # an object already in the zone unless nothing else is left.
-            if strict and (exact_xy or stacked):
+            orientation_failure = why.startswith(('release:', 'pre_place:', 'retreat:')) and 'IK' in why
+            same_position_retries = sum(math.hypot(a[0]-place_info['xy'][0],
+                a[1]-place_info['xy'][1]) < 1e-6 for a in avoided_poses)
+            if strict and (exact_xy or stacked or (orientation_failure and same_position_retries < 3)):
                 avoided_poses.append((*place_info['xy'], place_info['closing_angle']))
             elif strict:
                 # A region can use another center after the final leaned pose
@@ -1891,6 +1896,10 @@ class TaskRunner:
         stack_support = (det.extra or {}).get('_stack_support')
         if stack_support is not None and not any(_is_stack_base(det, other) for other in neighbors):
             return lambda *args, **kwargs: False
+        contact_model = None
+        if stack_support is not None:
+            from ..assistant.held_anchor import support_geometry
+            contact_model = support_geometry(gp)
         obstacles = []
         for other in neighbors:
             if other is det or not _has_xy(other):
@@ -1988,7 +1997,14 @@ class TaskRunner:
                         resting_pose=(det.extra or {}).get('resting_pose'))
                     rotation = T[:3, :3] @ gp.T_grasp[:3, :3].T
                     released = (source_box - gp.T_grasp[:3, 3]) @ rotation.T + T[:3, 3]
-                    if float(released[:, 2].min()) < float(stack_support['top_z']) - .002:
+                    low = float(released[:, 2].min())
+                    if contact_model is not None:
+                        from ..assistant.held_anchor import support_bottom
+                        low = support_bottom(contact_model, gp, T)
+                        cloud = np.asarray((det.extra or {}).get('_placement_points_base'),float)
+                        if cloud.ndim == 2 and cloud.shape[1:] == (3,) and len(cloud):
+                            low = min(low, float(((cloud-gp.T_grasp[:3,3])@rotation.T+T[:3,3])[:,2].min()))
+                    if low < float(stack_support['top_z']) - .002:
                         return False
                 if not gripper_clear(T, width):
                     return False

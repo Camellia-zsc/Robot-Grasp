@@ -29,6 +29,24 @@ def stacked_scene():
     return runner, target, grasp, previous, support, zone, polygon
 
 
+def test_round_support_contact_uses_confirmed_solid_without_invented_bottom_corners():
+    from cube_task.core.transforms import rot_y
+    from test_held_spherical_anchor import sphere_cloud
+    parts = stacked_scene()
+    runner, target, grasp, _previous, support, _zone, polygon = parts
+    target.extra['_placement_points_base'] = sphere_cloud([.2,.15,.0425], .0425, 9)
+    pose = top_down_T(.4,0.,.144,0.)
+    pose[:3,:3] = rot_y(np.radians(10.)) @ pose[:3,:3]
+    allowed = runner._strict_place_filter(target,grasp,[target,support],polygon)
+    assert allowed(.4,0.,0.,gripper_pose=pose)
+    pose[2,3] -= .015
+    assert not allowed(.4,0.,0.,gripper_pose=pose)
+    target.extra['_placement_points_base'] = np.zeros((100,3))
+    unconfirmed = runner._strict_place_filter(target,grasp,[target,support],polygon)
+    pose[2,3] += .015
+    assert not unconfirmed(.4,0.,0.,gripper_pose=pose)
+
+
 def replan(parts, extra=(), **kwargs):
     runner, target, grasp, previous, support, zone, polygon = parts
     return runner.replan_release(target, grasp, previous, .048,

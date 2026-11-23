@@ -311,18 +311,25 @@ class DashboardPhysics:
             self._settling = bool(settling)
         return self.world
 
-    def apply_scene_changes(self):
+    def apply_scene_changes(self, *, changed_names=None):
         """Apply explicit editor mutations to real free bodies, never to grasps."""
         with self._lock:
             mw = self.mujoco_world
             previous_supports = copy.deepcopy(self._supports)
             names = {o.name for o in self.world.objects}
+            changed = names if changed_names is None else set(changed_names)
+            if not changed <= names:
+                raise ValueError('待移动物品已不存在')
             if names != {o.name for o in mw.objects}:
+                if changed_names is not None:
+                    raise ValueError('物理场景物品列表已变化，干预未生效')
                 if mw.held_objects():
                     raise ValueError('夹持期间不能增删物理物品')
                 self._build()
             else:
                 for obj in self.world.objects:
+                    if obj.name not in changed:
+                        continue
                     actual = mw.object_pose(obj.name)
                     if not np.allclose(actual, obj.T_base_obj, atol=1e-10, rtol=0):
                         if obj.name in mw.held_objects():

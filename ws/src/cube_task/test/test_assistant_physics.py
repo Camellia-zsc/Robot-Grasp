@@ -62,6 +62,18 @@ def test_centered_apple_has_real_support_contact_without_rigid_attachment(build)
                    for t in physics.mujoco_world.model.eq_type)
 
 
+def test_explicit_edit_does_not_apply_stale_pose_of_an_unedited_held_body(build, monkeypatch):
+    physics, base, apple, _events = build()
+    actual = physics.mujoco_world.object_pose(apple.name).copy()
+    monkeypatch.setattr(physics.mujoco_world, 'held_objects', lambda: [apple.name])
+    apple.T_base_obj[:3,3] += [.001,0.,0.]
+    base.T_base_obj[:2,3] += [.02,0.]
+    edited = base.T_base_obj.copy()
+    physics.apply_scene_changes(changed_names=[base.name])
+    np.testing.assert_array_equal(physics.mujoco_world.object_pose(apple.name), actual)
+    np.testing.assert_allclose(physics.mujoco_world.object_pose(base.name), edited)
+
+
 def test_planning_uses_the_controllers_actual_joint_limits_after_scene_rebuild(build):
     physics, _base, _apple, _events = build()
     for rebuild in (False, True):

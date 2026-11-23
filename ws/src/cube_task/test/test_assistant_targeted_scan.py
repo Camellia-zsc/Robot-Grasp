@@ -168,7 +168,8 @@ def test_real_explicit_local_observation_is_not_repeated_before_grasp(tmp_path):
         assert session.arm.inner.n_calls == motions
 
 
-def test_planning_refusal_does_not_advance_physics_or_scan(tmp_path, monkeypatch):
+@pytest.mark.parametrize('destination', [dict(type='point', xy=[.3, 0.]), None])
+def test_planning_refusal_does_not_advance_physics_or_scan(tmp_path, monkeypatch, destination):
     with SimulationSession(realtime=False, log_dir=tmp_path) as session:
         session.prepare()
         target = next(d for d in session._observed_detections if d.label == 'red')
@@ -176,12 +177,12 @@ def test_planning_refusal_does_not_advance_physics_or_scan(tmp_path, monkeypatch
         def unexpected(*args, **kwargs):
             raise AssertionError('a planning refusal must not settle or reobserve')
         session._physics = SimpleNamespace(settle=unexpected,
-            resting_status=lambda name: dict(success=True, posture_ok=True))
+            resting_status=lambda name: dict(success=True, posture_ok=True), close=lambda: None)
         monkeypatch.setattr(session, 'observe', unexpected)
         monkeypatch.setattr(session, '_verify_destination', lambda *a: False)
         monkeypatch.setattr(session, '_publish_snapshot', lambda: None)
         result = session._finish_attempt(None, 'no_clear_supported_release',
-            'target', 'desktop_point', target, obj, dict(type='point', xy=[.3, 0.]))
+            'target', 'zone_red' if destination is None else 'desktop_point', target, obj, destination)
         session._physics = None
         assert result['stage'] == 'plan' and not result['ok']
 

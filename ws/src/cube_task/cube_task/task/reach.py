@@ -206,6 +206,7 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
     lowered = {}
     contacts = (('release', place, 'T_release'),) if held_only else (
         ('grasp', grasp, 'T_grasp'), ('release', place, 'T_release'))
+    coupled_contact = False
     for name, obj, attr in contacts:
         if _planning_cancelled(arm):
             return False, 'aborted', tilts
@@ -218,6 +219,31 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
     if (getattr(target, 'label', None) == 'pear' and
             (getattr(target, 'extra', None) or {}).get('resting_pose') == 'upright'):
         grasp_R = grasp.T_grasp[:3, :3] if held_only else new['grasp'][2][:3, :3]
+        release_T = new['release'][2]
+        up = release_T[:3, :3] @ grasp_R.T @ np.array([0.,0.,1.])
+        if (float(up[2]) < math.cos(math.radians(3.))
+                and (not held_only or target.extra.get('_upright_contact_coupled'))):
+            # Solving the source and destination independently can turn an
+            # upright flat-bottom fruit onto one edge. Couple their wrist
+            # lean: preserve body-up while retaining the selected closing yaw.
+            yaw = (math.atan2(release_T[1,1],release_T[0,1])
+                   - math.atan2(grasp_R[1,1],grasp_R[0,1]))
+            c,s = math.cos(yaw),math.sin(yaw)
+            turn = np.array([[c,-s,0.],[s,c,0.],[0.,0.,1.]])
+            candidate = release_T.copy()
+            candidate[:3,:3] = turn @ grasp_R
+            if _check(arm,candidate,None)[0]:
+                new['release'] = (place,'T_release',candidate)
+                tilts['release'] = round(_tilt_deg(candidate),1)
+                coupled_contact = True
+            elif not held_only:
+                candidate = new['grasp'][2].copy()
+                candidate[:3,:3] = turn.T @ release_T[:3,:3]
+                if _check(arm,candidate,None)[0]:
+                    new['grasp'] = (grasp,'T_grasp',candidate)
+                    tilts['grasp'] = round(_tilt_deg(candidate),1)
+                    grasp_R = candidate[:3,:3]
+                    coupled_contact = True
         up = new['release'][2][:3, :3] @ grasp_R.T @ np.array([0., 0., 1.])
         # The planar base tolerates gentle lean; do not deliberately release a
         # known upright fruit beyond its measured physical recovery envelope.
@@ -245,6 +271,8 @@ def adjust_plan_poses(arm, grasp, place, floors: Optional[Dict[str, float]] = No
     tilts = {k: tilts[k] for k in order if k in tilts}
     for obj, attr, T2 in new.values():
         setattr(obj, attr, T2)
+    if coupled_contact:
+        target.extra['_upright_contact_coupled'] = True
     if report is not None:
         report['lowered'] = lowered
     return True, '', tilts

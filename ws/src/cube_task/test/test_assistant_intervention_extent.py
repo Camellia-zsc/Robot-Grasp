@@ -46,6 +46,26 @@ def apply_while_running(sim, request):
         sim._tick()
 
 
+def test_rejected_physical_edit_retains_geometry_revision_and_camera_hint(tabletop):
+    from types import SimpleNamespace
+    sim,target,events = tabletop
+    before,revision = target.T_base_obj.copy(),sim._environment_revision
+    sim._released_observation_hints = {target.label:'kept'}
+    def reject(**kwargs):
+        assert kwargs['changed_names']==[target.name]
+        raise ValueError('物理场景已变化')
+    sim._physics = SimpleNamespace(apply_scene_changes=reject)
+    try:
+        sim._interventions.append((1,dict(object_id=target.name,xy=[.7,.5],yaw=0.)))
+        sim._apply_interventions()
+        np.testing.assert_array_equal(target.T_base_obj,before)
+        assert sim._environment_revision==revision
+        assert sim._released_observation_hints[target.label]=='kept'
+        assert any(kind=='scene_intervention_rejected' for kind,_ in events)
+    finally:
+        sim._physics=None
+
+
 @pytest.mark.parametrize('x_side,y_side', [(0, 0), (0, 1), (1, 0), (1, 1)])
 def test_running_move_reaches_all_table_corners_outside_robot_and_pick_area(
         tabletop, x_side, y_side):

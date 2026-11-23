@@ -25,7 +25,8 @@ Both use a cosine-ramped trapezoid time scaling (ramp _ACCEL_TIME_S). A move
 is done when the trajectory ended, the measured TCP (MuJoCo state) is within
 robot.motion.pos_tol / rot_tol_deg (move_joints: every joint within 0.01 rad)
 and the joints are still for robot.motion.settle_samples polls; otherwise
-'timeout' (robot.motion.timeout_base_s + timeout_per_m_s x distance) or
+'timeout' (the larger of the distance allowance and planned trajectory duration
+plus timeout_base_s; an explicit caller timeout takes precedence) or
 'stalled' (the arm stopped short, or a tracking error showed it is blocked by
 a contact; the arm then holds the measured joints).
 
@@ -792,6 +793,8 @@ class MujocoArm(ArmInterface):
             qs = np.vstack([q0, q_goal])
             dq = float(np.max(np.abs(q_goal - q0)))
             v = self._joint_speed * scale / dq if dq > 0 else math.inf
+        if timeout is None:
+            limit = max(limit, _Profile(v, _ACCEL_TIME_S).T + self._timeout_base)
         return self._execute(qs, v, T, None, t0, limit)
 
     def move_joints(self, q: Sequence[float], timeout: Optional[float] = None) -> MotionResult:
@@ -819,6 +822,8 @@ class MujocoArm(ArmInterface):
         limit = self._limit(dist, timeout)
         dq = float(np.max(np.abs(qt - q0)))
         v = self._joint_speed * (self._speed / 100.0) / dq if dq > 0 else math.inf
+        if timeout is None:
+            limit = max(limit, _Profile(v, _ACCEL_TIME_S).T + self._timeout_base)
         return self._execute(np.vstack([q0, qt]), v, T_goal, qt, t0, limit)
 
     # ------------------------------------------------------------ gripper

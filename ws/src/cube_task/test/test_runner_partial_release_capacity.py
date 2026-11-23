@@ -14,6 +14,9 @@ from test_runner_local_release import scene
 def measured_green_region():
     runner, _, _, _ = scene()
     configure_sandbox(runner.cfg)
+    # This fixture deliberately models the old narrow custom guard/card.
+    # Keep candidate enumeration and the guard in the same workspace.
+    runner.cfg.set('robot.workspace.y', [-.40,.40])
     runner.placer = PlacePlanner(runner.cfg)
     runner.nominal = {entry['label']: entry['dimensions'][:2] for entry in catalog_entries()}
     runner.arm.guard = SimpleNamespace(x=[.08, .60], y=[-.40, .40], r_max=.62)
@@ -59,6 +62,12 @@ def test_complete_current_pear_measurement_keeps_strict_capacity_checks():
     pear = Detection('pear', 1., center_base=np.array([.1409, .3522, .113]),
                      top_z=.113, height=.113, length=.0753, width=.0524, yaw=0.,
                      extra={'resting_pose': 'upright'})
+    capacity, why = runner.has_release_capacity(target, grasp, place, .0502, [green, pear])
+    # At the current 15 mm measurement reserve the old 20 cm fixture is
+    # genuinely full. Completeness makes this a definite result, not permission
+    # to bypass collision/outline checks. The real dashboard uses 30 cm cards.
+    assert capacity is False and why == 'no_clear_supported_release'
+    runner.zones[place.zone].size = (.30,.30)
     capacity, why = runner.has_release_capacity(target, grasp, place, .0502, [green, pear])
     assert capacity is True and why == ''
 

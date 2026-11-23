@@ -131,6 +131,22 @@ def test_timed_slice_with_completed_rejections_continues_before_camera_motion(mo
     assert not moves and now[0] < 17.
 
 
+def test_missing_camera_rays_trigger_new_view_without_repeating_same_blind_search(monkeypatch):
+    session,target,grasp,place,now,moves,calls = release_session(monkeypatch)
+    blind = []
+    def replan(*args,cancelled=None,search_state=None,**kwargs):
+        if moves:
+            return place,''
+        blind.append(True)
+        search_state.update(avoided=[(.17,.34)],unseen_xy=[(.19,.32)])
+        while not cancelled():
+            now[0] += 1.
+        return None,'placement_planning_budget_exceeded'
+    session.runner.replan_release = replan
+    assert session._before_release(grasp,place,.05,PickResult(False,detail={'holding':True})) is place
+    assert len(blind)==1 and len(moves)==1
+
+
 def test_release_search_rejections_do_not_survive_a_new_camera_measurement(monkeypatch):
     session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
     states = []

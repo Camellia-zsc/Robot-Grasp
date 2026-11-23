@@ -57,6 +57,11 @@ _MAX_GEOMETRY = {
 
 def configure_sandbox(cfg) -> None:
     """Configure a general-shape task while keeping L1 block semantics intact."""
+    # The interactive tabletop extends past the competition's +/-40 cm strip.
+    # Keep the radial envelope, x limits, joint IK and collision checks; the
+    # old y rectangle must not veto an otherwise reachable tabletop grasp.
+    radius = float(cfg.get('robot.workspace.r_max', .62))
+    cfg.set('robot.workspace.y', [-radius, radius])
     # The interactive physical task lowers to the measured support, rather
     # than using the competition fruit's 10 mm drop and per-label lowering.
     # RGB-D/support and seated-grip error need a few mm of allowance: a 2 mm
@@ -95,6 +100,11 @@ def configure_sandbox(cfg) -> None:
     # Search the existing mechanical depth limit (normally 40 mm), keeping
     # aperture, palm clearance, measured taper and neighboring-object checks.
     depths['pear'] = float(cfg.get('grasp.max_grasp_depth', 0.030))
+    # On a 50 mm solid cube the 30 mm distal pad fits from z=20 to 50 mm.
+    # The pear's 40 mm search depth put cube tips at z=10 mm; a leaned full
+    # opening then scraped the table and changed the supposedly rigid grip.
+    for label in ('red', 'green', 'yellow'):
+        depths[label] = min(.030, float(cfg.get('grasp.max_grasp_depth', .030)))
     cfg.set('grasp.max_grasp_depth_by_label', depths)
     # Even separated objects can touch in the camera projection. Keep the
     # base-XY watershed so it separates these instances, but avoid 8 mm

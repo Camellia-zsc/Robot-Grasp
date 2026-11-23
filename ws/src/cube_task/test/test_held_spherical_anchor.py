@@ -62,6 +62,27 @@ def test_ambiguous_held_semantic_instances_do_not_update_grip():
     assert not held_anchor([raw, copy.deepcopy(raw)], grasp, source, tcp)['ok']
 
 
+def test_confirmed_held_identity_survives_unknown_cropped_body_only_near_its_anchor():
+    grasp, source, tcp, center, fragments = fragment_scene()
+    grasp.target.extra['_held_translation_anchor']['translation_only'] = True
+    grasp.target.extra['_held_translation_anchor']['pair'] = dict(ok=True,translation_only=True)
+    raw = Detection('unknown', .5, valid=False, reject_reason='partial_object',
+        extra={'_points_base': sphere_cloud(center, .0425, 76)})
+    fit = held_anchor([raw], grasp, source, tcp)
+    assert fit['ok'] and fit['tracked_unknown_fragment']
+    assert raw.label == 'unknown'  # Never promotes an environment target.
+    raw.extra['_points_base'] += [.02, 0., 0.]
+    assert not held_anchor([raw], grasp, source, tcp)['ok']
+    raw.extra['_points_base'] -= [.02, 0., 0.]
+    raw.label = 'apple'
+    assert not held_anchor([raw], grasp, source, tcp)['ok']
+    raw.label = 'unknown'
+    grasp.target.extra['_held_translation_anchor']['pair']['ok'] = False
+    assert not held_anchor([raw], grasp, source, tcp)['ok']
+    del grasp.target.extra['_held_translation_anchor']
+    assert not held_anchor([raw], grasp, source, tcp)['ok']
+
+
 def fragment_scene():
     grasp = measured_grasp()
     source = source_anchor(grasp)

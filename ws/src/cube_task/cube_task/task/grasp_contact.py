@@ -25,7 +25,9 @@ def supported_grasp(planner, arm, detection, baseline, *, free_tilt=None):
     supported = (extra.get('support_observed') is True and extra.get('support_label')
                  and extra.get('support_z') is not None)
     tapered = measured_tapered_contact(detection)
-    if (not detection.valid or not baseline.feasible or not (supported or tapered)
+    solid_square = (extra.get('catalog_shape') in ('box','cube')
+                    and (extra.get('grasp') or {}).get('kind') == 'square')
+    if (not detection.valid or not baseline.feasible or not (supported or tapered or solid_square)
             or (extra.get('grasp') or {}).get('mode') != 'profile'
             or not accepts_kwarg(planner.plan, 'closing_angle')):
         return baseline
@@ -59,7 +61,9 @@ def supported_grasp(planner, arm, detection, baseline, *, free_tilt=None):
     x, y = baseline.T_grasp[:2, 3]
     tangent = math.atan2(float(y), float(x)) + math.pi / 2
     angles = []
-    for angle in (tangent, float(baseline.closing_angle) + math.pi / 2):
+    candidates = ((float(baseline.closing_angle) + math.pi / 2,) if solid_square else
+                  (tangent, float(baseline.closing_angle) + math.pi / 2))
+    for angle in candidates:
         if not any(abs(math.remainder(angle - old, math.pi)) < math.radians(2) for old in angles):
             angles.append(angle)
     for angle in angles:

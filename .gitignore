@@ -60,6 +60,7 @@ local_validation/assistant_sim/
 local_validation/assistant_ui/
 local_validation/capacity_recovery/
 local_validation/typical_tasks_20261122/
+local_validation/randomized_20261123/
 
 # Graphify: keep shareable graphs, exclude local runtime paths and extraction cache
 graphify-out/cache/

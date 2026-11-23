@@ -64,6 +64,16 @@ def test_depth_noise_slope_does_not_turn_a_flat_tabletop_profile_into_a_tapered_
     assert not calls
 
 
+def test_known_square_tries_other_face_pair_to_balance_a_leaned_tabletop_grasp():
+    detection,baseline,planner,arm,calls = contact_harness()
+    detection.extra = dict(table_z=0.,catalog_shape='box',
+                          grasp=dict(kind='square',mode='profile'))
+    selected = supported_grasp(planner,arm,detection,baseline)
+    assert selected is not baseline and len(calls)==1
+    assert calls[0][1] == pytest.approx(baseline.closing_angle+math.pi/2)
+    assert detection.extra['grasp']['supported_contact']['after_gap_mm'] < .01
+
+
 @pytest.mark.parametrize('missing', ['support_observed', 'support_label', 'support_z', 'grasp'])
 def test_missing_camera_support_or_profile_keeps_original_grasp(missing):
     detection, baseline, planner, arm, calls = contact_harness()

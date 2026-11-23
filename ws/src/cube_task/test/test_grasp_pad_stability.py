@@ -73,6 +73,28 @@ def test_a_gently_tapered_neck_remains_feasible():
     assert det.extra['grasp']['neck_taper_deg'] <= 20.
 
 
+def test_fingertip_tcp_uses_only_the_contact_pad_above_the_tip():
+    # The steep shoulder BELOW the fingertip cannot make the actual straight
+    # 30 mm pad above it unstable. Depth limits still keep the palm clear.
+    det, _ = _plan([0., .060, .075, .105, .120],
+                   [.085, .085, .054, .054, .010], top=.120, min_depth=.008)
+    planner = GraspPlanner(make_cfg('L2', robot__gripper__max_width=.1,
+        grasp__max_grasp_depth=.040, grasp__pad_center_offset=.015), 'L2')
+    plan = planner.plan(det)
+    assert plan.feasible, plan.reason
+    assert plan.T_grasp[2, 3] == pytest.approx(.080)
+    assert plan.expected_width == pytest.approx(.054, abs=.001)
+
+
+def test_shifted_contact_pad_still_rejects_a_steep_shoulder_above_the_tip():
+    det, _ = _plan([0., .075, .120], [.085, .085, .010], top=.120, min_depth=.008)
+    planner = GraspPlanner(make_cfg('L2', robot__gripper__max_width=.1,
+        grasp__max_grasp_depth=.040, grasp__min_grasp_depth=.040,
+        grasp__pad_center_offset=.015), 'L2')
+    plan = planner.plan(det)
+    assert not plan.feasible and 'dome' in plan.reason
+
+
 def test_a_widest_section_inside_the_actual_pad_band_remains_feasible():
     det, plan = _plan([0., .060, .075, .090, .100],
                       [.040, .050, .080, .050, .020])

@@ -293,6 +293,32 @@ def test_low_departure_does_not_authorize_an_object_already_below_the_support():
     assert not route and 'table' in why
 
 
+@pytest.mark.parametrize('case,allowed', [('clear', True), ('penetrating', False),
+    ('unconfirmed', False), ('other_support', False), ('end_too_low', False)])
+def test_lift_away_from_observed_source_support_restores_full_route_clearance(case, allowed):
+    target, grasp, _frame, _camera = inputs()
+    target.center_base[2] = target.top_z = .1
+    target.extra.update(table_z=.05, support_z=.05, support_label='yellow', support_observed=True)
+    grasp.T_grasp[2, 3] = .07
+    start = top_down_T(.3, 0., .072, 0.)  # Body is 2 mm above its old support.
+    end = top_down_T(.4, 0., .2, 0.)
+    if case == 'penetrating': start[2, 3] = .069
+    if case == 'unconfirmed': target.extra['support_observed'] = False
+    if case == 'other_support': target.extra['support_label'] = 'green'
+    if case == 'end_too_low': end = top_down_T(.3, 0., .076, 0.)
+    base = Detection('yellow', 1., center_base=np.array([.3, 0., .05]),
+        top_z=.05, height=.05, length=.05, width=.05, yaw=0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''),
+                          _check_linear_path=lambda *a: (True, ''))
+    route, why = safe_inspection_route(arm, grasp, start, end, [base], .05)
+    assert bool(route) is allowed, why
+    if allowed:
+        assert len(route) == 2
+        np.testing.assert_allclose(route[0][:2, 3], start[:2, 3])
+        np.testing.assert_allclose(route[0][:3, :3], start[:3, :3])
+        assert route[0][2, 3] >= start[2, 3] + .015
+
+
 @pytest.mark.parametrize('resting_pose,clear', [('upright', True), ('uncertain', False)])
 def test_round_carried_body_avoids_box_corners_without_shrinking_unknown_shapes(resting_pose, clear):
     target, grasp, _frame, _camera = inputs()

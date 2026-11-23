@@ -9,6 +9,9 @@ from test_assistant_release_phases import release_session
 
 def setup_route(monkeypatch):
     session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
+    # The release fixture bypasses entry planning. These tests need the real
+    # current-pose -> checked-route seam rather than that release-only stub.
+    del session._plan_carried_entry
     session._active_revision = session._environment_revision
     session.runner._held_transfer_feedback = lambda det: ({'grasp': grasp}, .05, '')
     session.camera._last = SimpleNamespace()

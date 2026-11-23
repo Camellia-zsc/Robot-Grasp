@@ -430,6 +430,12 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
         center = np.array([0., sign * (float(opening) / 2 + .006), -.025])
         local_boxes.append(center + signs * [.010, .006 + opening_uncertainty / 2, .025])
     radius = max(float(np.max(np.linalg.norm(b, axis=1))) for b in local_boxes)
+    source_support = (det.extra.get('support_label')
+                      if det.extra.get('support_observed') is True else None)
+    try:
+        support_z = float(det.extra.get('support_z', math.nan))
+    except (TypeError, ValueError):
+        support_z = math.nan
     obstacles = []
     for other in neighbors:
         if _planning_cancelled(arm, cancelled):
@@ -442,9 +448,11 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
             yaw = float(other.yaw)
         except (ValueError, TypeError):
             return [], 'inspection route has incomplete neighbor geometry'
+        was_support = (other.valid and source_support == other.label
+                       and abs(top - support_z) < .005)
         obstacles.append((object_footprint(other.center_base[:2], a, b, yaw,
                           label=other.label, resting_pose=other.extra.get('resting_pose')), top - h, top,
-                          str(other.label), np.asarray(other.center_base[:2])))
+                          str(other.label), np.asarray(other.center_base[:2]), was_support))
     blocked_by = ['table or unconfirmed geometry']
 
     def overlap(a, b, gap):
@@ -460,7 +468,7 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
                     return False
         return True
 
-    def clear(T, pad):
+    def clear(T, pad, departing_support=False):
         if _planning_cancelled(arm, cancelled):
             return False
         if (bend_reference is not None and _tapered_contact(grasp)
@@ -482,17 +490,27 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
                     blocked_by[0] = 'table'
                     return False
             polygon = cv2.convexHull(carried[:, :2].astype(np.float32)).reshape(-1, 2)
-            for footprint, bottom, top, label, xy in obstacles:
+            for footprint, bottom, top, label, xy, was_support in obstacles:
                 if low > top + pad or high < bottom - pad:
                     continue
                 if overlap(polygon, footprint, pad):
+                    # A lower grasp can leave the carried body just above its
+                    # measured former support, inside the EXTRA sweep margin.
+                    # Only a fixed-attitude vertical raise may restore that
+                    # margin. Actual overlap, sideways motion and other bodies
+                    # still fail; every segment endpoint gets the full check.
+                    if (departing_support and was_support and low >= top + .001
+                            and T[2, 3] >= current[2, 3] - 1e-6
+                            and np.linalg.norm(T[:2, 3] - current[:2, 3]) < 1e-6
+                            and np.allclose(T[:3, :3], current[:3, :3], atol=1e-6, rtol=0.)):
+                        continue
                     blocked_by[0] = '%s at (%.3f, %.3f)' % (label, *xy)
                     return False
         return True
 
     current, inspection = np.asarray(current, float), np.asarray(inspection, float)
     choices = [[inspection]]
-    if allow_table_departure:
+    if allow_table_departure or source_support is not None:
         # Full-height fixed-attitude raises can be unreachable from a low
         # release. Clear the contact vertically first, then turn above it.
         for height in (.016, .02, .04):
@@ -540,7 +558,8 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
             count = max(1, int(math.ceil(max(distance / .008, angle / math.radians(4)))))
             pad = .008 + (distance + radius * angle) / (2 * count)
             samples = [interpolate_pose(start, end, k / count) for k in range(count + 1)]
-            if not all(clear(pose, pad) for pose in samples):
+            if (not all(clear(pose, pad, departing_support=True) for pose in samples)
+                    or not clear(end, pad)):
                 if _planning_cancelled(arm, cancelled):
                     return [], 'aborted'
                 last_reason, accepted = ('inspection swept held object or fingers overlaps a measured obstacle: '

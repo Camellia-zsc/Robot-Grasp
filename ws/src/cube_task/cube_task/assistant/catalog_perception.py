@@ -77,9 +77,13 @@ def configure_sandbox(cfg) -> None:
     cfg.set('grasp.open_full_tasks', full)
     cfg.set('grasp.section_profile', True)
     depths = dict(cfg.get('grasp.max_grasp_depth_by_label', {}) or {})
-    # The long stem must remain below the palm. Measured top minus 25 mm
-    # keeps the pads around the neck, above the steep shoulder of this type.
-    depths['pear'] = 0.025
+    # This dashboard's TCP is the fingertip: the distal 30 mm pad lies ABOVE
+    # it, not +/-15 mm around it. A fictitious lower half rejected the wider
+    # neck and made the actual fingers pinch the small tip instead.
+    cfg.set('grasp.pad_center_offset', 0.015)
+    # Search the existing mechanical depth limit (normally 40 mm), keeping
+    # aperture, palm clearance, measured taper and neighboring-object checks.
+    depths['pear'] = float(cfg.get('grasp.max_grasp_depth', 0.030))
     cfg.set('grasp.max_grasp_depth_by_label', depths)
     # Even separated objects can touch in the camera projection. Keep the
     # base-XY watershed so it separates these instances, but avoid 8 mm

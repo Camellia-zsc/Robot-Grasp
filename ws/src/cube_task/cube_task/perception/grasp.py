@@ -483,6 +483,11 @@ class GraspPlanner:
         self.adaptive_neighbors = bool(cfg.get('grasp.adaptive_neighbors', self.task == 'Sandbox'))
         self.finger_clearance = _float(cfg, 'grasp.finger_clearance', FINGER_CLEARANCE)
         self.pad_half = _float(cfg, 'grasp.pad_half', PAD_HALF)
+        # TCP can denote the fingertip rather than the pad centre. Positive
+        # offset moves the measured contact band upward along the approach.
+        self.pad_center_offset = _float(cfg, 'grasp.pad_center_offset', 0.)
+        if not math.isfinite(self.pad_center_offset) or self.pad_center_offset < 0.:
+            raise ValueError('grasp.pad_center_offset must be finite and >= 0')
         self.min_grasp_height = _float(cfg, 'grasp.min_grasp_height', MIN_GRASP_HEIGHT)
         if self.finger_clearance < 0.0 or self.pad_half < 0.0:
             raise ValueError('grasp.finger_clearance and grasp.pad_half must be >= 0')
@@ -737,7 +742,8 @@ class GraspPlanner:
                     cz, width, _, why, more = self._profile_grasp(det, profile, top, z_floor)
                     if why or cz >= top:
                         continue
-                    passed = section_width(profile, cz - self.pad_half, float(profile[0][-1]))
+                    passed = section_width(profile, cz + self.pad_center_offset - self.pad_half,
+                                           float(profile[0][-1]))
                 else:
                     cz = z
                     width = float(det.length) if kind == 'square' and delta else expected
@@ -777,7 +783,8 @@ class GraspPlanner:
 
         Candidates: TCP z in [max(z_floor, table + grasp.min_grasp_height),
         top - min_grasp_depth], at most max_grasp_depth below the top, where
-        every section the open fingers pass (z - pad_half up to the top) fits
+        every section the open fingers pass (z + pad_center_offset - pad_half
+        up to the top) fits
         max_width - 2 * finger_clearance. Each candidate must have its widest
         contact inside its own pad band, or narrow gently over the first 10 mm
         above a lower contact peak (a neck, at most NECK_MAX_TAPER_DEG half
@@ -792,7 +799,8 @@ class GraspPlanner:
         hi = top - self.min_depth
         n = int(math.floor((hi - lo) / GRASP_Z_STEP + 1e-9)) + 1 if hi >= lo else 1
         zs = [lo + k * GRASP_Z_STEP for k in range(max(1, n))]
-        passed = [section_width(prof, z - self.pad_half, top_pts) for z in zs]
+        passed = [section_width(prof, z + self.pad_center_offset - self.pad_half, top_pts)
+                  for z in zs]
         widest = section_width(prof, float(edges[0]), top_pts)
         info = {'section_max': round(widest, 4), 'fit': round(fit, 4)}
         ok = [i for i, w in enumerate(passed) if w <= fit + 1e-9]
@@ -807,7 +815,7 @@ class GraspPlanner:
         taper = 90.0
         reason = ''
         for i in ok:
-            t = _pad_taper_deg(prof, zs[i], self.pad_half)
+            t = _pad_taper_deg(prof, zs[i] + self.pad_center_offset, self.pad_half)
             if t is None:
                 pick = i
                 break
@@ -818,7 +826,7 @@ class GraspPlanner:
                 # Hidden low bins may be filled with an upper equator's width.
                 # Still check their taper, but call it a neck only when the
                 # upper half of the contact really is narrower.
-                z = zs[i]
+                z = zs[i] + self.pad_center_offset
                 if (section_width(prof, z, z + self.pad_half) + 1e-9
                         < section_width(prof, z - self.pad_half, z + self.pad_half)):
                     info['neck'] = True
@@ -831,7 +839,10 @@ class GraspPlanner:
                       'gripper max_width %.3f m)' % (label, taper, NECK_MAX_TAPER_DEG,
                                                    widest, fit, self.max_width))
         z = zs[pick]
-        expected = section_width(prof, z - self.pad_half, z + self.pad_half)
+        contact_z = z + self.pad_center_offset
+        expected = section_width(prof, contact_z - self.pad_half, contact_z + self.pad_half)
+        info['contact_z_range'] = [round(contact_z - self.pad_half, 4),
+                                   round(contact_z + self.pad_half, 4)]
         open_w = min(self.max_width, passed[pick] + 2.0 * self.finger_clearance
                      + self.open_margin)
         return z, expected, open_w, reason, info

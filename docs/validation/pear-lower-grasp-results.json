@@ -106,5 +106,20 @@
     "manipulation_steps": 1,
     "failed_steps": 0,
     "deferred_steps": 0
+  },
+  "live_web_acceptance": {
+    "complete": true,
+    "all_six_camera_and_physics": true,
+    "plans": 1,
+    "model_requests": 1,
+    "failed_steps": 0,
+    "deferred_steps": 0,
+    "scans": {
+      "frames": 7,
+      "full_scans": 0,
+      "local_scans": 5
+    },
+    "green_transform_max_abs_change": 5.192053999376414e-18,
+    "gripper_empty": true
   }
 }

@@ -187,6 +187,18 @@ def test_active_observation_requires_full_route_before_any_motion(active_harness
     assert result['holding']
 
 
+def test_explicit_active_observation_preserves_unlocalized_moved_body_exclusion(active_harness):
+    from cube_task.core.types import Detection
+    h = active_harness
+    unknown = Detection('unobserved_pear', 0., valid=False, top_z=.14)
+    h.session._motion_observer = SimpleNamespace(invalidated={'pear'},
+        uncertainty_obstacles=lambda **kw: [unknown])
+    h.route = []
+    result = h.execute()
+    assert not result['ok'] and not h.moves
+    assert any(d is unknown for d in h.routes[0][0][4])
+
+
 def test_stop_during_candidate_search_never_reaches_route_or_motion(active_harness, monkeypatch):
     h = active_harness
 

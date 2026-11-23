@@ -139,6 +139,24 @@ def pending(ctl):
     pytest.fail('no explicit approval request')
 
 
+def test_incremental_goal_completion_ends_queue_before_redundant_observe(create):
+    ctl, session, client = create(lambda context, number: [
+        step('m', 'move', 'apple', {'type': 'goal', 'index': 0}),
+        dict(id='extra', skill='observe', label='apple'),
+        dict(id='v', skill='verify'), dict(id='f', skill='finish')])
+    session._motion_observer = SimpleNamespace(current=lambda: [object()])
+    session._camera_goal_confirmed = lambda goal, fresh, revision: bool(fresh) and any(
+        o['label'] == goal['label'] and o.get('zone') == goal['zone_name']
+        for o in session._scene['objects'])
+    ctl.submit('把苹果放到红色区域')
+    assert ctl.wait_idle(3)
+    state = ctl.snapshot()
+    assert state['status'] == 'complete', state['last_result']
+    assert len(client.contexts) == 1
+    assert [call['skill'] for call in session.calls] == ['move', 'verify']
+    assert all(s['status'] == 'skipped' for s in state['skill_task']['steps'][1:])
+
+
 def approve(ctl, yes=True):
     p = pending(ctl)
     ctl.approve_recovery(dict(request_id=p['request_id'], scene_version=p['scene_version'], approved=yes))

@@ -10,6 +10,14 @@ from cube_task.assistant.skill_execution import SkillExecutor, _PlanChanged
 from test_assistant_targeted_scan import block, scan_session
 
 
+@pytest.fixture(autouse=True)
+def measured_body_anchor(monkeypatch):
+    # This fixture isolates scan progress; fitting a physical body is covered
+    # by source-support/held-anchor and complete physical replay tests.
+    monkeypatch.setattr('cube_task.assistant.held_anchor.source_anchor',
+                        lambda grasp: dict(ok=True))
+
+
 def stack_scan(*, support_valid=True):
     pear = block('pear', xy=(.51, -.01), top=.112, height=.112)
     pear.extra.update(_cloud_views=2, _observed_revision=1,
@@ -20,6 +28,7 @@ def stack_scan(*, support_valid=True):
     support = yellow if support_valid else cropped
     banana = block('banana', xy=(.17, -.32), top=.04, height=.04)
     session, seen = scan_session([[pear, cropped], [banana], [support], []])
+    session._prepare_observation_motion = lambda *a, **kw: True
     capture = session.runner._observe
     def observe(view):
         status, result, frame = capture(view)

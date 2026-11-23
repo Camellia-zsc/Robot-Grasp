@@ -69,6 +69,11 @@ active 是由本地执行器检查持物几何、碰撞与可达性后的安全�
 机器人姿态或轨迹，检查失败就不移动。持物也可请求 active，能否移动由几何门决定。
 每次观察应带来信息增量；history.changed=false 或 reason 表示没有新信息时，应改变观察意图、
 组合其他可行技能或说明无法推进，不要反复同视角 observe。
+capabilities.incremental_observation=true 表示执行器会在运动中更新可见物品、保留未变化的可靠测量，
+并在每个动作前自动检查子目标是否已经完成。对 observed_pending 目标优先直接组合连续 move，
+不要机械地在每件物品前后都插入 observe/verify；最终统一 verify/finish。只有具体缺失的测量、
+遮挡、身份歧义或失败反馈要求补充信息时才局部 observe。人工已完成的目标由执行器核验后跳过，
+目标区新出现的物品由局部落位规划避开；无需仅因无关物品变化而重做整套决策。
 goals 每项为 {"label":"唯一实测类别","zone_name":"已有区域名或null"}，
 叠放目标用 zone_name=null、destination={"type":"on_object","label":"实测支撑物类别"}。
 红色方块是物品 red，红色区域是 zone_red，二者不能互换；用户要求放在方块上面时不得偷偷改成区域。
@@ -299,7 +304,8 @@ def _capabilities(value):
         raise ValueError('技能执行能力无效。')
     result = _fields(value, strings=('physics_backend',),
                      flags=('active_observe_requires_geometry', 'multi_object_rearrangement',
-                            'restores_original_pose', 'stacking', 'gravity_contacts', 'automatic_righting'))
+                            'restores_original_pose', 'stacking', 'gravity_contacts', 'automatic_righting',
+                            'incremental_observation'))
     for key in ('skills', 'observe_modes', 'observe_destination_types',
                 'destination_types', 'holding_allowed_skills'):
         items = value.get(key)

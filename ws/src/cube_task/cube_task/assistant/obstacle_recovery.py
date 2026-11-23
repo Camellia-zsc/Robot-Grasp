@@ -38,7 +38,9 @@ def _angle_error(a, b):
 def _grasp(session, det, neighbors):
     candidate = copy.deepcopy(det)
     peers = [candidate] + [copy.deepcopy(other) for other in neighbors if other is not det]
-    annotate_grasp_neighbors(candidate, peers)
+    floor = getattr(session.runner.planner, 'neighbor_floor_z', None)
+    annotate_grasp_neighbors(candidate, peers,
+                             minimum_z=floor(candidate) if callable(floor) else None)
     return candidate, session.runner.planner.plan(candidate)
 
 

@@ -153,6 +153,29 @@ def test_inspection_pose_proposals_are_guarded_and_clear_all_intermediate_rotati
     assert all(tilt == 40. for _pose, tilt in checked)
 
 
+def test_pose_aware_inspection_can_see_above_unknown_body_without_a_spherical_lift():
+    target, grasp, _frame, _camera = inputs()
+    target.length, target.width, target.height, target.top_z = .16, .04, .04, .04
+    target.center_base[2] = .04
+    grasp.T_grasp = top_down_T(0., 0., .008, 0.)
+    grasp.expected_width = .04
+    current = top_down_T(.3, 0., .23, 0.)
+    arm = SimpleNamespace(get_tcp_pose=lambda: SimpleNamespace(value=current),
+        check_reachable=lambda T, **kw: (.20 <= T[2, 3] <= .25, 'height limit'),
+        _check_linear_path=lambda *a, **kw: (True, ''))
+    T_fc = make_T(np.diag([1., -1., -1.]), [0., 0., .05])
+    poses = list(iter_safe_inspection_poses(arm, grasp, T_fc, np.eye(4), [.3, 0.], .14,
+        orientation_clearance=True, max_poses=2))
+    assert poses
+    obstacle = Detection('unobserved_pear', 0., valid=False,
+        center_base=np.array([.3, 0., .14]), top_z=.14, height=.14,
+        length=1., width=1., yaw=0.)
+    # Candidate generation grants no motion permission: the unchanged full
+    # swept-body/finger check must still pass above the uncertainty volume.
+    route, why = safe_inspection_route(arm, grasp, current, poses[0], [obstacle], .04)
+    assert route, why
+
+
 def test_inspection_without_reachability_check_refuses_to_offer_unchecked_motion():
     _target, grasp, _frame, _camera = inputs()
     poses, _minimum = safe_inspection_poses(SimpleNamespace(), grasp, np.eye(4), np.eye(4),
@@ -219,6 +242,19 @@ def test_far_tall_neighbor_does_not_raise_the_local_inspection_path():
                                       top_down_T(.25, 0., .15, 0.), [far], .05)
     assert len(route) == 1 and not why
     assert route[0][2, 3] == .15
+
+
+def test_observation_stop_reserves_clearance_for_the_next_route_padding():
+    _target, grasp, _frame, _camera = inputs()
+    obstacle = Detection('green', 1., center_base=np.array([.2, .070, .20]),
+                         top_z=.20, height=.20, length=.06, width=.06, yaw=0.)
+    arm = SimpleNamespace(check_reachable=lambda *a, **k: (True, ''))
+    start, end = top_down_T(0., 0., .15, 0.), top_down_T(.2, 0., .15, 0.)
+    route, _why = safe_inspection_route(arm, grasp, start, end, [obstacle], .05)
+    assert route  # The incident's first, finely sampled approach could pass.
+    route, why = safe_inspection_route(arm, grasp, start, end, [obstacle], .05,
+                                      endpoint_clearance=.02)
+    assert not route and 'overlaps' in why
 
 
 def test_no_inspection_motion_is_offered_when_every_native_path_is_rejected():

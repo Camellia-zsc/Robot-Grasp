@@ -79,6 +79,27 @@ def test_actual_noisy_rgbd_classifies_each_unseen_catalog_object(sandbox, label)
         assert best.summary()['resting_pose'] == 'upright'
 
 
+@pytest.mark.parametrize('label', ['banana', 'yellow'])
+@pytest.mark.parametrize('x', [.28, .42])
+def test_yellow_objects_remain_identifiable_on_and_across_the_pale_yellow_card(sandbox, label, x):
+    from cube_task.assistant.simulation import DASHBOARD_ZONE_COLORS_BGR
+    from cube_task.sim.world import SimZone
+    _cfg, pipeline = sandbox
+    obj = make_catalog_object(label, 'yellow-on-card', [x,0.], .25)
+    obj.label = 'untrusted-render-metadata'
+    world = SimWorld(objects=[obj], zones=[SimZone('zone_yellow', [.28,0.,0.], [.30,.30],
+        color_bgr=DASHBOARD_ZONE_COLORS_BGR['zone_yellow'])])
+    intr = CameraIntrinsics.from_dict(layout_intrinsics('A'))
+    found = []
+    for i, (_q, pose) in enumerate(official_wrist_views('A')):
+        color, depth = render_rgbd(world, intr, pose, gripper=False,
+                                  rng=892+i, noise_std=.0008, dropout=.002)
+        found.extend(d for d in pipeline.process(Frame(color,depth,intr,200+i),pose,{}).detections
+                     if d.valid and d.label == label)
+    assert found, (label, x)
+    assert min(np.linalg.norm(d.center_base[:2]-[x,0.]) for d in found) < .025
+
+
 def test_cropped_pear_and_unknown_shapes_are_not_called_complete():
     pear = Detection('pear', 0.9, length=0.05, width=0.019, height=0.072)
     assert not completeness(pear)

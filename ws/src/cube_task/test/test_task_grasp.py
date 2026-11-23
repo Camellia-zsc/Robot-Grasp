@@ -19,7 +19,7 @@ def _ang_mod(a, period):
 
 
 def test_basic_block_plan_heights_and_orientation():
-    cfg = make_cfg()
+    cfg = make_cfg(grasp__grasp_depth_ratio=.5, grasp__open_full_tasks=[])
     p = GraspPlanner(cfg, 'L1').plan(make_det('red', 0.30, 0.05, size=0.03, height=0.03))
     assert p.feasible, p.reason
     top = 0.03
@@ -35,7 +35,7 @@ def test_basic_block_plan_heights_and_orientation():
 
 
 def test_grasp_depth_clipped_and_z_clamped_above_table():
-    cfg = make_cfg()
+    cfg = make_cfg(grasp__max_grasp_depth=.030)
     gp = GraspPlanner(cfg, 'L1')
     tall = gp.plan(make_det('red', 0.3, 0.0, height=0.10, table_z=0.02))
     assert tall.T_grasp[2, 3] == pytest.approx(0.12 - 0.030)     # max_grasp_depth
@@ -146,7 +146,7 @@ def test_transit_height_clears_walls_and_held_object():
 
 
 def test_place_plan_flat_and_walled():
-    cfg = make_cfg()
+    cfg = make_cfg(place__release_height_flat=.015)
     pp = PlacePlanner(cfg)
     flat = Zone('flat', np.array([0.2, 0.3, 0.01]))
     p = pp.plan(flat, held_offset=0.015, transit_z=0.2)
@@ -168,7 +168,7 @@ def test_place_plan_flat_and_walled():
 
 
 def test_held_offset_of_plan():
-    gp = GraspPlanner(make_cfg(), 'L1')
+    gp = GraspPlanner(make_cfg(grasp__grasp_depth_ratio=.5), 'L1')
     p = gp.plan(make_det('red', 0.3, 0.0, height=0.04, table_z=0.01))
     assert held_offset_of(p) == pytest.approx(0.04 - 0.02)
 

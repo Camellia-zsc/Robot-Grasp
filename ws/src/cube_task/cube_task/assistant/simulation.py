@@ -38,6 +38,11 @@ from .destinations import (destination_label, footprint_in_destination, placemen
                            validate_destination)
 
 _LOG = logging.getLogger(__name__)
+DASHBOARD_ZONE_COLORS_BGR = {
+    'zone_red': (188, 192, 234),
+    'zone_green': (179, 216, 186),
+    'zone_yellow': (160, 230, 248),
+}
 _STAGE_MESSAGES = {
     'start': '开始抓放', 'open': '张开夹爪', 'pre': '移动到目标上方',
     'descend': '下降到抓取位置', 'close': '闭合夹爪抓取物品',
@@ -202,6 +207,7 @@ class SimulationSession:
         self._interventions = deque()
         self._intervention_id = 0
         self._environment_revision = 0
+        self._last_physical_change_revision = -1
         self._active_revision = 0
         self._observed_detections = []
         self._scan_stats = {'frames': 0, 'full_scans': 0, 'local_scans': 0}
@@ -231,6 +237,14 @@ class SimulationSession:
                                log_dir=None if log_dir is None else str(log_dir))
         self.cfg, self.world, self.info = load_cfg_for(args, 'L1')
         configure_sandbox(self.cfg)
+        # Dashboard cards have room for multiple library objects. Competition
+        # layouts and the physical robot's taught zones are not changed.
+        for zone in self.world.zones:
+            zone.size = tuple(max(.30, float(v)) for v in zone.size)
+            if zone.name in DASHBOARD_ZONE_COLORS_BGR:
+                zone.color_bgr = DASHBOARD_ZONE_COLORS_BGR[zone.name]
+            self.cfg.set('zones.' + zone.name + '.size', list(zone.size))
+            self.info['zones'][zone.name].size = zone.size
         self._placement = placement_metadata(self.cfg, self.info['pick_polygon'])
         self._placement_center = None
         self._destination_views = {}
@@ -274,6 +288,8 @@ class SimulationSession:
         self.runner = TaskRunner(self.cfg, 'Sandbox', self.arm, self.camera,
                                  make_sandbox_perception(self.cfg), self.clock, self.logger,
                                  operator=self.operator, mode=backend)
+        from .motion_observation import MotionObservation
+        self._motion_observer = MotionObservation(self)
         self._configure_observation_views()
         self._base_view_count = len(self.runner.views)
         self.runner.skill.on_stage = self._on_stage
@@ -303,6 +319,16 @@ class SimulationSession:
 
     def _on_stage(self, stage: str) -> None:
         self._stage = str(stage)
+        observer = getattr(self, '_motion_observer', None)
+        # The stage callback belongs to motion primitives; gripper commands
+        # do not call it. Lift is the first callback after successful closure.
+        if observer is not None and stage in ('lift', 'retry_lift') and self._recovery_target is not None:
+            # Only the body in our measured grasp starts moving. Earlier
+            # background depth remains valid (the old source body can only
+            # occlude it conservatively). Completion evidence is still revoked.
+            observer.invalidate([self._recovery_target.label], clear_views=False)
+        if observer is not None and stage == 'retreat':
+            observer.frames.clear()  # A released body now occupies new space.
         self._publish_snapshot()
         self._emit('stage', {'stage': stage,
                              'message': _STAGE_MESSAGES.get(stage, '正在执行机械臂动作')})
@@ -316,10 +342,13 @@ class SimulationSession:
             self._check_physical_changes()
         revision = self._environment_revision
         self._apply_interventions()
+        observer = getattr(self, '_motion_observer', None)
+        if observer is not None and self._status in ('executing', 'settling'):
+            observer.capture()
         # Keep every intervention/control tick, but bound display work in wall
         # time. Stage/observation publications and human edits remain immediate.
         if (revision != self._environment_revision or
-                time.monotonic() - self._last_snapshot_wall >= .05):
+                time.monotonic() - self._last_snapshot_wall >= .15):
             self._publish_snapshot()
 
     def _remember_physics(self):
@@ -352,6 +381,10 @@ class SimulationSession:
                 moving.append(obj.label)
         if moving:
             self._environment_revision += 1
+            self._last_physical_change_revision = self._environment_revision
+            observer = getattr(self, '_motion_observer', None)
+            if observer is not None:
+                observer.invalidate(moving)
             self._remember_physics()
             self._emit('physics_scene_changed', dict(labels=moving,
                 message='物理接触使物品位置发生变化，旧观测和完成记录已失效'))
@@ -382,7 +415,7 @@ class SimulationSession:
         """Queue an edit; only the simulation owner mutates world geometry."""
         if not isinstance(request, dict) or request.get('action') != 'move':
             raise ValueError('运行中干预仅支持移动或旋转未夹持物品')
-        if set(request) - {'action', 'object_id', 'xy', 'yaw', 'scene_version'}:
+        if set(request) - {'action', 'object_id', 'xy', 'yaw', 'scene_version', 'environment_revision'}:
             raise ValueError('干预请求含有不支持的字段')
         snap = self.snapshot()
         if self._closed or self.cancel_event.is_set() or not self._prepared:
@@ -390,7 +423,10 @@ class SimulationSession:
         obj = next((o for o in snap.get('objects', []) if o['id'] == request.get('object_id')), None)
         if obj is None or obj.get('held'):
             raise ValueError('请选择桌面上未夹持的物品')
-        if type(request.get('scene_version')) is not int or request['scene_version'] != snap['scene_version']:
+        marker = 'environment_revision' if 'environment_revision' in request else 'scene_version'
+        expected = self._environment_revision if marker == 'environment_revision' else snap['scene_version']
+        if (('environment_revision' in request and 'scene_version' in request)
+                or type(request.get(marker)) is not int or request[marker] != expected):
             raise ValueError('场景版本已变化，请刷新后重试')
         # Validate syntax now; geometry is checked again at the application boundary.
         for key, size in (('xy', 2), ('yaw', None)):
@@ -447,6 +483,9 @@ class SimulationSession:
                     self._physics.apply_scene_changes()
                     self._remember_physics()
                 self._environment_revision += 1
+                observer = getattr(self, '_motion_observer', None)
+                if observer is not None:
+                    observer.invalidate([obj.label])
                 self._emit('scene_intervention_applied', {'request_id': request_id,
                            'message': '人为干预已生效，后续动作将通过相机重新确认'})
             except ValueError as exc:
@@ -455,6 +494,19 @@ class SimulationSession:
 
     def _execution_guard(self, stage):
         self._apply_interventions()
+        # An edit to another object during lift is handled at this stopped,
+        # held boundary. The ensuing carry callback must certify a NEW route.
+        # Descent, release and an already executing transit never waive a change.
+        if (stage == 'held_transit' and self._stage == 'lift'
+                and self._environment_revision != self._active_revision
+                and getattr(self, '_last_physical_change_revision', -1) <= self._active_revision
+                and getattr(self, '_motion_observer', None) is not None):
+            observer = self._motion_observer
+            observer.capture(force=True)
+            target = self._recovery_target
+            if target is not None and not self.cancel_event.is_set():
+                self._active_revision = self._environment_revision
+                self._motion_replan_required = True
         if (stage in ('descend', 'close') and
                 self._environment_revision != self._active_revision):
             return 'scene_changed'
@@ -509,6 +561,10 @@ class SimulationSession:
         from .observation_policy import merge_local_detections, measurement_visible
         from .placement_observation import safe_inspection_route
         from ..core.extrinsics import camera_pose_in_base
+        fresh, why = self._observe_changed_carried(grasp, place, width, result,
+                                                 fresh, revision, budget)
+        if why:
+            return None, why
         current = self.arm.get_tcp_pose()
         if (current is None or current.value is None or
                 self.clock.now()-float(current.stamp) > self.runner.skill.feedback_max_age):
@@ -518,7 +574,11 @@ class SimulationSession:
                                    self.runner.T_flange_tcp)
         neighbors = merge_local_detections(self._observed_detections,
             [d for d in fresh if d.center_base is not None and d.label != grasp.target.label],
-            lambda d: measurement_visible(d, frame, pose), forget=[grasp.target])
+            lambda d: self._observation_replaced(d, frame, pose), forget=[grasp.target],
+            preserve_incomplete=getattr(self, '_motion_observer', None) is not None)
+        observer = getattr(self, '_motion_observer', None)
+        if observer is not None:
+            neighbors += observer.uncertainty_obstacles(exclude=[grasp.target.label])
         self._emit('placement_progress', {'message': '正在按当前夹持姿态检查搬运路径，保持夹持'})
         route, why = budget.run(safe_inspection_route, self.arm, grasp,
             np.asarray(current.value).copy(), place.T_pre, neighbors, width,
@@ -532,9 +592,90 @@ class SimulationSession:
             return None, 'scene_changed'
         if not route:
             return None, why
-        self._observed_detections = copy.deepcopy(neighbors)
+        self._observed_detections = copy.deepcopy(
+            [d for d in neighbors if not d.label.startswith('unobserved_')])
         result.detail['held_transit_opening_uncertainty'] = .001
         return route, ''
+
+    def _observe_changed_carried(self, grasp, place, width, result, fresh, revision, budget):
+        """Locate changed bodies before committing to a destination entry path.
+
+        A whole-table uncertainty volume must stay in every swept-path check.
+        Use measured fragments only to aim the camera; only a new complete
+        RGB-D detection may remove that volume. This also works during the
+        first lift, before a held-recovery context has been saved.
+        """
+        observer = getattr(self, '_motion_observer', None)
+        if observer is None or not observer.invalidated - {grasp.target.label}:
+            return fresh, ''
+        from .placement_observation import (iter_safe_inspection_poses,
+            safe_inspection_route, inspection_history, remember_inspection)
+        ext = self.runner.ext
+        T_fc = ext.T if ext.parent_frame == 'flange' else self.runner.T_flange_tcp @ ext.T
+        table = float(self.cfg.get('perception.table.expected_z', 0.) or 0.)
+        self._emit('active_observation', {
+            'message': '物品位置已变化，先保持夹持并从局部视角确认，再继续搬运'})
+        remember_inspection(self, grasp, self.arm.get_tcp_pose().value)
+        missing = observer.invalidated - {grasp.target.label}
+        hints = [d for d in self._observed_detections if d.label in missing
+                 and d.center_base is not None
+                 and d.extra.get('_observed_revision') == revision]
+        xy = (max(hints, key=lambda d: d.n_points).center_base[:2]
+              if hints else place.T_pre[:2, 3])
+        obstacles = [d for d in self._observed_detections if d.label != grasp.target.label]
+        obstacles += observer.uncertainty_obstacles(exclude=[grasp.target.label])
+        highest = max([table] + [float(d.top_z) for d in obstacles
+                                if d.top_z is not None and math.isfinite(float(d.top_z))])
+        poses = iter_safe_inspection_poses(self.arm, grasp, T_fc,
+            self.runner.T_flange_tcp, xy, highest, table_z=table,
+            free_tilt_deg=self.runner.free_tilt,
+            nominal=self.runner.nominal.get(grasp.target.label),
+            intrinsics=self.camera.intrinsics(), cancelled=budget.cancelled,
+            exclude_poses=inspection_history(self, grasp),
+            orientation_clearance=True,
+            focus_z=table+max(observer.height_priors.get(label, .22) for label in missing)/2)
+        views, reason = 0, 'changed_object_not_observed'
+        sentinel = object()
+        while True:
+            pose = budget.run(next, poses, sentinel)
+            if pose is sentinel:
+                break
+            self._apply_interventions()
+            if self.cancel_event.is_set():
+                raise _PlacementInterrupted()
+            if revision != self._environment_revision:
+                return fresh, 'scene_changed'
+            neighbors = [d for d in self._observed_detections
+                         if d.label != grasp.target.label and not d.label.startswith('unobserved_')]
+            neighbors += observer.uncertainty_obstacles(exclude=[grasp.target.label])
+            route, reason = budget.run(safe_inspection_route, self.arm, grasp,
+                self.arm.get_tcp_pose().value.copy(), pose, neighbors, width,
+                table_z=table, nominal=self.runner.nominal.get(grasp.target.label),
+                neighbor_nominal=self.runner.nominal, free_tilt_deg=self.runner.free_tilt,
+                cancelled=budget.cancelled, opening_uncertainty=.001,
+                allow_joint_route=True, endpoint_clearance=.02)
+            if not route:
+                continue
+            for waypoint in route:
+                self._apply_interventions()
+                if revision != self._environment_revision:
+                    return fresh, 'scene_changed'
+                measured = self.runner.skill._verify_held(result, 'dropped_before_observation')
+                if measured is not None and abs(measured-width) > .001:
+                    return fresh, 'held_opening_changed'
+                if not self._move_inspection_waypoint(result, waypoint, **(
+                        {'joint_route': route} if hasattr(route, 'end_joints') else {})):
+                    break
+            fresh = self._stationary_recovery_observation(grasp=grasp, width=width)
+            if revision != self._environment_revision:
+                return fresh, 'scene_changed'
+            remember_inspection(self, grasp, self.arm.get_tcp_pose().value)
+            views += 1
+            if not observer.invalidated - {grasp.target.label}:
+                return fresh, ''
+            if views >= 4:
+                break
+        return fresh, 'changed_object_not_observed: ' + str(reason)
 
     def _calibrate_carried_anchor(self, grasp, result, width, first_detections=None):
         """Confirm seating before using the carried reference for another path."""
@@ -569,6 +710,8 @@ class SimulationSession:
         return True, '', fresh
 
     def _before_carry(self, grasp, place, result):
+        replan = getattr(self, '_motion_replan_required', False)
+        self._motion_replan_required = False
         original = grasp.T_grasp.copy()
         revision = self._environment_revision
         measured = self.runner.skill._verify_held(result, 'dropped_before_carry')
@@ -578,10 +721,36 @@ class SimulationSession:
         if not confirmed:
             result.detail['held_transit_planning_reason'] = reason
             return False, reason, None
-        if np.array_equal(original, grasp.T_grasp):
+        observer = getattr(self, '_motion_observer', None)
+        unknown = observer is not None and observer.invalidated - {grasp.target.label}
+        if np.array_equal(original, grasp.T_grasp) and not replan and not unknown:
             return True, '', None
-        budget = _PlacementBudget(self.arm, self.cancel_event, seconds=15.)
+        # An externally moved body needs a checked new view as well as the
+        # carry route. Give that combined operation the normal placement
+        # allowance; a small route-only slice causes repeated model recovery.
+        budget = _PlacementBudget(self.arm, self.cancel_event, seconds=45. if replan or unknown else 15.)
         try:
+            if replan:
+                # An edit can occupy the provisional landing/hover itself.
+                # Searching more paths to that obsolete endpoint cannot help.
+                # Reuse the normal RGB-D landing planner before committing to
+                # entry; it also certifies a route from the actual held pose.
+                updated = self._refine_release(grasp, place, result.grasp_width, result, budget)
+                if updated is None:
+                    reason = result.detail.get('placement_planning_reason', 'placement_changed')
+                    return False, reason, None
+                route = getattr(updated, 'inspection_entry_route', None)
+                if route is None:
+                    route, reason = self._plan_carried_entry(grasp, updated, result.grasp_width,
+                        result, self._last_fresh, revision, budget)
+                    if not route:
+                        result.detail['held_transit_planning_reason'] = reason
+                        return False, reason, None
+                place.__dict__.update(copy.deepcopy(updated.__dict__))
+                result.detail['held_transit_opening_uncertainty'] = .001
+                return True, '', route
+            if fresh is None:
+                fresh = self._stationary_recovery_observation(grasp=grasp, width=result.grasp_width)
             route, reason = self._plan_carried_entry(grasp, place, result.grasp_width,
                                                     result, fresh, revision, budget)
         except _PlacementInterrupted:
@@ -731,8 +900,11 @@ class SimulationSession:
         neighbors = list(self._observed_detections)
         checks = result.detail['placement_checks'] = dict(
             release_rejection='', capacity=None, capacity_reason='', inspection_rejection='')
-        support_views, support_revision = [], None
+        observer = getattr(self, '_motion_observer', None)
+        support_views = observer.support_views() if observer is not None else []
+        support_revision = self._environment_revision if support_views else None
         last_measured = []
+        inspection_focus = None
         support_current = True
         last_progress = [0.]
         def progress(fields):
@@ -756,7 +928,8 @@ class SimulationSession:
                 return function(*args, cancelled=interrupted, **kwargs)
 
         def measure():
-            nonlocal neighbors, support_revision, options, support_current, width, last_measured
+            nonlocal neighbors, support_revision, options, support_current, width, last_measured, inspection_focus
+            support_current = True
             checks.update(capacity=None, capacity_reason='')
             revision = self._environment_revision
             fresh = self._stationary_recovery_observation(grasp=grasp, width=width)
@@ -793,10 +966,22 @@ class SimulationSession:
                                  if d.valid and d.extra.get('catalog_complete')}
                                 if editor is not None and editor.metadata().get('one_per_class')
                                 else ())
-            neighbors = merge_local_detections(neighbors, fresh,
-                         lambda d: measurement_visible(d, frame, pose), forget=[target],
-                         singleton_labels=singleton_labels)
+            neighbors = merge_local_detections(
+                         [d for d in neighbors if not d.label.startswith('unobserved_')], fresh,
+                         lambda d: self._observation_replaced(d, frame, pose), forget=[target],
+                         singleton_labels=singleton_labels,
+                         preserve_incomplete=getattr(self, '_motion_observer', None) is not None)
+            observer = getattr(self, '_motion_observer', None)
+            if observer is not None:
+                observer.remember(fresh, revision)
+                neighbors += observer.uncertainty_obstacles(exclude=[target.label])
             self._recovery_neighbors = copy.deepcopy(neighbors)
+            if observer is not None and observer.invalidated - {target.label}:
+                # No release search can pass the unresolved body's exclusion
+                # volume. Obtain its missing pose instead of burning a complete
+                # grid/IK budget and asking the model to repeat that search.
+                support_current = False
+                return None, 'changed_object_not_observed', revision
             if destination is not None and destination['type'] == 'on_object':
                 from .stacking import planning_options, annotate
                 support_current = False
@@ -843,6 +1028,8 @@ class SimulationSession:
                     observation_filter=visible, search_state=search_state,
                     progress=progress, **options)
             checks['release_rejection'] = str(why) if updated is None else ''
+            unseen = search_state.get('unseen_xy', ())
+            inspection_focus = np.asarray(unseen[0], float) if unseen else None
             return updated, why, revision
         updated, why, revision = budget.run(measure)
         if str(why).startswith('held_anchor_unconfirmed'):
@@ -878,7 +1065,13 @@ class SimulationSession:
                 landing = (place.T_release[:3, :3] @ grasp.T_grasp[:3, :3].T
                            @ (source - grasp.T_grasp[:3, 3]) + place.T_release[:3, 3])
                 xy = landing[:2]
-                if (capacity is True and why != 'placement_planning_budget_exceeded'
+                if inspection_focus is not None:
+                    # Look at an actual clear candidate missing camera rays,
+                    # rather than repeatedly looking at the occupied old slot.
+                    # This supplies no release authority; the new image must
+                    # pass the complete release/path/visibility checks again.
+                    xy = inspection_focus
+                elif (capacity is True and why != 'placement_planning_budget_exceeded'
                         and destination is not None and destination.get('type') != 'on_object'):
                     # Choose where to LOOK using full reachable geometry when
                     # visibility rejects the old slot. This draft grants no
@@ -898,13 +1091,32 @@ class SimulationSession:
                 # The pose generator bounds rotations above the table. Actual
                 # obstacles are checked against each full swept route below,
                 # so a distant tall item cannot mandate an impossible lift.
+                focus_options = {}
+                observer = getattr(self, '_motion_observer', None)
+                missing = set() if observer is None else observer.invalidated - {target.label}
+                if missing:
+                    # A changed tall object's position is needed before a slot
+                    # can be certified. A table-centred gaze can crop its neck
+                    # in every view. Partial detections only aim this camera;
+                    # they never authorize grasping or shrinking the obstacle.
+                    hints = [d for d in self._observed_detections if d.label in missing
+                             and d.center_base is not None
+                             and d.extra.get('_observed_revision') == revision]
+                    if hints:
+                        hint = max(hints, key=lambda d: d.n_points)
+                        xy = np.asarray(hint.center_base[:2], float)
+                    height = max(observer.height_priors.get(label, .22) for label in missing)
+                    focus_options['focus_z'] = table + height/2
+                    focus_options['orientation_clearance'] = True
+                highest = max([table] + [float(d.top_z) for d in neighbors
+                    if d.top_z is not None and math.isfinite(float(d.top_z))]) if missing else table
                 poses = iter_safe_inspection_poses(self.arm, grasp, T_fc,
-                                 self.runner.T_flange_tcp, xy, table,
+                                 self.runner.T_flange_tcp, xy, highest,
                                  table_z=table, free_tilt_deg=self.runner.free_tilt,
                                  nominal=self.runner.nominal.get(target.label),
                                  intrinsics=self.camera.intrinsics(),
                                  cancelled=budget.cancelled, progress=progress,
-                                 exclude_poses=inspection_history(self, grasp))
+                                 exclude_poses=inspection_history(self, grasp), **focus_options)
                 observed_views = 0
                 sentinel = object()
                 while True:
@@ -918,6 +1130,7 @@ class SimulationSession:
                         neighbor_nominal=self.runner.nominal,
                         free_tilt_deg=self.runner.free_tilt,
                         cancelled=budget.cancelled, progress=progress, allow_joint_route=True,
+                        endpoint_clearance=.02,
                         bend_reference=current,
                         allow_table_departure=bool(result.detail.get('held_anchor_replan_required')))
                     if not route:
@@ -1028,6 +1241,10 @@ class SimulationSession:
                 self._physics.apply_scene_changes()
                 self._remember_physics()
             self._environment_revision += 1
+            observer = getattr(self, '_motion_observer', None)
+            if observer is not None:
+                observer.evidence.clear()
+                observer.invalidated.clear()
             self._observed_detections = []
             self.runner._placed.clear()
             self.runner._placed_labels.clear()
@@ -1115,8 +1332,7 @@ class SimulationSession:
             self._last_fresh = []
             order = self._view_order(target) if local else list(range(self._base_view_count))
             source_views = []
-            source_focus = bool(local and target.get('_observe_source')
-                                and target.get('_observation_hint_only'))
+            source_focus = bool(local and target.get('_observe_source'))
             if source_focus:
                 source_views = self._source_observation_views(target)
                 # Repeating all fixed cameras cannot repair a crop shared by
@@ -1159,6 +1375,9 @@ class SimulationSession:
                     self._publish_snapshot()
                     raise RuntimeError('simulation observation failed: ' + why)
                 result = next_result
+                observer = getattr(self, '_motion_observer', None)
+                if observer is not None:
+                    observer.reconcile(result.detections, revision)
                 self._scan_stats['frames'] += 1
                 self._cache_observation(view, result, frame)
                 current_detections = tag_view(result.detections, view)
@@ -1177,6 +1396,9 @@ class SimulationSession:
                     measured.extra['_capture_index'] = step
                     measured.extra['_capture_stamp'] = float(frame.stamp)
                     measured.extra['_capture_flange'] = np.asarray(flange.value, float).copy()
+                observer = getattr(self, '_motion_observer', None)
+                if observer is not None:
+                    observer.remember_frame(frame, pose, revision)
                 if local and target.get('required_support') and (
                         revision != self._environment_revision or getattr(self, '_interventions', ())
                         or self.cancel_event.is_set()):
@@ -1256,6 +1478,12 @@ class SimulationSession:
                             if (support.get('center_base') is not None
                                     or support.get('xy') is not None):
                                 ranked = self._view_order(support)
+                                if source_focus:
+                                    # Bounded source views can omit the base.
+                                    # After proving the upper grasp, allow new
+                                    # local support views without rescanning it.
+                                    order.extend(candidate for candidate in ranked[:4]
+                                                 if candidate not in order)
                                 priority = {candidate: rank for rank, candidate in enumerate(ranked)}
                                 order[step:] = sorted(order[step:],
                                     key=lambda candidate: priority.get(candidate, len(priority)))
@@ -1311,16 +1539,18 @@ class SimulationSession:
             if local:
                 detections = merge_local_detections(
                     self._observed_detections, fresh,
-                    lambda d: any(measurement_visible(d, f, p) for f, p in coverage),
+                    lambda d: any(self._observation_replaced(d, f, p) for f, p in coverage),
                     forget=forget,
                     singleton_labels={d.label for d in fresh
                                       if d.extra.get('catalog_complete')},
-                    preserve_incomplete=(getattr(self, '_physics', None) is not None
-                                         and self._observation_revision == revision))
+                    preserve_incomplete=getattr(self, '_motion_observer', None) is not None)
             self._last_fresh = fresh
             self._observation_revision = revision
             self._last_observation_purpose = purpose
             self._observed_detections = copy.deepcopy(detections)
+            observer = getattr(self, '_motion_observer', None)
+            if observer is not None:
+                observer.remember(fresh, revision)
             self._emit('observation_complete', {'purpose': purpose, 'views': captured_views,
                        'message': '局部观测完成' if local else '首次全场观测完成',
                        'stats': copy.deepcopy(self._scan_stats)})
@@ -1351,7 +1581,16 @@ class SimulationSession:
         return True
 
     def _reusable_target(self, reference):
-        """Reuse only a still-fresh complete capture from the unchanged camera pose."""
+        """Reuse monitored base-frame evidence, or the legacy same-pose capture."""
+        observer = getattr(self, '_motion_observer', None)
+        if observer is not None:
+            if observer.source(reference) is None:
+                return False
+            self._last_fresh = observer.current()
+            self._observation_revision = self._environment_revision
+            self._last_observation_purpose = 'motion_observation'
+            observer.stats['source_reuses'] += 1
+            return True
         from .observation_policy import unique_target
         # A release-verification view proves a completed placement, not a new
         # grasp observation. Keep that boundary even if its frame is recent.
@@ -1406,9 +1645,12 @@ class SimulationSession:
         if (old.extra.get('_observed_revision') != revision or
                 np.linalg.norm(det.center_base[:2] - old.center_base[:2]) > .003):
             return None
-        if det.label in ('banana', 'pear') and abs(math.remainder(
-                float(det.yaw or 0) - float(old.yaw or 0), math.pi)) > math.radians(4):
-            return None
+        if det.label in ('banana', 'pear'):
+            from .catalog import restoration_yaw_period
+            period = restoration_yaw_period(det.label, det.extra.get('resting_pose'))
+            if period is not None and abs(math.remainder(
+                    float(det.yaw or 0) - float(old.yaw or 0), period)) > math.radians(4):
+                return None
         if any(a is None or b is None or abs(a-b) > .10 * max(a, b)
                for a, b in ((det.length, old.length), (det.width, old.width))):
             return None
@@ -1423,6 +1665,12 @@ class SimulationSession:
                        for a, b in ((det.length, reference.get('length')),
                                     (det.width, reference.get('width')),
                                     (det.height, reference.get('height'))))
+
+    def _observation_replaced(self, det, frame, pose):
+        from .observation_policy import measurement_absent, measurement_visible
+        predicate = (measurement_absent if getattr(self, '_motion_observer', None) is not None
+                     else measurement_visible)
+        return predicate(det, frame, pose)
 
     def _view_order(self, target):
         from .observation_policy import rank_views
@@ -1445,7 +1693,7 @@ class SimulationSession:
                           half_extent=max(.04, float(target.get('length') or .08) / 2),
                           target_z=float(target.get('top_z') or .04), required_targets=required)
 
-    def _publish_scene(self, detections, warnings, diagnostics, stamp):
+    def _publish_scene(self, detections, warnings, diagnostics, stamp, *, preserve_status=False):
             self._scene_version += 1
             mapping = {}
             objects = []
@@ -1460,6 +1708,11 @@ class SimulationSession:
                 object_id = 'v%d-object-%d' % (self._scene_version, index)
                 measured = copy.deepcopy(det)
                 measured.extra['object_id'] = object_id
+                observer = getattr(self, '_motion_observer', None)
+                changed = observer is not None and measured.label in observer.invalidated
+                if changed:
+                    measured.valid = False
+                    measured.reject_reason = 'changed_not_reobserved'
                 # Keep the visible support from every uniquely associated
                 # wrist view. A curved object's rectangle center is not a
                 # rigid anchor when it is rotated for a later placement.
@@ -1470,7 +1723,10 @@ class SimulationSession:
                 mapping[object_id] = measured
                 objects.append(dict(measured.summary(), object_id=object_id,
                                     in_zone=zone is not None, zone=zone,
-                                    view=measured.extra.get('view', 0)))
+                                    view=measured.extra.get('view', 0),
+                                    measurement_state='changed' if changed else
+                                        'updated' if measured.extra.get('_capture_stamp') == float(stamp) else 'retained',
+                                    measured_at=measured.extra.get('_capture_stamp')))
                 for key in ('support_z', 'support_label', 'support_polygon', 'support_observed'):
                     if key in measured.extra:
                         objects[-1][key] = copy.deepcopy(measured.extra[key])
@@ -1483,10 +1739,12 @@ class SimulationSession:
                            'task': 'Sandbox', 'mode': self.backend,
                            'observation_diagnostics': diagnostics,
                            'observed_at': float(stamp),
+                           'incremental': bool(preserve_status),
                            'observation_stats': copy.deepcopy(self._scan_stats),
                            'warnings': warnings}
-            self._status = 'ready'
-            self._stage = ''
+            if not preserve_status:
+                self._status = 'ready'
+                self._stage = ''
             self._publish_snapshot()
             self._emit('scene', self._scene)
             return copy.deepcopy(self._scene)
@@ -1609,13 +1867,17 @@ class SimulationSession:
                         placement_options = self._placement_options(destination)
                         zone_name = placement_options['placement_zone'].name
                 else:
-                    placement_options = {}
                     zone_name = zone_name or self.runner.class_to_zone[det.label]
                     if zone_name not in self.runner.zones:
                         return self._refusal('invalid_zone', 'target zone does not exist', object_id, zone_name)
+                    zone = self.runner.zones[zone_name]
+                    placement_options = dict(placement_zone=copy.deepcopy(zone),
+                                             placement_polygon=zone.corners_xy(), exact_xy=False)
                 # Initial intent is stable; coordinates must be confirmed in a new image.
                 original = copy.deepcopy(det)
-                preconfirmed = (getattr(self, '_last_observation_purpose', '') in
+                preconfirmed = self._reusable_target(stack_reference or
+                    (original.summary() | {'view': original.extra.get('view')})) or (
+                                getattr(self, '_last_observation_purpose', '') in
                                 ('recover_target', 'recover_queued_target') and
                                 self._observation_revision == self._environment_revision and
                                 not getattr(self, '_interventions', ()) and
@@ -1710,11 +1972,10 @@ class SimulationSession:
                 self._refresh_placement_occupancy(target, neighbors, destination=destination)
                 # A prior explicit request may have failed only because its
                 # destination was blocked. A new destination can be feasible.
-                if destination is not None:
-                    self.runner._tracks = [t for t in self.runner._tracks
-                                           if not (t.get('label') == det.label and
-                                                   np.linalg.norm(np.asarray(t['xy']) - det.center_base[:2]) < .03
-                                                   and str(t.get('reason', '')).startswith(('place infeasible', 'unreachable')))]
+                self.runner._tracks = [t for t in self.runner._tracks
+                                       if not (t.get('label') == det.label and
+                                               np.linalg.norm(np.asarray(t['xy']) - det.center_base[:2]) < .03
+                                               and str(t.get('reason', '')).startswith(('place infeasible', 'unreachable')))]
                 self._status = 'executing'
                 self._active_placement = (target, destination, zone_name, placement_options)
                 self._publish_snapshot()
@@ -2038,7 +2299,8 @@ class SimulationSession:
             self._released_observation_obstacle = Detection(det.label, 0.,
                 center_base=np.array([x,y,high]), top_z=high, height=high-low,
                 length=length, width=width, yaw=math.radians(angle), valid=False,
-                reject_reason='commanded_release_obstacle_only', extra={'table_z':low})
+                reject_reason='commanded_release_obstacle_only',
+                extra={'table_z':low, '_identity_revision':self._environment_revision})
             if not hasattr(self, '_released_observation_hints'):
                 self._released_observation_hints = {}
             # Keep per-object aiming hints when another release supersedes the
@@ -2380,8 +2642,17 @@ class SimulationSession:
                         if d.label == goal['label'] and d.height is not None), None)
                     if base is not None and upper is not None:
                         query['top_z'] = max(query.get('top_z', 0.), float(base.top_z + upper.height))
-            scene = self.observe(target=query, purpose='verify_place')
-            fresh = list(self._last_fresh)
+            observer = getattr(self, '_motion_observer', None)
+            pooled = observer.current() if observer is not None else []
+            if pooled and all(self._camera_goal_confirmed(g, pooled,
+                                self._environment_revision) for g in group):
+                fresh, scene = pooled, self.scene
+                self._last_fresh = fresh
+                self._observation_revision = self._environment_revision
+                observer.stats['verification_reuses'] += len(group)
+            else:
+                scene = self.observe(target=query, purpose='verify_place')
+                fresh = list(self._last_fresh)
             for goal in group:
                 targets.append(unique_target(fresh, goal['label']))
                 def confirmed():
@@ -2487,8 +2758,17 @@ class SimulationSession:
                     if destination is not None:
                         goal['destination'] = destination
                     query['verify_goals'] = [goal]
-                self.observe(target=query, purpose='verify_place',
-                             forget=[det] if result is not None and result.ok else [])
+                observer = getattr(self, '_motion_observer', None)
+                pooled = observer.current() if observer is not None else []
+                if (result is not None and result.ok and pooled and
+                        self._camera_goal_confirmed(query['verify_goals'][0], pooled,
+                                                    self._environment_revision)):
+                    self._last_fresh = pooled
+                    self._observation_revision = self._environment_revision
+                    observer.stats['verification_reuses'] += 1
+                else:
+                    self.observe(target=query, purpose='verify_place',
+                                 forget=[det] if result is not None and result.ok else [])
             except RuntimeError as exc:
                 summary['observation_error'] = str(exc)
         else:
@@ -2612,8 +2892,9 @@ class SimulationSession:
                                             self.runner.T_flange_tcp)
                 neighbors = merge_local_detections(self._recovery_neighbors,
                     [d for d in fresh if d.center_base is not None and d.label != goal['label']],
-                    lambda d: measurement_visible(d, self.camera._last, pose),
-                    forget=[self._recovery_target])
+                    lambda d: self._observation_replaced(d, self.camera._last, pose),
+                    forget=[self._recovery_target],
+                    preserve_incomplete=getattr(self, '_motion_observer', None) is not None)
                 self._recovery_neighbors = neighbors
                 observations = [d.summary() for d in neighbors]
                 if getattr(self.runner, 'has_held_recovery', False):
@@ -2682,7 +2963,8 @@ class SimulationSession:
         from ..camera.utils import capture_averaged
         from ..core.extrinsics import camera_pose_in_base
 
-        newer = float(getattr(self.runner, '_last_stamp', None) or 0.0)
+        revision = self._environment_revision
+        newer = max(float(getattr(self.runner, '_last_stamp', None) or 0.0), self.clock.now())
         frame = capture_averaged(self.camera, self.runner.n_avg,
                                  newer_than=newer, timeout=self.runner.frame_timeout)
         if frame is None:
@@ -2723,7 +3005,27 @@ class SimulationSession:
             detections = result.detections
         self._scan_stats['frames'] += 1
         self.runner._last_stamp = float(frame.stamp)
-        self._cache_observation(6, result, frame, label='恢复时静止观测')
+        observer = getattr(self, '_motion_observer', None)
+        if observer is not None and revision == self._environment_revision:
+            target_label = (grasp.target.label if grasp is not None else
+                            context['det'].label if context is not None else None)
+            for d in detections:
+                d.extra.update(_capture_stamp=float(frame.stamp),
+                               _capture_flange=np.asarray(flange.value).copy(),
+                               _observed_revision=revision)
+            fresh = [d for d in detections if d.label != target_label]
+            observer.reconcile(fresh, revision)
+            observer.remember(fresh, revision)
+            observer.remember_frame(frame, pose, revision)
+            from .observation_policy import merge_local_detections, measurement_visible
+            singletons = {d.label for d in fresh if d.valid and d.extra.get('catalog_complete')}
+            merged = merge_local_detections(self._observed_detections, fresh,
+                lambda d: self._observation_replaced(d, frame, pose), singleton_labels=singletons,
+                preserve_incomplete=True)
+            self._last_fresh = fresh
+            self._observation_revision = revision
+            self._publish_scene(merged, result.warnings, [], frame.stamp, preserve_status=True)
+        self._cache_observation(6, result, frame, label='动作间隙观测')
         self._emit('recovery_observation', {'message': ('已保持夹持并完成静止相机观测'
                     if self.runner.has_held_recovery else '已完成当前视角的静止相机观测'),
                                            'detections': [d.summary() for d in result.detections]})
@@ -2943,6 +3245,11 @@ class SimulationSession:
             self.cancel_event.external = None
             self.cancel_event.clear()
             self._environment_revision += 1
+            observer = getattr(self, '_motion_observer', None)
+            if observer is not None:
+                observer.evidence.clear()
+                observer.invalidated.clear()
+                observer.frames.clear()
             self._observed_detections = []
             self._invalidate_scene('上次任务已停止；下一项操作将重新确认当前现场')
             self._status, self._stage = 'ready', ''
@@ -2981,6 +3288,7 @@ class SimulationSession:
                 'placement': copy.deepcopy(self._placement),
                 'status': 'stopped' if self.cancel_event.is_set() else self._status,
                 'stage': self._stage, 'scene_version': self._scene_version,
+                'environment_revision': self._environment_revision,
                 'sim_time': self.clock.now() - self._started_at,
                 'camera_available': self._jpeg is not None,
                 'speed': self.clock.speed, 'joints': q.tolist(),
@@ -2996,6 +3304,9 @@ class SimulationSession:
                 'observation_stats': copy.deepcopy(self._scan_stats),
                 'score': self.world.score(self.runner.class_to_zone),
                 'class_to_zone': dict(self.runner.class_to_zone)}
+        observer = getattr(self, '_motion_observer', None)
+        if observer is not None:
+            snap['motion_observation'] = dict(observer.stats, pending_labels=sorted(observer.invalidated))
         if physics is not None:
             snap['physics'] = physics.state()
         with self._cache_lock:

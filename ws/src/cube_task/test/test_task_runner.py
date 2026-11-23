@@ -155,10 +155,13 @@ def test_operator_abort_during_run_stops_motion():
     op = Operator(enabled=False)
     rig.world.on_place = lambda zone, label: op.abort('test')
     rep = rig.runner(operator=op).run()
-    assert rep.stop_reason == 'aborted' and rep.placed == 1
+    # Released is distinct from a fully verified placement when the operator
+    # aborts before retreat and the final camera audit.
+    assert rep.stop_reason == 'aborted' and rep.placed == 0
+    assert rig.world.placed == {'zone_red': ['red']} and rig.world.held is None
     # Abort arrived while the gripper opened at the release pose: no command after it.
     assert rig.arm.commands[-1][0] == 'gripper'
-    assert rep.picks[-1].ok and rep.picks[-1].error == 'retreat_aborted'
+    assert not rep.picks[-1].ok and rep.picks[-1].error == 'retreat_aborted'
     assert len([c for c in rig.arm.commands if c[0] == 'move_joints']) == 1
 
 

@@ -238,13 +238,14 @@ def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target
                               highest_obstacle, table_z=0., clearance=.04,
                               free_tilt_deg=40., nominal=None, intrinsics=None, *,
                               cancelled=None, progress=None, max_poses=12, max_checks=None,
-                              exclude_poses=()):
+                              exclude_poses=(), focus_z=None, orientation_clearance=False):
     """Yield reachable held-camera poses, spending IK only as consumed.
 
-    Callers first lift vertically to at least ``minimum_tcp_z`` before moving
-    sideways, then use their existing guarded motion path. The bound uses the
-    farthest measured/nominal object corner from the *actual grasp*, so it also
-    covers intermediate rotations. This function sends no motion commands.
+    By default a bounding sphere clears arbitrary rotations. Callers which
+    check every swept pose can request orientation_clearance: endpoint heights
+    then use the full carried body and both fingers at that endpoint's actual
+    attitude. A long flat body need not lift by its half length. This function
+    sends no motion commands and never certifies the route between endpoints.
     Cancellation or an exhausted reachability-check budget ends the iterator.
     ``progress`` receives small dictionaries; no motion commands are sent.
     """
@@ -257,7 +258,10 @@ def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target
     det = grasp.target
     if check is None:
         return
-    target = np.r_[np.asarray(target_xy, float), float(table_z) + .015]
+    gaze_z = float(table_z) + .015 if focus_z is None else float(focus_z)
+    if not math.isfinite(gaze_z) or gaze_z < float(table_z):
+        return
+    target = np.r_[np.asarray(target_xy, float), gaze_z]
     radial = target[:2] / max(float(np.linalg.norm(target[:2])), 1e-6)
     lateral = np.array([-radial[1], radial[0]])
     T_camera_tcp = inv_T(np.asarray(T_flange_camera, float)) @ np.asarray(T_flange_tcp, float)
@@ -278,6 +282,17 @@ def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target
     offset = np.asarray(det.center_base[:2]) - grasp.T_grasp[:2, 3]
     support = []
     opening = float(grasp.expected_width) + RELEASE_OPEN_EXTRA
+    source_local = (corners-grasp.T_grasp[:3, 3]) @ grasp.T_grasp[:3, :3]
+    signs = np.array([[i,j,k] for i in (-1,1) for j in (-1,1) for k in (-1,1)])
+    held_local = np.vstack([source_local] + [
+        np.array([0., sign*(opening/2+.006), -.025]) + signs*[.010,.006,.025]
+        for sign in (-1,1)])
+    def endpoint_floor(rotation):
+        if not orientation_clearance:
+            return minimum_tcp_z
+        return (max(float(table_z), float(highest_obstacle)) + float(clearance)
+                - float(np.min(held_local @ np.asarray(rotation)[2, :])))
+
     for closing in closing_angles:
         if _planning_cancelled(arm, cancelled):
             return
@@ -312,7 +327,8 @@ def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target
             for side in (-.12, -.06, 0., .06, .12):
                 pose = attitude.copy()
                 pose[:2, 3] = target[:2] + distance*radial + side*lateral
-                pose[2, 3] = max(minimum_tcp_z, float(table_z)+height)
+                pose[2, 3] = max(endpoint_floor(pose[:3, :3]), float(table_z)+height+
+                    (0. if orientation_clearance else max(0., gaze_z-float(table_z)-.015)))
                 proposals.append((visibility_score(pose @ inv_T(T_camera_tcp)), pose))
     if progress is not None:
         progress({'phase': 'inspection_candidates', 'generated': 0, 'checked': 0, 'reachable': 0})
@@ -346,7 +362,7 @@ def iter_safe_inspection_poses(arm, grasp, T_flange_camera, T_flange_tcp, target
                     # A target on the hard limit can land outside it after the
                     # solver/servo's finite orientation error. Keep proposals
                     # inside the limit; all actual path checks retain 40 deg.
-                    if (float(T_tcp[2, 3]) >= minimum_tcp_z
+                    if (float(T_tcp[2, 3]) >= endpoint_floor(T_tcp[:3, :3])
                             and tilt <= max(0., free_tilt_deg-.25)
                             and (not _tapered_contact(grasp)
                                  or _grip_bend(attitude, T_tcp) <= math.radians(15.))):
@@ -408,7 +424,7 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
                           table_z=0., nominal=None, neighbor_nominal=None,
                           free_tilt_deg=40., *, cancelled=None, progress=None, max_checks=None,
                           opening_uncertainty=0., allow_joint_route=False, bend_reference=None,
-                          allow_table_departure=False):
+                          allow_table_departure=False, endpoint_clearance=0.):
     """Return a fully prechecked linear held-camera route, or hold position.
 
     Endpoint reachability alone does not establish a reachable lift or a safe
@@ -422,9 +438,11 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
         return [], 'aborted'
     try:
         opening_uncertainty = float(opening_uncertainty)
+        endpoint_clearance = float(endpoint_clearance)
     except (ValueError, TypeError):
         return [], 'inspection route has invalid opening uncertainty'
-    if not math.isfinite(opening_uncertainty) or opening_uncertainty < 0.:
+    if (not math.isfinite(opening_uncertainty) or opening_uncertainty < 0.
+            or not math.isfinite(endpoint_clearance) or endpoint_clearance < 0.):
         return [], 'inspection route has invalid opening uncertainty'
     import cv2
     from ..robot.kinematics import rot_log
@@ -575,7 +593,7 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
             pad = .008 + (distance + radius * angle) / (2 * count)
             samples = [interpolate_pose(start, end, k / count) for k in range(count + 1)]
             if (not all(clear(pose, pad, departing_support=True) for pose in samples)
-                    or not clear(end, pad)):
+                    or not clear(end, max(pad, endpoint_clearance))):
                 if _planning_cancelled(arm, cancelled):
                     return [], 'aborted'
                 last_reason, accepted = ('inspection swept held object or fingers overlaps a measured obstacle: '
@@ -634,7 +652,8 @@ def safe_inspection_route(arm, grasp, current, inspection, neighbors, opening,
                 corners = np.vstack(local_boxes)
                 swept = np.asarray([corners @ pose[:3, :3].T+pose[:3, 3] for pose in poses])
                 pad = .008 + float(np.max(np.linalg.norm(np.diff(swept, axis=0), axis=2)))/2
-                if all(clear(pose, pad) for pose in poses):
+                if (all(clear(pose, pad) for pose in poses)
+                        and clear(poses[-1], max(pad, endpoint_clearance))):
                     return JointTransitRoute(inspection, start_q, end_q), ''
                 last_reason = 'joint sweep held object or fingers overlaps a measured obstacle: '+blocked_by[0]
     return [], last_reason

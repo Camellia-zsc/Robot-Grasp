@@ -58,6 +58,22 @@ class SkillOrchestrator:
         return bool(getattr(self.session, '_interventions', ()) or
                     self.session.snapshot().get('editor', {}).get('intervention_pending', 0))
 
+    def _refresh_semantic_queue(self, memory):
+        """Rebind semantic steps after an edit; never reuse their old motion path."""
+        session = self.session
+        observer = getattr(session, '_motion_observer', None)
+        if observer is None or session.snapshot().get('held_object'):
+            return False
+        with session._operation_lock:
+            self._check_stop()
+            session._apply_interventions()
+            observer.capture(force=True)
+            self._invalidate_audit(memory)
+            self.ctl._event('skill_scene_updated', dict(
+                message='已更新变化的物品；保留任务目标，下一步重新绑定测量并跳过已完成子任务',
+                pending_labels=sorted(observer.invalidated)))
+        return True
+
     def _verification_current(self, result):
         return bool(result and result.get('verified_revision') == self._revision()
                     and not self._pending_interventions())
@@ -828,9 +844,12 @@ class SkillOrchestrator:
                 for index, step in enumerate(steps):
                     self._check_stop()
                     if revision != self._revision() or self._pending_interventions():
-                        failure = dict(ok=False, error='scene_changed', stage='before_skill',
-                                       message='人为干预改变现场，旧计划取消，重新规划')
-                        break
+                        if self._refresh_semantic_queue(memory):
+                            revision, verified = self._revision(), None
+                        else:
+                            failure = dict(ok=False, error='scene_changed', stage='before_skill',
+                                           message='人为干预改变现场，旧计划取消，重新规划')
+                            break
                     self._publish(status='executing', current_index=index)
                     step.update(status='executing', message='正在执行')
                     self._publish(steps=steps)
@@ -838,9 +857,12 @@ class SkillOrchestrator:
                                     '技能 %d/%d：%s' % (index+1, len(steps), self._describe(step)))
                     ctl._event('skill_step', dict(message=self._describe(step), step=step))
                     if revision != self._revision() or self._pending_interventions():
-                        failure = dict(ok=False, error='scene_changed', stage='before_dispatch',
-                                       message='技能开始前现场变化，旧方案已取消')
-                        break
+                        if self._refresh_semantic_queue(memory):
+                            revision, verified = self._revision(), None
+                        else:
+                            failure = dict(ok=False, error='scene_changed', stage='before_dispatch',
+                                           message='技能开始前现场变化，旧方案已取消')
+                            break
                     deferred = getattr(executor, 'defer_unobserved', None)
                     candidate = deferred(step, memory['goals']) if callable(deferred) else None
                     if self._defer_step(step, candidate, memory, steps, number):
@@ -895,6 +917,14 @@ class SkillOrchestrator:
                         result = executor.execute(step, memory['goals'],
                             protected_goals=memory['protected_goals'], cancel_event=ctl._cancel,
                             expected_revision=revision)
+                    if (result.get('ok') and getattr(self.session, '_motion_observer', None) is not None
+                            and revision != self._revision() and not self._pending_interventions()
+                            and not self.session.snapshot().get('held_object')
+                            and result.get('verified_revision') == self._revision()):
+                        # This action certified its new path and completed at
+                        # the new revision. Keep the remaining semantic goals.
+                        revision, verified = self._revision(), None
+                        self._invalidate_audit(memory)
                     if self._defer_step(step, result, memory, steps, number):
                         verified = prior_verified
                         continue
@@ -937,6 +967,23 @@ class SkillOrchestrator:
                         proof = self._proof(result, selected)
                         if proof is not None:
                             verified = self._combine_proofs(verified,proof)
+                    if (physical and result.get('ok') and not memory['obligations']
+                            and not self.session.snapshot().get('held_object')):
+                        observer = getattr(self.session, '_motion_observer', None)
+                        if observer is not None:
+                            final_goals = self._final_goals(memory)
+                            pooled = observer.current()
+                            if final_goals and all(self.session._camera_goal_confirmed(
+                                    goal, pooled, self._revision()) for goal in final_goals):
+                                final = self._verify_all(executor, memory, verified)
+                                reviewed, _new = self._end_audit(executor, memory, final,
+                                    result=final, expected_revision=self._revision())
+                                final = reviewed if reviewed is not None else final
+                                if final.get('ok'):
+                                    for pending in steps[index+1:]:
+                                        pending.update(status='skipped', message='最终目标已全部核验，无需继续操作')
+                                    self._publish(steps=steps)
+                                    return self._finish(True, '全部原始目标已通过核验，提前结束剩余步骤', memory, final)
                     if not result.get('ok'):
                         failure = result
                         if step['skill'] == 'ask' or result.get('aborted') or result.get('fault'):

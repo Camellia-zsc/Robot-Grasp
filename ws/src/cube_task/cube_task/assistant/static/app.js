@@ -470,7 +470,8 @@ function renderObservations(state){
   const unconfirmed=objects.filter(object=>object.valid===false).length;
   setText("object-count",`${objects.length-unconfirmed} 个目标${unconfirmed?` · ${unconfirmed} 条待确认`:""}`);
   const diagnostics=Array.isArray(scene.observation_diagnostics)?scene.observation_diagnostics:[];
-  setText("observation-note",`检测来自 RGB-D 扫描，包含工作区与放置区中的方块和水果。摆场后等待下条指令重新观测。${diagnostics.length?`已合并 ${diagnostics.length} 条重复或混合观测，可切换相机视角查看。`:""}`);
+  const stream=state.simulation?.motion_observation;
+  setText("observation-note",`${stream?`执行中持续更新可见目标，已利用 ${number(stream.frames,0)} 帧运动中观测；未变化物品复用已有测量。`:"检测来自 RGB-D 扫描，包含工作区与放置区中的方块和水果。"}${diagnostics.length?`已合并 ${diagnostics.length} 条重复或混合观测，可切换相机视角查看。`:""}`);
   const rejectionNames={touches_image_border:"画面截断",touches_roi_border:"范围边缘截断",touches_zone:"轮廓接触区域边界",occluded:"轮廓被遮挡",partial_object:"轮廓不完整",few_points:"深度点不足",too_small:"轮廓过小",too_large:"轮廓过大",too_tall:"高度异常",merged:"物体轮廓粘连",low_score:"识别把握不足"};
   const selected=selectedId(state);const rows=[];
   for(const object of objects){
@@ -527,8 +528,8 @@ function renderCamera(state){
   setText("camera-time",frameStamp(observation?(observation.sim_time??observation.stamp):isLive?camera.sim_time:(state.scene?.observed_at??state.scene?.timestamp)));
   const labels=observation?.detected_labels;
   const names=Array.isArray(labels)?[...new Set(labels.map(label=>displayLabel(typeof label==="object"?label.label:label)))]:null;
-  setText("camera-targets",observation?(names?names.length?`该视角检测到：${names.join("、")}`:"该视角未检测到目标":"该视角未提供检测摘要"):"实时画面仅供观察，不会逐帧更新检测列表");
-  setText("camera-note",observation?"冻结画面来自最近一次任务扫描，可切换视角查看已放置区域。":isLive?"画面跟随机械臂运动；目标列表在任务扫描完成后更新。":"实时预览尚未就绪；当前显示最近一次相机观测。");
+  setText("camera-targets",observation?(names?names.length?`该视角检测到：${names.join("、")}`:"该视角未检测到目标":"该视角未提供检测摘要"):state.simulation?.motion_observation?"运动过程中自动更新可见目标":"实时腕部相机画面");
+  setText("camera-note",observation?"该画面保存了对应时刻的识别结果，可切换视角查看。":isLive?"画面跟随机械臂运动；可见目标持续更新，遮挡部分保留最近可靠测量。":"当前显示最近一次相机观测；执行过程中会自动更新。");
   $("camera-image").alt=observation?`${observation.label||"腕部相机"}的冻结观测` : isLive?"实时腕部相机预览":"最近一次腕部相机观测";
   $("camera-status-dot").classList.toggle("live",isLive&&Boolean(camera.available));
   refreshCamera();
@@ -742,8 +743,9 @@ function drawTable(sim,state){
   for(const zone of normalizedZones(sim,state)){
     const center=vec(zone.center||zone.position);const size=zone.size||[.12,.12,.005];const sx=number(size[0],.12),sy=number(size[1],.12),z=tableZ+.0008;
     const name=zone.label||zone.name||"放置区域";const key=colorKey(name)||colorKey(zone.name)||Object.entries(state.scene?.class_to_zone||{}).find(([,value])=>value===zone.name)?.[0];const color=palette[colorKey(key)]||"#9db4ba";
+    const surface=rgbHex(zone.color_rgb,color);
     const points=[[center[0]-sx/2,center[1]-sy/2,z],[center[0]+sx/2,center[1]-sy/2,z],[center[0]+sx/2,center[1]+sy/2,z],[center[0]-sx/2,center[1]+sy/2,z]];
-    polygon(points,`${color}1a`,`${color}88`,1);line([...points,points[0]],`${color}8a`,1,[4,4]);
+    polygon(points,`${surface}b3`,`${color}88`,1);line([...points,points[0]],`${color}8a`,1,[4,4]);
     const zoneName=({red:"红色放置区",green:"绿色放置区",yellow:"黄色放置区",blue:"蓝色放置区"})[colorKey(key)]||String(name);
     label([center[0],center[1]+sy*.5+.025,z],zoneName,color,"#ffffffcc");
   }

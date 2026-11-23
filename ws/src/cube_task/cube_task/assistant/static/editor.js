@@ -113,7 +113,9 @@ window.SceneEditor=(()=>{
     if(!movable(object)){setError("机械臂夹持中的物品不能移动；请选择其他物品。");return;}
     clearDestination();editor.interventionPending=true;editor.interventionVersion=version();editor.interventionRequestId=null;setError("");controls();
     try{
-      const result=await api("/api/scene-intervene",{scene_version:editor.interventionVersion,action,...fields});
+      const environment=editor.state?.simulation?.environment_revision;
+      const revision=Number.isInteger(environment)?{environment_revision:environment}:{scene_version:editor.interventionVersion};
+      const result=await api("/api/scene-intervene",{...revision,action,...fields});
       editor.interventionRequestId=result.request_id??null;editor.ghost=null;editor.drag=null;
       setHint(result.queued===false?"干预已生效；后续动作将通过相机局部确认变化。":"干预已排队，将在仿真步间生效；原抓取任务继续执行。");
       renderState(await api("/api/state"));
@@ -170,7 +172,7 @@ window.SceneEditor=(()=>{
     for(let x=Math.ceil(lo[0]/.05)*.05;x<hi[0];x+=.05){const a=project([x,lo[1]]),b=project([x,hi[1]]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();}
     for(let y=Math.ceil(lo[1]/.05)*.05;y<hi[1];y+=.05){const a=project([lo[0],y]),b=project([hi[0],y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();}
     if(bounds?.x?.length===2&&bounds?.y?.length===2){polygon([[bounds.x[0],bounds.y[0]],[bounds.x[1],bounds.y[0]],[bounds.x[1],bounds.y[1]],[bounds.x[0],bounds.y[1]]],"#72a0be05","#a7becb",.7,[3,4]);if(manual){const p=project([bounds.x[0]+.01,bounds.y[1]-.018]);ctx.font='9px "Microsoft YaHei",sans-serif';ctx.fillStyle="#7898aa";ctx.textAlign="left";ctx.fillText(intervening?"整个桌面 · 干预范围":"整个桌面 · 手动摆场",p[0],p[1]);}}
-    for(const zone of zones){const [x,y]=zone.center||[0,0],[sx,sy]=zone.size||[.2,.2],yaw=safeNumber(zone.yaw),c=Math.cos(yaw),s=Math.sin(yaw),corners=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b])=>[x+a*sx/2*c-b*sy/2*s,y+a*sx/2*s+b*sy/2*c]);const color=palette[colorKey(zone.name)]||"#9cafad";polygon(corners,color+"12",color+"80",.8);const p=project([x,y]);ctx.fillStyle=color;ctx.font='9px "Microsoft YaHei",sans-serif';ctx.textAlign="center";ctx.fillText(({zone_red:"红区",zone_green:"绿区",zone_yellow:"黄区"})[zone.name]||zone.name,p[0],p[1]);}
+    for(const zone of zones){const [x,y]=zone.center||[0,0],[sx,sy]=zone.size||[.2,.2],yaw=safeNumber(zone.yaw),c=Math.cos(yaw),s=Math.sin(yaw),corners=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b])=>[x+a*sx/2*c-b*sy/2*s,y+a*sx/2*s+b*sy/2*c]);const color=palette[colorKey(zone.name)]||"#9cafad",surface=Array.isArray(zone.color_rgb)?"#"+zone.color_rgb.slice(0,3).map(v=>Math.max(0,Math.min(255,Math.round(safeNumber(v)))).toString(16).padStart(2,"0")).join(""):color;polygon(corners,surface+"cc",color+"80",.8);const p=project([x,y]);ctx.fillStyle=color;ctx.font='9px "Microsoft YaHei",sans-serif';ctx.textAlign="center";ctx.fillText(({zone_red:"红区",zone_green:"绿区",zone_yellow:"黄区"})[zone.name]||zone.name,p[0],p[1]);}
     polygon(pick,"#60ab920a","#7dad9d",1,[5,4]);
     if(pick.length){const p=project([Math.min(...pick.map(p=>p[0]))+.01,Math.max(...pick.map(p=>p[1]))-.018]);ctx.font='9px "Microsoft YaHei",sans-serif';ctx.fillStyle="#7b9e90";ctx.textAlign="left";ctx.fillText(manual?"抓取区 · 任务参考":"抓取区",p[0],p[1]);}
     for(const object of objects()){

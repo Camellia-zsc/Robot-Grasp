@@ -8,8 +8,22 @@ import pytest
 from cube_task.assistant.simulation import SimulationSession
 from cube_task.assistant.skill_execution import SkillExecutor
 from cube_task.assistant.observation_policy import rank_views
-from test_assistant_targeted_scan import block, scan_session, fresh_session
+from test_assistant_targeted_scan import block, scan_session as base_scan_session, fresh_session
 from test_assistant_observation_policy import INTR, camera
+
+
+@pytest.fixture(autouse=True)
+def measured_body_anchor(monkeypatch):
+    # These synthetic detections exercise view scheduling and joint support
+    # evidence. Real source-body fitting has separate RGB-D/physics tests.
+    monkeypatch.setattr('cube_task.assistant.held_anchor.source_anchor',
+                        lambda grasp: dict(ok=True))
+
+
+def scan_session(frames):
+    session, seen = base_scan_session(frames)
+    session._prepare_observation_motion = lambda *a, **kw: True
+    return session, seen
 
 
 def reference():

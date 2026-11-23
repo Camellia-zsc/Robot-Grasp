@@ -107,6 +107,13 @@ class DashboardController:
             self._events.append(event)
 
     def _on_sim_event(self, kind, payload=None):
+        if kind == 'scene' and isinstance(payload, dict):
+            with self._lock:
+                self._scene = copy.deepcopy(payload)
+            if payload.get('incremental'):
+                return  # Live detections update the table, not the action log.
+        if kind == 'motion_observation':
+            return  # Counters are published in the simulation snapshot.
         self._event(kind, payload)
         if isinstance(payload, dict):
             with self._lock:
@@ -517,7 +524,7 @@ class DashboardController:
         if not isinstance(request, dict):
             raise ValueError('干预操作需要为 JSON 对象')
         if (request.get('action') != 'move'
-                or set(request) - {'action', 'object_id', 'xy', 'yaw', 'scene_version'}):
+                or set(request) - {'action', 'object_id', 'xy', 'yaw', 'scene_version', 'environment_revision'}):
             raise ValueError('运行中干预只允许移动或旋转已有物品')
         with self._lock:
             session = self._session

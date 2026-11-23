@@ -222,6 +222,7 @@ class PickPlaceSkill:
         checked transit, release and retreat primitives as a normal pick apply.
         A failed continuation holds position and keeps the gripper closed.
         """
+        self.active_grasp = grasp
         t0 = self.clock.now()
         r = PickResult(ok=False, stage='retry_place', label=grasp.target.label,
                        zone=place.zone, grasp_width=grasp_width,
@@ -457,6 +458,7 @@ class PickPlaceSkill:
     # -------------------------------------------------------------------- flow
     def _pick_to_lift(self, g: GraspPlan, r: PickResult, require_feedback=False) -> None:
         """Shared checked opening, descent, closing, lift and held feedback."""
+        self.active_grasp = g
         self._open(r, 'open', g.open_width, need=g.expected_width + OPEN_CLEARANCE)
         self._move(r, 'pre', g.T_pre, False)
         self._guard('descend')

@@ -38,6 +38,7 @@ def scan_session(frames):
         seen.append(view)
         return 'ok', PerceptionResult(copy.deepcopy(frames[view]), frame_stamp=10.), SimpleNamespace(stamp=10.)
     session.runner = SimpleNamespace(_observe=observe, view_merge=.04,
+        views=[np.zeros(6) for _ in frames],
         _partial=lambda d: False, ext=SimpleNamespace(parent_frame='flange', T=np.eye(4)),
         T_flange_tcp=np.eye(4), _last_obs_failure='')
     def publish(detections, warnings, diagnostics, stamp):
@@ -150,14 +151,20 @@ def test_real_explicit_local_observation_is_not_repeated_before_grasp(tmp_path):
         assert session.arm.inner.n_calls == motions
         session._last_observation_purpose = 'verify_place'
         executor._fresh_target('red', 'recover_queued_target')
+        # The dashboard now keeps individually monitored base-frame evidence:
+        # a verification view does not itself move or invalidate the object.
+        assert session._scan_stats['frames'] == before['frames']
+        session._motion_observer.invalidate(['red'])
+        session._last_observation_purpose = 'consumed_for_pick'
+        executor._fresh_target('red', 'recover_queued_target')
         assert session._scan_stats['frames'] == before['frames'] + 1
         assert session.arm.inner.n_calls == motions
         before = copy.deepcopy(session._scan_stats)
-        # Freshness expires even without a human edit. The next image is
-        # captured in place when this camera view still covers the target.
+        # Time alone does not move an individually monitored simulation body.
+        # A later valid motion capture or explicit change notice updates it.
         session.clock.sleep(session.runner.max_frame_age + .1)
         executor._fresh_target('red', 'recover_queued_target')
-        assert session._scan_stats['frames'] == before['frames'] + 1
+        assert session._scan_stats['frames'] == before['frames']
         assert session.arm.inner.n_calls == motions
 
 
@@ -251,6 +258,7 @@ def test_reused_stack_slot_keeps_complementary_captures_until_verification_finis
 
 def route_session(height):
     session = object.__new__(SimulationSession)
+    session._environment_revision = 0
     session.world = SimpleNamespace(held=None)
     session.cancel_event = threading.Event()
     session._interventions = []

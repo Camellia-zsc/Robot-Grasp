@@ -894,7 +894,7 @@ class TaskRunner:
         track['xy'] = _xy(det)
         self._neighbors = list(neighbors)
         from ..perception.grasp import annotate_grasp_neighbors
-        annotate_grasp_neighbors(det, neighbors)
+        annotate_grasp_neighbors(det, neighbors, minimum_z=self.planner.neighbor_floor_z(det))
         gp = self.planner.plan(det)
         from .grasp_contact import supported_grasp
         gp = supported_grasp(self.planner, self.arm, det, gp, free_tilt=self.free_tilt)
@@ -935,7 +935,7 @@ class TaskRunner:
                                  avoid_poses=avoided_poses,
                                  candidate_filter=lambda x, y: not release_workspace_reason(self.arm, (x, y)),
                                  pose_filter=self._strict_place_filter(det, gp, neighbors,
-                                                                        placement_polygon))
+                                     placement_polygon, completion_zone=self.zones.get(zone_name)))
         pending = [footprint_dims(d, self.nominal.get(d.label)) for d in neighbors
                    if d is not det and self.class_to_zone.get(d.label) == zone_name]
         pending = [p for p in pending if p is not None]
@@ -957,7 +957,7 @@ class TaskRunner:
                                            self.free_tilt, report)
         if ok and strict:
             ok, why = self._adjust_strict_release(det, gp, pp, neighbors,
-                                                 placement_polygon, place_info['xy'], held)
+                placement_polygon, place_info['xy'], held, completion_zone=self.zones.get(zone_name))
         avoid: List[Tuple[float, float]] = []
         stacked = (det.extra or {}).get('_stack_support') is not None
         retry_limit = STACK_RELEASE_RETRIES if stacked else RELEASE_RETRIES
@@ -987,7 +987,7 @@ class TaskRunner:
                                                self.free_tilt, report)
             if ok and strict:
                 ok, why = self._adjust_strict_release(det, gp, pp, neighbors,
-                                                     placement_polygon, place_info['xy'], held)
+                    placement_polygon, place_info['xy'], held, completion_zone=self.zones.get(zone_name))
         if not ok and footprint is not None and not strict:
             # Last resort: the zone center, on a flat card only when nothing lies there.
             pc = self.placer.plan(zone, held, tz, occupied=occupied, held=shape,
@@ -1502,9 +1502,14 @@ class TaskRunner:
                                             completion_zone=search['completion_zone'],
                                             release_opening=shape.get('requested_release_opening'))
         def measured_allowed(x, y, closing):
-            return (not interrupted() and
-                    allowed(x, y, closing) and
-                    (observation_filter is None or observation_filter(x, y, closing)))
+            if interrupted() or not allowed(x, y, closing):
+                return False
+            if observation_filter is None or observation_filter(x, y, closing):
+                return True
+            unseen = state.setdefault('unseen_xy', [])
+            if len(unseen) < 16 and all(math.hypot(x-a, y-b) > .01 for a,b in unseen):
+                unseen.append((float(x),float(y)))
+            return False
         state = {} if search_state is None else search_state
         avoided = state.setdefault('avoided', [])
         avoided_poses = state.setdefault('avoided_poses', [])
@@ -1515,8 +1520,11 @@ class TaskRunner:
         if spatial:
             c,s = math.cos(zone.yaw), math.sin(zone.yaw)
             rotation = np.array([[c,-s],[s,c]])
-            quarter = np.asarray(zone.size)*.25
-            preferred_xy += tuple(tuple(zone.center[:2]+rotation@(quarter*direction))
+            # A centre occupant can exclude every quarter-offset seed even
+            # on an enlarged card. Cover its outer pockets before fine grids.
+            preferred_xy += tuple(tuple(zone.center[:2]+rotation@(
+                np.asarray(zone.size)*fraction*direction))
+                for fraction in (.30, .35, .25)
                 for direction in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,-1),(1,-1),(-1,1)))
         xy_attempts = state.setdefault('xy_attempts', {})
         cell_attempts = state.setdefault('cell_attempts', {})
@@ -1751,7 +1759,7 @@ class TaskRunner:
                             if d is not det]
         self._neighbors = others
         from ..perception.grasp import annotate_grasp_neighbors
-        annotate_grasp_neighbors(target, others)
+        annotate_grasp_neighbors(target, others, minimum_z=self.planner.neighbor_floor_z(target))
         gp = self.planner.plan(target)
         from .grasp_contact import supported_grasp
         gp = supported_grasp(self.planner, self.arm, target, gp, free_tilt=self.free_tilt)
@@ -1835,6 +1843,14 @@ class TaskRunner:
         high = max([tz] + [float(z.center[2]) + max(0.0, float(z.wall_height))
                            for z in self.zones.values()] + ([line] if line is not None else []))
         clear = high + self.transit_clear + held
+        if self.cfg.get('assistant.dynamic_scene_clearance', False):
+            # Interactive edits can move any measured body onto the old carry
+            # line. Do not lower the lift below the scene-wide clearance that
+            # was already used to create this plan; try a reachable lean instead.
+            tops = [float(d.top_z) for d in getattr(self, '_neighbors', ())
+                    if d is not det and d.top_z is not None and math.isfinite(float(d.top_z))]
+            clear = max(clear, transit_height(self.cfg, list(self.zones.values()),
+                tz, held, max(tops) if tops else None))
         z_g, z_r = float(gp.T_grasp[2, 3]), float(pp.T_release[2, 3])
         h = float(det.height) if det.height is not None else top - tz
         return {'pre_grasp': top + self.min_approach,
@@ -1860,7 +1876,10 @@ class TaskRunner:
         if completion_zone is not None:
             from ..assistant.destinations import ZONE_COMPLETION_MARGIN
             goal_center = np.asarray(completion_zone.center, float)[:2]
-            goal_half = np.asarray(completion_zone.size, float) / 2 - ZONE_COMPLETION_MARGIN
+            reserve = float(getattr(self, 'cfg', {}).get('assistant.named_zone_measurement_margin', 0.) or 0.)
+            if not math.isfinite(reserve) or reserve < 0:
+                raise ValueError('named zone measurement margin must be finite and nonnegative')
+            goal_half = np.asarray(completion_zone.size, float) / 2 - ZONE_COMPLETION_MARGIN - reserve
             c, s = math.cos(completion_zone.yaw), math.sin(completion_zone.yaw)
             goal_rotation = np.array([[c, -s], [s, c]])
 

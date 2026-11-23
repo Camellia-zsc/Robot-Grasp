@@ -139,7 +139,9 @@ def test_preference_uses_measured_cloud_or_measured_box_through_the_actual_grasp
                   'asymmetric': (.0245, .0105, -.010)}.get(cloud_kind, (.012, .003, .010)))
     expected = [.34 + dx * math.cos(tilt) + dz * math.sin(tilt), -.06 + dy]
     np.testing.assert_allclose([points[0] for points in captured], [expected])
-    assert len(captured[0]) == 9  # measured anchor, then broad region alternatives
+    assert len(captured[0]) == 25  # measured anchor, balanced/outer pockets, quarter offsets
+    offsets = np.asarray(captured[0][1:]) - runner.zones['zone_red'].center[:2]
+    assert np.max(np.abs(offsets)) == pytest.approx(.35 * .2)
 
 
 def test_preferred_xy_does_not_change_an_exact_destination():

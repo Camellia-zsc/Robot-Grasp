@@ -895,8 +895,9 @@ class SimWorld:
             c = obj.center_xy()
             return self.zone_at(float(c[0]), float(c[1]))
         best: Optional[Tuple[float, SimZone]] = None
+        points = obj.footprint_points()
         for z in self.zones:
-            f = self.zone_fraction(obj, z)
+            f = float(np.mean(z.contains_points(points)))
             if f >= need - 1e-9 and (best is None or f > best[0]):
                 best = (f, z)
         return None if best is None else best[1]

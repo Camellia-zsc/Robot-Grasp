@@ -64,6 +64,16 @@ def test_visible_missing_target_is_deleted_even_when_saved_in_an_old_view():
     assert original.extra['view'] == 4  # Never mutate source measurements.
 
 
+def test_monitored_complete_body_survives_a_new_crop_even_with_covered_old_footprint():
+    original = det('pear')
+    crop = det('pear', (.005, 0.), valid=False)
+    assert merge_local_detections([original], [crop], lambda d: True,
+                                  preserve_incomplete=True) == [original, crop]
+    # Genuine disappearance still revokes the old geometry.
+    assert merge_local_detections([original], [], lambda d: True,
+                                  preserve_incomplete=True) == []
+
+
 def test_fresh_geometry_supersedes_stale_measurement_regardless_of_class():
     original, corrected = det('pear'), det('banana', (.005, 0.))
     assert merge_local_detections([original], [corrected], lambda d: False) == [corrected]
@@ -132,5 +142,59 @@ def test_monitored_scene_crop_keeps_complete_source_only_when_it_cannot_disprove
     old, fresh = det(), det(valid=complete)
     kept = merge_local_detections([old], [fresh], lambda d: visible,
                                  preserve_incomplete=True, forget=[old] if forgotten else [])
-    assert any(item is old for item in kept) is (not visible and not complete and not forgotten)
+    assert any(item is old for item in kept) is (not complete and not forgotten)
     assert any(item is fresh for item in kept)
+
+
+def test_monitored_visible_source_with_no_replacement_detection_is_removed():
+    old = det()
+    assert not merge_local_detections([old], [], lambda d: True,
+                                      preserve_incomplete=True)
+
+
+def test_cropped_wrong_class_cannot_erase_an_unchanged_complete_identity():
+    old, crop = det(), det(label='apple', valid=False)
+    kept = merge_local_detections([old], [crop], lambda d: True, preserve_incomplete=True)
+    assert old in kept and crop in kept
+    crop.valid = True
+    assert merge_local_detections([old], [crop], lambda d: True,
+                                  preserve_incomplete=True) == [crop]
+
+
+def test_new_upper_body_does_not_erase_its_occluded_known_support():
+    base, upper = det(), det(label='pear')
+    upper.top_z, upper.height = .16, .11
+    kept = merge_local_detections([base], [upper], lambda d: False,
+                                  preserve_incomplete=True)
+    assert base in kept and upper in kept
+
+
+def test_merged_upper_and_support_silhouette_does_not_erase_known_lower_body():
+    base, merged = det(label='yellow'), det(label='pear')
+    base.extra['catalog_complete'] = True
+    # The stacked body and base touch in the image. Segmentation estimates
+    # the taller silhouette from the tabletop rather than its support plane.
+    merged.top_z, merged.height = .124, .124
+    kept = merge_local_detections([base], [merged], lambda d: False,
+                                  preserve_incomplete=True)
+    assert any(d is base for d in kept)
+    assert any(d is merged for d in kept)
+
+
+@pytest.mark.parametrize('depth,absent', [(.95,False),(1.,True),(.8,False),(float('nan'),False)])
+def test_segmentation_miss_needs_actual_background_depth_before_forgetting(depth, absent):
+    from cube_task.assistant.observation_policy import measurement_absent
+    target = det()
+    target.extra['_points_base'] = np.array([[i*.001,j*.001,.05]
+                                           for i in range(4) for j in range(4)])
+    assert measurement_absent(target, frame(depth), camera()) is absent
+
+
+def test_old_edge_surface_rays_cannot_erase_a_support_whose_core_is_still_visible():
+    from cube_task.assistant.observation_policy import measurement_absent
+    target = det()
+    target.extra['_points_base'] = np.array([[.032+i*.001,j*.001,.05]
+                                           for i in range(4) for j in range(4)])
+    image = frame(1.)
+    image.depth[100,100] = .95
+    assert not measurement_absent(target, image, camera())

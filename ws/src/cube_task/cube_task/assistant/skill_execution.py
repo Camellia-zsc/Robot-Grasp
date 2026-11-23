@@ -44,6 +44,7 @@ class SkillExecutor:
             holding_allowed_skills=['observe', 'place', 'ask'],
             active_observe_requires_geometry=True, multi_object_rearrangement=True,
             restores_original_pose=True, stacking=physical, physical_stacking=physical,
+            incremental_observation=bool(getattr(self.session, '_motion_observer', None)),
             automatic_righting=False,
             gravity_contacts=physical, physics_backend='mujoco' if physical else 'sim')
 
@@ -87,10 +88,12 @@ class SkillExecutor:
             previous_guard = getattr(arm_skill, 'execution_guard', None)
 
             def guard(stage):
-                if not self._plan_current():
-                    return 'scene_changed'
                 # The existing guard may itself apply a queued intervention.
                 error = previous_guard(stage) if previous_guard is not None else None
+                if (error is None and stage == 'held_transit'
+                        and getattr(session, '_motion_replan_required', False)
+                        and getattr(session, '_active_revision', None) == session._environment_revision):
+                    self._expected_revision = session._environment_revision
                 return error or (None if self._plan_current() else 'scene_changed')
 
             if arm_skill is not None and expected_revision is not None:
@@ -333,6 +336,10 @@ class SkillExecutor:
             scene = session.scene
             session._last_observation_purpose = purpose
         else:
+            # A complete silhouette can still lack the two views/contact
+            # geometry needed for a grasp (especially above another object).
+            # Request useful source views, not the same fixed table cameras.
+            reference['_observe_source'] = True
             scene = session.observe(target=reference, purpose=purpose)
         det = unique_target(session._last_fresh, label,
                             partial=lambda d: session._target_partial(d, reference))
@@ -355,7 +362,7 @@ class SkillExecutor:
         """Refresh held-state surroundings without an unchecked camera move."""
         session = self.session
         from ..core.extrinsics import camera_pose_in_base
-        from .observation_policy import measurement_visible, merge_local_detections
+        from .observation_policy import measurement_absent, measurement_visible, merge_local_detections
 
         session._apply_interventions()
         revision = session._environment_revision
@@ -372,7 +379,10 @@ class SkillExecutor:
                  and (target is None or d.label != target.label)]
         neighbors = merge_local_detections(
             session._observed_detections, fresh,
-            lambda d: measurement_visible(d, frame, pose), forget=[target] if target is not None else [])
+            lambda d: (measurement_absent if getattr(session, '_motion_observer', None) is not None
+                       else measurement_visible)(d, frame, pose),
+            forget=[target] if target is not None else [],
+            preserve_incomplete=getattr(session, '_motion_observer', None) is not None)
         session._last_fresh = fresh
         session._observation_revision = revision
         session._observed_detections = copy.deepcopy(neighbors)
@@ -579,13 +589,15 @@ class SkillExecutor:
         """A completion claim needs fresh camera data and one scene identity."""
         session = self.session
         revision = getattr(session, '_environment_revision', None)
-        if (getattr(session, '_last_observation_purpose', '') == 'consumed_for_pick' or
+        observer = getattr(session, '_motion_observer', None)
+        if ((observer is None and getattr(session, '_last_observation_purpose', '') == 'consumed_for_pick') or
                 getattr(session, '_interventions', ()) or
                 session.snapshot().get('editor', {}).get('intervention_pending', 0)):
             return None
-        if fresh and getattr(session, '_observation_revision', None) != revision:
+        if fresh and observer is None and getattr(session, '_observation_revision', None) != revision:
             return None
-        detections = getattr(session, '_last_fresh' if fresh else '_observed_detections', ())
+        detections = (observer.current(label) if observer is not None else
+                      getattr(session, '_last_fresh' if fresh else '_observed_detections', ()))
         if not fresh:
             # Older views may prove that a grasp is still needed, but may not
             # prove completion after a later robot motion in the same revision.

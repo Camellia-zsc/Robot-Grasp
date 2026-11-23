@@ -89,6 +89,25 @@ def test_proven_geometric_capacity_failure_does_not_move_to_another_view(monkeyp
     assert 'no_clear_supported_release' in result.detail['placement_planning_reason']
 
 
+def test_release_merge_keeps_unchanged_complete_peers_next_to_invalid_crops(monkeypatch):
+    import copy
+    from test_assistant_targeted_scan import block
+    session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
+    other = block('red', xy=(.4,.3))
+    crop = copy.deepcopy(other); crop.valid = False
+    session._observed_detections.append(other)
+    session._motion_observer = SimpleNamespace(invalidated=set(), support_views=lambda: [],
+        remember=lambda *a: None, uncertainty_obstacles=lambda **kw: [])
+    session._stationary_recovery_observation = lambda **kw: [crop]
+    peers = []
+    def replan(det, gp, pp, width, neighbors, **kw):
+        peers.extend(neighbors)
+        return place, ''
+    session.runner.replan_release = replan
+    assert session._before_release(grasp, place, .05, PickResult(False, detail={'holding':True})) is place
+    assert any(d.label == 'red' and d.valid for d in peers)
+
+
 def test_timed_slice_with_completed_rejections_continues_before_camera_motion(monkeypatch):
     session, target, grasp, place, now, moves, calls = release_session(monkeypatch)
     states = []

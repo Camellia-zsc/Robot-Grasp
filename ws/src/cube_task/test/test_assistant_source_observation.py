@@ -104,18 +104,34 @@ def test_unknown_source_location_uses_the_explicit_region_as_search_fallback():
     assert len(destinations) == 1
 
 
-def test_partial_source_scan_uses_new_views_and_stops_after_two_complete_fruit_views():
+@pytest.mark.parametrize('complete', [False, True])
+def test_source_scan_uses_new_views_even_when_complete_silhouette_lacks_grasp_views(complete):
     pear = block('pear', xy=(.335, -.17), top=.157, height=.106)
     session, seen = scan_session([[], [pear], [pear]])
     session.runner.views = [[0.] * 6 for _ in range(3)]
     session._source_observation_views = lambda reference: [1, 2]
     guarded = []
     session._safe_observation_joints = lambda q, detections: guarded.append(q) or True
-    scene = session.observe(target=dict(HINT, _observe_source=True, _observation_hint_only=True),
+    scene = session.observe(target=dict(HINT, valid=complete, _observe_source=True,
+                                       _observation_hint_only=not complete),
                             purpose='skill_observe')
     assert seen == [1, 2] and len(guarded) == 2
     assert session._scan_stats == dict(local_scans=1, full_scans=0, frames=2)
     assert any(o['label'] == 'pear' and o['valid'] for o in scene['objects'])
+
+
+def test_fresh_grasp_request_for_complete_but_unusable_source_selects_local_source_views():
+    pear = block('pear', top=.157, height=.106)
+    scene = {'objects':[pear.summary()]}
+    calls = []
+    session = SimpleNamespace(scene=scene, _last_fresh=[pear], _environment_revision=1,
+        _observation_revision=1, _target_partial=lambda d,r:False,
+        _reusable_target=lambda r:False,
+        observe=lambda **kw:calls.append(kw) or scene)
+    result, _summary = SkillExecutor(session)._fresh_target('pear','skill_pick')
+    assert result is pear
+    assert calls[0]['target']['_observe_source'] is True
+    assert not calls[0]['target'].get('_observation_hint_only')
 
 
 def test_source_view_route_is_rechecked_from_current_joints_before_dispatch():

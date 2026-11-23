@@ -1,8 +1,9 @@
 """Small observation decisions based solely on measured camera geometry.
 
 These helpers do not move the arm or inspect the simulation. Cached objects
-outside a new image remain useful as obstacles, but a grasp must still confirm
-its selected target in a fresh image. Replacing only a view's detections is not
+outside a new image remain useful as obstacles. A grasp needs current source
+evidence, supplied by a new image or an individually monitored unchanged body.
+Replacing only a view's detections is not
 enough: a moved object may also survive in a different, older view.
 """
 from __future__ import annotations
@@ -20,6 +21,29 @@ def _xy(det):
     except (AttributeError, TypeError, ValueError, IndexError):
         return None
     return xy if xy.shape == (2,) and np.all(np.isfinite(xy)) else None
+
+
+def _same_layer(a, b):
+    """A measured upper body does not replace its differently named support."""
+    if a.label == b.label:
+        return True
+    try:
+        atop, btop = float(a.top_z), float(b.top_z)
+        abottom, bbottom = atop-float(a.height), btop-float(b.height)
+        if np.all(np.isfinite([atop, btop, abottom, bbottom])):
+            # Touching stack surfaces can form one taller silhouette whose
+            # inferred bottom is the tabletop. It cannot disprove a complete
+            # known lower body merely by occupying the same projected XY.
+            # Actual background depth or explicit motion still removes it.
+            for lower, higher in ((a, b), (b, a)):
+                if (lower.valid and lower.extra.get('catalog_complete') is True
+                        and float(higher.top_z)-float(lower.top_z) > .02
+                        and float(higher.height)-float(lower.height) > .02):
+                    return False
+            return not (bbottom >= atop-.005 or abottom >= btop-.005)
+    except (TypeError, ValueError):
+        pass
+    return True
 
 
 def rank_views(cameras, intrinsics, target_xy, preferred=None, half_extent=.04,
@@ -99,7 +123,7 @@ def merge_local_detections(previous, fresh, visible, association_dist=.04,
     trigger this override. A fresh ungraspable object still replaces its ghost.
     With unchanged monitored physics, ``preserve_incomplete`` can retain a
     complete old source outside full image coverage beside a new crop. It is
-    still subject to the normal fresh source checks before grasping.
+    still subject to source invalidation and contact checks before grasping.
     Inputs are returned by reference and are never mutated.
     """
     fresh = list(fresh)
@@ -116,10 +140,19 @@ def merge_local_detections(previous, fresh, visible, association_dist=.04,
         if any(det.label == label and np.linalg.norm(xy - p) <= association_dist
                for label, p in forgotten_xy):
             continue
+        nearby = [d for d in fresh if _xy(d) is not None
+                  and np.linalg.norm(xy-_xy(d)) <= association_dist
+                  and _same_layer(det, d)]
+        if (preserve_incomplete and det.valid and nearby
+                and all(not d.valid for d in nearby)):
+            # Seeing the old footprint is not proof that a cropped new
+            # segmentation (whose class can also change at a crop) is a
+            # better complete body measurement. Callers
+            # still invalidate any body whose physical pose has changed.
+            kept.append(det)
+            continue
         if visible(det):
             continue
-        nearby = [d for d in fresh if _xy(d) is not None
-                  and np.linalg.norm(xy-_xy(d)) <= association_dist]
         if nearby and not (preserve_incomplete and det.valid and not any(d.valid for d in nearby)):
             continue
         kept.append(det)
@@ -168,5 +201,49 @@ def measurement_visible(det, frame, T_base_camera, margin_px=8,
         expected = points[:9] @ T_cb[2, :3] + T_cb[2, 3]
         return bool(np.all(np.isfinite(observed)) and np.all(observed > 0)
                     and np.all(observed >= expected - occlusion_margin))
+    except (TypeError, ValueError, AttributeError, IndexError, np.linalg.LinAlgError):
+        return False
+
+
+def measurement_absent(det, frame, T_base_camera):
+    """Missing segmentation is not absence: old surface rays must see behind it.
+
+    Use actual previously measured upper-body points, rather than empty box
+    corners. Occluded rays, missing depth and an object still at the old depth
+    all retain the previous obstacle. Explicit motion invalidation is separate.
+    """
+    if not measurement_visible(det, frame, T_base_camera):
+        return False
+    try:
+        points = np.asarray(det.extra.get('_placement_points_base',
+                            det.extra.get('_points_base')), float)
+        if points.ndim != 2 or points.shape[1:] != (3,):
+            return False
+        points = points[np.all(np.isfinite(points), axis=1)]
+        points = points[points[:, 2] >= float(det.top_z)-float(det.height)*.5]
+        if len(points) < 8:
+            return False
+        points = points[::max(1, len(points)//64)][:64]
+        # Previously measured side faces can lie just outside a body after a
+        # millimetre-scale seating change. Also require the old volume's core
+        # to be empty; edge rays alone must not erase a still-present support.
+        c, s = math.cos(float(det.yaw or 0)), math.sin(float(det.yaw or 0))
+        offsets = np.array([[x*float(det.length), y*float(det.width)]
+                            for x in (-.3,-.15,0.,.15,.3)
+                            for y in (-.3,-.15,0.,.15,.3)])
+        xy = offsets @ np.array([[c,s],[-s,c]]) + np.asarray(det.center_base[:2])
+        core = np.column_stack([xy, np.full(len(xy), float(det.top_z)-float(det.height)*.5)])
+        points = np.vstack([points, core])
+        uv = project_points(points, T_base_camera, frame.intrinsics)
+        intr = frame.intrinsics
+        if (not np.all(np.isfinite(uv)) or np.any(uv < 0)
+                or np.any(uv[:,0] > intr.width-1) or np.any(uv[:,1] > intr.height-1)):
+            return False
+        pixels = np.rint(uv).astype(int)
+        observed = np.asarray(frame.depth)[pixels[:,1], pixels[:,0]]
+        T_cb = np.linalg.inv(np.asarray(T_base_camera, float))
+        expected = points @ T_cb[2,:3] + T_cb[2,3]
+        return bool(np.all(np.isfinite(observed)) and np.all(expected > 0)
+                    and np.all(observed > expected+.015))
     except (TypeError, ValueError, AttributeError, IndexError, np.linalg.LinAlgError):
         return False

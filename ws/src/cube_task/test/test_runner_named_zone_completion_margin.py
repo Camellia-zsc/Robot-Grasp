@@ -8,7 +8,21 @@ import pytest
 from cube_task.assistant.batch import whole_footprint_in_zone
 from cube_task.assistant.skill_execution import SkillExecutor
 from cube_task.core.types import Zone
+from cube_task.task.runner import TaskRunner
 from test_runner_local_release import scene
+
+
+def test_interactive_carry_cannot_lower_below_a_tall_body_outside_the_old_route():
+    from dataclasses import replace
+    runner, target, grasp, place = scene()
+    runner.min_approach, runner.transit_clear = .02, .03
+    runner._neighbors = [target, replace(target, label='pear',
+        center_base=np.array([.3, -.3, .125]), top_z=.125, height=.125)]
+    static_floor = TaskRunner._floors(runner, target, grasp, place, .02)['lift']
+    runner.cfg.set('assistant.dynamic_scene_clearance', True)
+    interactive_floor = TaskRunner._floors(runner, target, grasp, place, .02)['lift']
+    assert static_floor < .195
+    assert interactive_floor >= .195
 
 
 def zone_scene(size=(.2, .2), yaw=0.):
@@ -64,6 +78,37 @@ def test_final_leaned_pose_keeps_the_same_named_zone_completion_check():
     ok, why = runner._adjust_strict_release(target, grasp, place, [], zone.corners_xy(),
         zone.center[:2], .02, held_only=True, completion_zone=zone)
     assert not ok and why == 'leaned release has no full footprint or finger clearance'
+
+
+def test_dashboard_reserves_measurement_error_without_weakening_camera_completion():
+    runner, target, grasp, _place, zone, camera_scene = zone_scene()
+    runner.cfg.set('assistant.named_zone_measurement_margin', .004)
+    allowed = runner._strict_place_filter(target, grasp, [], zone.corners_xy(), completion_zone=zone)
+    near_edge = zone.center[:2] + [.1-.025-.008, 0.]
+    assert whole_footprint_in_zone(target.summary() | {'center_base': [*near_edge, .05]}, camera_scene, zone.name)
+    assert not allowed(*near_edge, grasp.closing_angle)
+    safer = zone.center[:2] + [.1-.025-.0091, 0.]
+    assert allowed(*safer, grasp.closing_angle)
+
+
+def test_recorded_long_fruit_cross_view_shift_does_not_force_a_second_grasp():
+    runner, target, grasp, _place, zone, camera_scene = zone_scene(size=(.24,.24))
+    zone.center = np.array([.17,-.35,0.])
+    camera_scene['zones'][0]['center'] = zone.center.tolist()
+    target.label = 'banana'
+    target.extra['resting_pose'] = 'flat'
+    target.length, target.width = .1335,.0451
+    runner.nominal['banana'] = (.154785,.052385)
+    runner.cfg.set('assistant.named_zone_measurement_margin', .015)
+    allowed = runner._strict_place_filter(target, grasp, [], zone.corners_xy(), completion_zone=zone)
+    assert not allowed(.17,-.266,grasp.closing_angle)
+    assert not allowed(.17,-.270,grasp.closing_angle)
+    assert allowed(.17,-.281,grasp.closing_angle)
+    # The same observed 11 mm centre difference failed at the old seed. The
+    # interior seed keeps the unchanged five-millimetre camera postcondition.
+    measured = target.summary() | {'length': .1421,'width': .0395,'yaw': -.0165}
+    assert not whole_footprint_in_zone(measured | {'center_base': [.1655,-.255,.0398]},camera_scene,zone.name)
+    assert whole_footprint_in_zone(measured | {'center_base': [.1655,-.270,.0398]},camera_scene,zone.name)
 
 
 def test_real_named_region_options_keep_completion_contract_for_held_transfer(monkeypatch):

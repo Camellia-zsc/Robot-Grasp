@@ -104,3 +104,17 @@ def test_human_move_cannot_reposition_held_object(tabletop):
                                  scene_version=sim.snapshot()['scene_version']))
     np.testing.assert_array_equal(target.T_base_obj, before)
     assert not sim._interventions
+
+
+def test_motion_capture_versions_do_not_reject_an_unchanged_environment_edit(tabletop):
+    sim, target, _ = tabletop
+    revision = sim._environment_revision
+    sim._scene_version += 12  # RGB-D updates are not physical layout changes.
+    sim._publish_snapshot()
+    sim.intervene_scene(dict(action='move', object_id=target.name, xy=[.75, .5],
+                             environment_revision=revision))
+    np.testing.assert_allclose(target.center_xy(), [.75, .5])
+    assert sim._environment_revision == revision + 1
+    with pytest.raises(ValueError, match='版本'):
+        sim.intervene_scene(dict(action='move', object_id=target.name, xy=[.7, .5],
+                                 environment_revision=revision))

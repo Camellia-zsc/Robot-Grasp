@@ -8,6 +8,7 @@ import pytest
 from cube_task.assistant.carried_observation import CarriedDetections
 from cube_task.assistant.simulation import SimulationSession
 from cube_task.core.types import CameraIntrinsics, Detection, Frame, Stamped
+from cube_task.core.clock import SimClock
 
 
 def stationary_session(monkeypatch, *, held=True, feedback=True, tcp_stamp=2.):
@@ -20,6 +21,9 @@ def stationary_session(monkeypatch, *, held=True, feedback=True, tcp_stamp=2.):
     grasp = SimpleNamespace(target=target)
     context = dict(det=target, grasp=grasp)
     session = object.__new__(SimulationSession)
+    session._environment_revision = 0
+    session.clock = SimClock()
+    session.clock.sleep(1.99)
     session.arm = SimpleNamespace(get_flange_pose=lambda: Stamped(np.eye(4), 2.),
                                   get_tcp_pose=lambda: Stamped(np.eye(4), tcp_stamp))
     session.camera = SimpleNamespace(_last=frame)
@@ -39,6 +43,7 @@ def stationary_session(monkeypatch, *, held=True, feedback=True, tcp_stamp=2.):
     captures = []
     def capture(*args, **kwargs):
         captures.append(1)
+        session.clock.sleep(.01)
         return frame
     def mask(capture, pose, source, tcp, opening, **kwargs):
         masks.append((capture, source, opening))

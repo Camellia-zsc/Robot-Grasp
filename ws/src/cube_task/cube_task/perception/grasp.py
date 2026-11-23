@@ -373,12 +373,17 @@ def _identity_plan(det: Detection, reason: str, close_width: float) -> GraspPlan
                      closing_angle=0.0, feasible=False, reason=reason)
 
 
-def annotate_grasp_neighbors(det: Detection, neighbors: Sequence[Detection]) -> None:
+def annotate_grasp_neighbors(det: Detection, neighbors: Sequence[Detection], *,
+                             minimum_z: Optional[float] = None) -> None:
     """Attach measured neighbor clouds and identities, never simulator geometry.
 
     A multi-view target can retain its original frame's neighbor annotation.
     Refresh it from the current detections before planning, so moved or removed
     neighbors do not keep blocking a later attempt.
+
+    A complete RGB-D body wholly below the lowest possible finger sweep is
+    irrelevant to this local XY test. Incomplete bodies and unknown heights
+    remain obstacles. This never removes them from global route planning.
     """
     records, clouds = [], []
     for other in neighbors:
@@ -388,14 +393,22 @@ def annotate_grasp_neighbors(det: Detection, neighbors: Sequence[Detection]) -> 
                 and np.linalg.norm(np.asarray(other.center_base[:2]) -
                                    np.asarray(det.center_base[:2])) < .01):
             continue
-        observed = []
+        observed, tops = [], []
         for key in ('_points_xy', '_placement_points_base', '_points_base'):
             points = (other.extra or {}).get(key)
             if points is None:
                 continue
             points = np.asarray(points, dtype=float)
             if points.ndim == 2 and points.shape[1] >= 2:
-                observed.append(points[np.all(np.isfinite(points), axis=1), :2])
+                points = points[np.all(np.isfinite(points), axis=1)]
+                observed.append(points[:, :2])
+                if len(points) and points.shape[1] == 3:
+                    tops.append(float(np.max(points[:, 2])))
+        if (minimum_z is not None and math.isfinite(minimum_z) and other.valid
+                and (other.extra or {}).get('catalog_complete') is True
+                and _finite(other.top_z) and tops
+                and max(float(other.top_z), max(tops)) + NEIGHBOR_CLEARANCE < minimum_z):
+            continue
         if not observed or not sum(len(p) for p in observed):
             continue
         points = np.vstack(observed)
@@ -489,6 +502,9 @@ class GraspPlanner:
         if not math.isfinite(self.pad_center_offset) or self.pad_center_offset < 0.:
             raise ValueError('grasp.pad_center_offset must be finite and >= 0')
         self.min_grasp_height = _float(cfg, 'grasp.min_grasp_height', MIN_GRASP_HEIGHT)
+        self.neighbor_tilt_deg = max(
+            _float(cfg, 'robot.workspace.max_tilt_from_down_deg', 40.),
+            _float(cfg, 'robot.workspace.max_tilt_free_deg', 40.))
         if self.finger_clearance < 0.0 or self.pad_half < 0.0:
             raise ValueError('grasp.finger_clearance and grasp.pad_half must be >= 0')
         #: label -> widest measured section (m) still grasped (grasp.fit_width): the depth
@@ -521,6 +537,21 @@ class GraspPlanner:
     def _depth_limit(self, label: Optional[str]) -> float:
         """Constrain a known shape's approach depth, e.g. a tall pear's neck."""
         return self.max_depth_by_label.get(str(label), self.max_depth)
+
+    def neighbor_floor_z(self, det: Detection) -> Optional[float]:
+        """Conservative finger floor over every allowed contact/approach tilt.
+
+        Use the deepest allowed TCP, full gripper opening and the entire pad
+        band, rather than the nominal vertical plan. A support excluded here
+        is therefore below all subsequent alternative local grasp candidates.
+        """
+        if not _finite(det.top_z) or not 0. <= self.neighbor_tilt_deg < 90.:
+            return None
+        radius = math.hypot(self.max_width / 2 + FINGER_OUTER + NEIGHBOR_CLEARANCE,
+                            FINGER_HALF_BAND + NEIGHBOR_CLEARANCE)
+        descent = radius * math.sin(math.radians(self.neighbor_tilt_deg))
+        return (float(det.top_z) - self._depth_limit(det.label) - descent
+                + min(0., self.pad_center_offset - self.pad_half))
 
     def plan(self, det: Detection, *, closing_angle: Optional[float] = None) -> GraspPlan:
         """Return a GraspPlan; feasible=False with a reason when it cannot be done."""
@@ -1502,7 +1533,8 @@ class PlacePlanner:
             c, s = math.cos(zone.yaw), math.sin(zone.yaw)
             nx = int(float(zone.size[0]) / 2 / SLOT_GRID_STEP)
             ny = int(float(zone.size[1]) / 2 / SLOT_GRID_STEP)
-            compact_support = (2 * nx + 1) * (2 * ny + 1) <= SLOT_COARSE_MIN_POINTS
+            compact_support = (max(float(v) for v in zone.size) <= .30 or
+                               (2 * nx + 1) * (2 * ny + 1) <= SLOT_COARSE_MIN_POINTS)
             # Cover the whole support before spending a bounded phase on
             # millimetre neighbours of an occupied/unobserved region centre.
             # Small supports retain fine local alternatives for narrow slots.

@@ -78,8 +78,15 @@ def inspect_held(session, xy, polygon, stationary, check_current):
                         detail={'holding': True, 'steps': []})
     views, checked, last_reason = 0, 0, 'no_safe_observation_path'
     before = copy.deepcopy(session.scene.get('objects', []))
+    def measured_neighbors():
+        measured = stationary()
+        observer = getattr(session, '_motion_observer', None)
+        unknown = ([] if observer is None else
+                   observer.uncertainty_obstacles(exclude=[target.label]))
+        return list(measured) + unknown if unknown else measured
+
     try:
-        neighbors = budget.run(stationary)
+        neighbors = budget.run(measured_neighbors)
         check_current()
         remember_inspection(session, grasp, session.arm.get_tcp_pose().value)
         covered = _coverage(session, polygon)
@@ -104,12 +111,16 @@ def inspect_held(session, xy, polygon, stationary, check_current):
                 session._emit('placement_progress', dict(fields,
                     message='正在检查局部观察视角，仍保持夹持'))
 
+        observer = getattr(session, '_motion_observer', None)
+        missing = observer is not None and observer.invalidated - {target.label}
+        highest = max([table] + [float(d.top_z) for d in neighbors
+            if getattr(d, 'top_z', None) is not None and math.isfinite(float(d.top_z))]) if missing else table
         poses = iter_safe_inspection_poses(session.arm, grasp, T_fc,
-            session.runner.T_flange_tcp, xy, table, table_z=table,
+            session.runner.T_flange_tcp, xy, highest, table_z=table,
             free_tilt_deg=session.runner.free_tilt,
             nominal=session.runner.nominal.get(target.label), intrinsics=session.camera.intrinsics(),
             cancelled=budget.cancelled, progress=progress,
-            exclude_poses=inspection_history(session, grasp))
+            exclude_poses=inspection_history(session, grasp), orientation_clearance=bool(missing))
         sentinel = object()
         while checked < 12 and views < 2:
             pose = budget.run(next, poses, sentinel)
@@ -125,7 +136,8 @@ def inspect_held(session, xy, polygon, stationary, check_current):
                 session.arm, grasp, current, pose, neighbors, width, table_z=table,
                 nominal=session.runner.nominal.get(target.label), neighbor_nominal=session.runner.nominal,
                 free_tilt_deg=session.runner.free_tilt, cancelled=budget.cancelled,
-                opening_uncertainty=_INSPECTION_OPENING_UNCERTAINTY, allow_joint_route=True)
+                opening_uncertainty=_INSPECTION_OPENING_UNCERTAINTY, allow_joint_route=True,
+                endpoint_clearance=.02)
             if not route:
                 continue
             for waypoint in route:
@@ -155,7 +167,7 @@ def inspect_held(session, xy, polygon, stationary, check_current):
                 else:
                     session.runner.skill._move(result, 'inspect_place', waypoint, True)
                     session.runner.skill._verify_held(result, 'dropped_in_transit')
-            neighbors = budget.run(stationary)
+            neighbors = budget.run(measured_neighbors)
             check_current()
             remember_inspection(session, grasp, session.arm.get_tcp_pose().value)
             views += 1

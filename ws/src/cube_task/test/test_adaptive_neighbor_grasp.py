@@ -103,6 +103,49 @@ def test_a_real_blocker_is_identified_and_removing_it_invalidates_old_neighbor_p
     assert GraspPlanner(cfg, 'Sandbox').plan(target).feasible
 
 
+@pytest.mark.parametrize('height,complete,valid,cloud_top,blocked', [
+    (.05, True, True, .05, False),
+    (.12, True, True, .12, True),
+    (.05, False, True, .05, True),
+    (.05, True, False, .05, True),
+    (.05, True, True, .12, True),
+    (.05, True, True, None, True),
+])
+def test_stacked_grasp_uses_height_without_discarding_unknown_or_tall_obstacles(
+        height, complete, valid, cloud_top, blocked):
+    cfg = make_cfg(robot__gripper__max_width=.1, grasp__max_grasp_depth=.04,
+                   grasp__pad_center_offset=.015, grasp__open_full_tasks=['Sandbox'])
+    planner = GraspPlanner(cfg, 'Sandbox')
+    target = make_det('red', .3, 0., size=.03, height=.11, table_z=.05)
+    other = make_det('green', .3, 0., height=height)
+    other.valid = valid
+    other.extra.update(catalog_complete=complete, object_id='measured-base',
+                       _points_xy=np.array([[.33, 0.], [.3, .03]]))
+    if cloud_top is not None:
+        other.extra['_points_base'] = np.array([[.33, 0., cloud_top], [.3, .03, .05]])
+    # The original XY projection blocks both possible face pairs regardless
+    # of the measured vertical gap. All three production callers supply this
+    # conservative bound, including the local recovery proposal planner.
+    annotate_grasp_neighbors(target, [target, other],
+                             minimum_z=planner.neighbor_floor_z(target))
+    plan = planner.plan(target)
+    assert plan.feasible is not blocked, plan.reason
+    if blocked:
+        assert plan.reason.startswith('blocked_by_neighbor:')
+    # Local finger filtering must never mutate global collision geometry.
+    assert other.top_z == height
+    assert len(other.extra['_points_xy']) == 2
+
+
+def test_a_wider_tilt_envelope_preserves_a_low_neighbor():
+    cfg = make_cfg(robot__gripper__max_width=.1, grasp__max_grasp_depth=.04,
+                   grasp__pad_center_offset=.015,
+                   robot__workspace__max_tilt_free_deg=80.)
+    target = make_det('red', .3, 0., height=.11, table_z=.05)
+    planner = GraspPlanner(cfg, 'Sandbox')
+    assert planner.neighbor_floor_z(target) < .06
+
+
 def test_original_yaw_restoration_refuses_an_alternative_release_angle():
     planner = PlacePlanner(make_cfg(robot__gripper__max_width=.1))
     zone = Zone('temporary-origin', np.array([.3, 0., 0.]), (.3, .3))

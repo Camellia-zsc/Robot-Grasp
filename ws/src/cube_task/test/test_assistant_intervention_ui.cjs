@@ -155,13 +155,15 @@ function pointerAt(xy,table=state.scene.placement.table_bounds){
   eq(get("editor-yaw").disabled,true);
   has(get("editor-error").textContent,/夹持中的物品不能移动/);
 
-  update({...state,simulation:{...state.simulation,held_object:null,objects:state.simulation.objects.map(item=>({...item,held:false}))}});
+  update({...state,simulation:{...state.simulation,environment_revision:4,held_object:null,objects:state.simulation.objects.map(item=>({...item,held:false}))}});
   await map.dispatch("pointerdown",pointerAt([.30,0]));
   await get("editor-yaw").dispatch("change",{target:{value:45}});
   await new Promise(resolve=>setImmediate(resolve));
   const rotation=requests.filter(item=>item.url==="/api/scene-intervene").at(-1);
   eq(rotation.payload.action,"move");
   eq(rotation.payload.yaw,Math.PI/4);
+  eq(rotation.payload.environment_revision,4);
+  eq(Object.hasOwn(rotation.payload,"scene_version"),false);
   update({...state,events:[...state.events,{kind:"scene_intervention_rejected",request_id:2,message:"目标被夹持，干预未生效"}]});
   eq(get("editor-mode-intervene").disabled,false);
   has(get("editor-error").textContent,/干预未生效/);

@@ -83,6 +83,18 @@ def test_holding_one_object_only_prevents_moving_that_object():
         ctl.close()
 
 
+def test_environment_revision_reaches_session_through_controller():
+    ctl = create()
+    try:
+        request = move()
+        request.pop('scene_version')
+        request['environment_revision'] = 4
+        assert ctl.intervene_scene(request)['queued']
+        assert ctl._session.interventions == [request]
+    finally:
+        ctl.close()
+
+
 @pytest.mark.parametrize('payload', [None, [], 1, 'move'])
 def test_intervention_requires_an_object(payload):
     ctl = create()

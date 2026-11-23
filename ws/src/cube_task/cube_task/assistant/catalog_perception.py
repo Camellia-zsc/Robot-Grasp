@@ -64,6 +64,17 @@ def configure_sandbox(cfg) -> None:
     # Applying the old 5 mm pear offset here would penetrate the support.
     cfg.set('place.release_height_flat', 0.004)
     cfg.set('place.release_lower', {})
+    # Keep a small reserve for the difference between two RGB-D silhouettes.
+    # Verification still requires its original five-millimetre whole outline.
+    cfg.set('assistant.named_zone_measurement_margin', .015)
+    cfg.set('assistant.dynamic_scene_clearance', True)
+    # The tabletop is fixed in base coordinates in this editor. Reuse its
+    # measured plane briefly across wrist poses; object depth/segmentation is
+    # still recomputed for every image. Teaching examples explicitly refit.
+    cfg.set('perception.table.reuse_s', 3.)
+    # A curved/long body tilts at a free-space wrist pose. Keep its whole
+    # envelope above tabletop objects, including a newly moved tall fruit.
+    cfg.set('grasp.transit_z_min', max(.22, float(cfg.get('grasp.transit_z_min', .15))))
     entries = catalog_entries()
     cfg.set('tasks.L1.labels', ['red', 'green', 'yellow'])
     cfg.set('tasks.Sandbox', {'labels': [entry['label'] for entry in entries],
